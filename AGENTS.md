@@ -23,3 +23,9 @@ changes. The animation test exercises real Three.js scene and motion logic
 with a stub renderer, and is not evidence of visual/browser rendering QA.
 Do not claim human feelings, neural training, or unrestricted world interaction
 has been implemented. Distinguish completed capabilities from planned work.
+
+Jordan's role is observer and world builder, not an instructor in Crow's life.
+Do not add user controls for selecting his mood, posture, goals or passions.
+The observer camera must not be presented as a conversational actor. Experience-
+led personality is the target; seeded emotion values and activity counters
+are still prototype limitations. See the final section of DESIGN.md.

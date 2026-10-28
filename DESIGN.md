@@ -69,3 +69,30 @@ counters as general goal verification.
 Simulated emotion and memory-based adaptation are not proof of subjective
 experience. Local model weights are not retrained. No claim is made that
 Crow reproduces Pino's private implementation.
+
+## Observer role and experience-led development (Jordan's clarification)
+
+Jordan observes Crow and can add to the world. He does not select Crow's
+posture, mood, interests, passions, goals or projects, and is not a character
+giving Crow instructions. Walking around is an observer camera. Wishes are
+visible so Jordan can choose whether to introduce an opportunity; introducing
+something neither orders Crow to use it nor fulfils a desire by declaration.
+
+Crow's developing personality must be grounded in his own accumulated world
+experiences: what he notices, tries, revisits, succeeds at, struggles with and
+remembers. Do not author personal likes/dislikes or prescribe an emotional
+response to an object or activity. A chair provides physical support; whether
+Crow likes it is not a designer-assigned reward. Learning and changing his
+mind should be possible, without a predetermined story or end state.
+
+Biological-style needs and world mechanics are authored constraints. Any
+starting neutral internal state, model prior or emotional update rule must
+be acknowledged as a modelling choice. Do not claim a blank mind, feelings
+free of model influence, or fully emergent personality merely because the
+model generates a reflection. The existing seeded emotional baselines and
+small fixed toolset are prototype limitations to address, not the target.
+
+Future observer interfaces should show expressed wishes, actual actions and
+optional evidence/history. They should not offer controls for choosing his
+preferences or directing his life. Technical pause/backup controls are for
+maintenance, not behavioural coaching.
