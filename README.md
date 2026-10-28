@@ -50,6 +50,37 @@ It refuses tracked local edits. Refresh the browser with Ctrl+Shift+R after
 updating. Your ignored save data remains local and is not published to GitHub.
 Backups are under `backups/`; keep an additional copy elsewhere if important.
 
+## iPhone / iPad access (same Wi-Fi)
+
+Your PC remains the AI host. The phone displays the same world and shared save;
+no progress is transferred or duplicated. The PC must remain on with Crow running.
+
+Stop Crow with Ctrl+C before switching modes, then:
+
+```bash
+cd ~/Crows-Nest
+python3 crow.py --lan
+```
+
+Open the complete **Phone link** printed in that terminal in Safari on your
+phone, connected to the same Wi-Fi as the PC. Keep the `#token=...` part when
+copying the link. The link grants access to Crow's private life state and
+pause control, so keep it private. A new link is generated on each server start.
+The desktop link printed in this mode includes the same token.
+
+Use the left thumb pad to walk and drag the world to look around. **Journal**
+opens the scrollable side panel; **Close** returns to the world. **Find Crow**
+moves your observer camera near him. Your camera sends him no commands.
+
+Optionally use Safari's Share menu to add the page to your Home Screen. This
+is a browser interface, not local iPhone AI or an offline app. Access away
+from home is not configured; it needs a private remote connection. Do not
+forward port 8765 on your router. If the phone cannot connect, verify the
+PC's Wi-Fi address and any existing firewall restrictions before changing them.
+
+Without `--lan`, Crow remains accessible only on the PC as before. No local
+save data is uploaded to GitHub.
+
 ## What is in this version
 
 - Real UK clock and approximate seasonal daylight; real-duration sessions.
@@ -59,6 +90,8 @@ Backups are under `backups/`; keep an additional copy elsewhere if important.
 - A reading cabin with shelves, warm light and a chair.
 - Model-selected reading posture: chair, standing or floor; jointed movement,
   book pickup/return, sitting and page turning animate the chosen posture.
+
+The mobile update adds touch movement/look, a collapsible journal and authenticated LAN access.
 
 The chair is optional. The animation executes Crow's selected posture; it
 does not choose a preference or assign a comfort response. A general dynamic
@@ -80,6 +113,8 @@ preferences, not model-weight training or evidence of consciousness.
 ```bash
 python3 tests/test_simulation.py
 node tests/animation.mjs
+python3 tests/test_mobile.py
+node tests/touch.mjs
 ```
 
 Tests cover backend state/timing and Three.js animation logic with a stub

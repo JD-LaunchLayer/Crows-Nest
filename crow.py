@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 """Crow v0.3: local simulation, UK clock, grounded episodic and reflective memory."""
+import argparse
+import secrets
+import socket
 import copy
 import json
 import math
@@ -16,6 +19,7 @@ from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parent
 SAVE = ROOT / 'crow-save.json'
+ACCESS_TOKEN = None
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 TZ = ZoneInfo('Europe/London')
 LOCK = threading.RLock()
@@ -388,8 +392,14 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(code);self.send_header('Content-Type',kind);self.send_header('Cache-Control','no-store');self.send_header('Content-Length',str(len(body)));self.end_headers()
         try:self.wfile.write(body)
         except (BrokenPipeError,ConnectionResetError):pass
+    def authorised(self):
+        if ACCESS_TOKEN is None:return True
+        header=self.headers.get('Authorization','')
+        return secrets.compare_digest(header,'Bearer '+ACCESS_TOKEN)
     def do_GET(self):
-        static={'/':('index.html','text/html; charset=utf-8'),'/world.js':('world.js','application/javascript'),'/vendor/three.module.js':('vendor/three.module.js','application/javascript')}
+        if self.path.startswith('/api/') and not self.authorised():
+            return self.send(401,b'Open the full phone access link from the terminal.','text/plain')
+        static={'/':('index.html','text/html; charset=utf-8'),'/world.js':('world.js','application/javascript'),'/mobile_controls.js':('mobile_controls.js','application/javascript'),'/vendor/three.module.js':('vendor/three.module.js','application/javascript')}
         if self.path in static:
             name,kind=static[self.path];return self.send(200,(ROOT/name).read_bytes(),kind)
         if self.path=='/api/state':
@@ -398,6 +408,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200,body,'application/json')
         return self.send(404,b'Not found','text/plain')
     def do_POST(self):
+        if not self.authorised():return self.send(401,b'Phone access token required','text/plain')
         if self.path!='/api/toggle' or self.headers.get('X-Crow')!='local':return self.send(403,b'Forbidden','text/plain')
         with LOCK:
             state['paused']=not state['paused'];runtime['generation']+=1
@@ -409,9 +420,20 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__=='__main__':
-    clock();server=ThreadingHTTPServer(('127.0.0.1',8765),Handler)
+    parser=argparse.ArgumentParser(description='Crow local world')
+    parser.add_argument('--lan',action='store_true',help='Allow authenticated phone access on your home Wi-Fi')
+    args=parser.parse_args()
+    if args.lan:ACCESS_TOKEN=secrets.token_urlsafe(24)
+    clock();server=ThreadingHTTPServer(('0.0.0.0' if args.lan else '127.0.0.1',8765),Handler)
     threading.Thread(target=loop,daemon=True).start()
-    print('\nCrow v0.3: http://127.0.0.1:8765\nUK clock · real-time activities · Ctrl+C stops safely\n')
+    print('\nCrow v0.3.2: http://127.0.0.1:8765'+('/#token='+ACCESS_TOKEN if ACCESS_TOKEN else '')+'\nUK clock · real-time activities · Ctrl+C stops safely\n')
+    if args.lan:
+        try:
+            with socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as probe:
+                probe.connect(('192.0.2.1',9));address=probe.getsockname()[0]
+        except OSError:address='<your-PC-IP>'
+        print('Phone link (same Wi-Fi): http://'+address+':8765/#token='+ACCESS_TOKEN)
+        print('Keep this link private. The PC must stay on. No router port forwarding is needed.\n')
     try:server.serve_forever()
     except KeyboardInterrupt:
         with LOCK:state['paused']=True;persist()
