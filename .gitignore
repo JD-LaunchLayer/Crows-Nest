@@ -1,0 +1,11 @@
+# Crow's private evolving life stays on the machine running him.
+crow-save*.json
+crow-events.jsonl
+crow-reading/
+crow-config.json
+backups/
+.venv/
+__pycache__/
+*.pyc
+.env
+.env.*

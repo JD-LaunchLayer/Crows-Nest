@@ -1,0 +1,11 @@
+{
+  "activity_minutes": {
+    "rest": 15,
+    "practise": 30,
+    "explore": 20,
+    "craft": 45,
+    "read": 15,
+    "observe": 10,
+    "reflect": 10
+  }
+}
