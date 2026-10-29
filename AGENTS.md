@@ -56,3 +56,9 @@ species. Run tests/test_ecology.py and node tests/animation.mjs for changes.
 Use crow.now() for time, never datetime.now(), so the time-lapse twin stays
 consistent. tools/timelapse.py must only read the real save when creating the
 twin and must refuse to run in the real folder. Run tests/test_timelapse.py.
+
+consolidation.py owns the finite held memory; the model proposes, the executor
+admits. Keep evidence citation, ceilings and visible forgetting. All model calls
+go through crow.model_call so provider fallback and the spending cap apply. Never
+put the API key in state, events, logs or HTTP responses. Run
+tests/test_consolidation.py and tests/test_provider.py.

@@ -46,7 +46,7 @@ def candidates(state):
     """Every recallable item, labelled by evidence type. Nothing is generated."""
     items = []
     for m in state.get('memories', []):
-        if m.get('kind') in ('started', 'resumed'):
+        if m.get('kind') in ('started', 'resumed', 'consolidated'):
             continue  # "Started X." carries little; its outcome event is recalled instead.
         items.append({'type': 'event', 'id': m.get('id'), 'order': m.get('id') or 0,
                       'text': _short(m.get('event'), 220), 'why': _short(m.get('reason'), 120),
@@ -83,6 +83,9 @@ def candidates(state):
         items.append({'type': 'search_miss', 'id': None, 'order': 0,
                       'text': _short(f"Search '{f.get('query')}' found nothing relevant: {f.get('reason')}", 200),
                       'why': _short(f.get('question'), 120), 'when': '', 'importance': .1})
+    import consolidation  # local import: consolidation itself uses this module
+    if state.get('mind'):
+        items += consolidation.recall_items(state)
     return items
 
 
@@ -182,8 +185,19 @@ def recent_pattern(state, window=12):
             streak += 1
         else:
             break
+    looked = [m for m in state.get('memories', []) if m.get('kind') == 'experience' and m.get('action') == 'observe'][-window:]
     log = state.get('reading_log', [])[-window:]
     unanswered = sum(1 for r in log if r.get('answer_status') == 'not_answered')
     repeats = sum(1 for r in log if r.get('new_source_text') is False)
     return {'last_choices': actions, 'decisions_with_current_intention': streak,
-            'recent_readings': len(log), 'readings_not_answering': unanswered, 'repeated_excerpts': repeats}
+            'recent_readings': len(log), 'readings_not_answering': unanswered, 'repeated_excerpts': repeats,
+            'recent_observations': len(looked),
+            'observations_with_nothing_new': sum(1 for m in looked if m.get('new_evidence') is False)}
+
+
+def similar(a, b, threshold=.5):
+    """True when two short texts share most of their meaningful words (reworded duplicates)."""
+    x, y = words(a), words(b)
+    if not x or not y:
+        return str(a).casefold().strip() == str(b).casefold().strip()
+    return len(x & y) / len(x | y) >= threshold

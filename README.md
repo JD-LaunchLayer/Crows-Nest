@@ -482,3 +482,69 @@ one small model, not a prediction of the real Crow.
 ```bash
 python3 tests/test_timelapse.py
 ```
+
+## v0.8.1 — no lessons from nothing new
+
+The first twin pilot started at dusk. Crow observed eleven times in the dark,
+noticed nothing new each time, and still recorded six reworded lessons and
+self-observations praising darkness ("darkness enhances minimalist focus…").
+
+- An observation that produced no new detail is saved as an event and still
+  appraised, but, like a repeated reading excerpt, it cannot add long-term
+  lessons, interest score or self-observations.
+- Lessons, self-observations and project titles are compared by shared words,
+  so reworded duplicates are not stored again; a reworded project title
+  continues the existing project.
+- The decision context states whether it is dark, dim or daylight outside, and
+  `recent_pattern` counts recent observations that found nothing new.
+- The twin waits in real time when Ollama or the network is unreachable, without
+  ageing him or counting it as his failure; it gives up after 30 minutes.
+  The live Crow still pauses with an error in that case.
+
+Earlier entries are left as they were.
+
+## v0.9.0 — sleep consolidation and an optional cloud mind
+
+### Memory rewritten while he sleeps
+
+Adapted from the approach published for Pino (pinos.world). After each sleep,
+the model rereads that day's actual events against what Crow already holds, in
+three sections of at most 24 memories: what mattered and what he believes, how
+to do things, and what the world allows. It may add, revise, reinforce or
+contradict; `consolidation.py` decides what is admitted:
+
+- every new memory or revision must cite a real event from that day;
+- reworded duplicates reinforce the existing memory instead of being stored;
+- one word may anchor at most four memories in a section, one pair of words at
+  most two (this is what would have stopped the six "darkness" lessons);
+- strength halves every three weeks of active life unless reinforced; paused or
+  closed time does not fade anything;
+- a full section only admits something stronger than its weakest memory, which
+  is moved to a visible "forgotten" archive; revisions keep earlier wording.
+
+The event log and per-event lessons are untouched. Held memories reach
+decisions (the strongest few always, others by relevance) and reflections. The
+journal shows "What he holds in mind", what is closest to fading and what was
+recently forgotten. A consolidation failure is recorded and never stops him.
+
+### Claude Haiku 5.5 as his mind (optional), with local fallback
+
+```bash
+python3 tools/use_haiku.py        # asks for an Anthropic API key, tests it, saves it privately
+python3 tools/use_haiku.py --off  # back to local Qwen
+```
+
+Restart Crow afterwards. The key lives only in the git-ignored
+`crow-config.json` (readable only by your user), never in his save or the
+browser view. With Haiku his decision context is larger. Every call records
+real token counts and cost (at $0.10/$0.50 per million input/output tokens).
+Real Crow has a daily cap (default $1, set with `--daily-budget`); past it, or
+whenever the cloud is unreachable or answers badly, that call uses local Qwen
+instead. The journal shows today's spend. The time-lapse twin uses the same
+settings with its own whole-run limit (`--max-spend`, default $40) and waits
+out local-model outages without ageing.
+
+```bash
+python3 tests/test_consolidation.py
+python3 tests/test_provider.py
+```
