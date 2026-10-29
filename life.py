@@ -41,7 +41,7 @@ def effort(action):
     return {'sleep':0.,'rest':.05,'read':.08,'reflect':.08,'observe':.1,
             'eat':.1,'drink':.05,'inspect':.12,'test_object':.2,'plan':.25,
             'craft':.55,'construct':.75,'gather':.65,'explore':.45,
-            'practise':.65,'move_object':.8,'fell_tree':1.}.get(action,.15)
+            'practise':.65,'move_object':.8,'fell_tree':1.,'browse':.08,'trade':.3}.get(action,.15)
 
 
 def advance(state, seconds, action):
@@ -154,6 +154,7 @@ def practical_attempt(state, decision, seconds):
     error*=1 if method['support']=='bench' else 1.8
     error*=1 if method['passes']=='light' else 1.7
     error*=1 if method['direction']=='along' else 1.5
+    if state.get('possessions',{}).get('whetstone'):error*=.85  # a keen blade: an owned tool, not practice
     error=round(error,2);met=error<=target
     # Motor practice transfers across shapes, but reading and idle time cannot add it.
     p['control_hours']+=max(0,seconds)/3600*.12/(1+fatigue(state))

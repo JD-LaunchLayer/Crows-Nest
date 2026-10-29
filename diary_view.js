@@ -38,7 +38,7 @@ export function createDiary({document}){
  }
  function update(s){
   if(!$('diary'))return;
-  const key=JSON.stringify([s.decisions,s.pending&&s.pending.start,(s.diary||[]).length,s.interests,(s.personality_notes||[]).length,s.affect,s.current_intention,s.clock&&s.clock.date]);
+  const key=JSON.stringify([s.trading,s.possessions,s.decisions,s.pending&&s.pending.start,(s.diary||[]).length,s.interests,(s.personality_notes||[]).length,s.affect,s.current_intention,s.clock&&s.clock.date]);
   if(key===last)return;last=key;
   if(s.clock)$('diaryDate').textContent=`${s.clock.date} · ${s.clock.time}${s.twin?' · twin clock':s.crow_clock?' · Crow\'s own time':' · UK time'}`;
   $('diaryBadge').textContent=s.twin?'CROW · TIME-LAPSE TWIN':'CROW\'S JOURNAL';
@@ -57,6 +57,12 @@ export function createDiary({document}){
    const bar=el('div',undefined,'bar'+(score<0?' neg':''));const fill=el('i');fill.style&&(fill.style.width=Math.min(100,Math.abs(score)*10)+'%');bar.append(fill);box.append(bar);
   }
   if(!items.length)box.append(el('p','No interests have formed yet.','muted'));
+  const trade=$('diaryTrade');if(trade){trade.replaceChildren();const t=s.trading;
+   if(t){trade.append(el('p',`Trade credit: ${t.credit}`));
+    const owned=Object.entries(s.possessions||{}).filter(([,n])=>n);trade.append(el('p',owned.length?'He owns: '+owned.map(([k,n])=>n>1?`${k} ×${n}`:k).join(', '):'He has not bought anything yet.','muted'));
+    if((t.requests||[]).length){trade.append(el('p','Things he has asked the post to stock:'));for(const r of [...t.requests].reverse().slice(0,8))trade.append(el('p',`“${r.item}”${r.times>1?` (asked ${r.times} times)`:''}`,'thought'));}
+    else trade.append(el('p','He has not asked for anything to be stocked.','muted'));
+    const last=(t.ledger||[]).at(-1);if(last)trade.append(el('p','Last at the post: '+last.text,'muted'));}}
   const self=$('diarySelf');self.replaceChildren();
   for(const n of (s.personality_notes||[]).slice(-6).reverse())self.append(el('p','“'+n.text+'”','thought'));
   if(!(s.personality_notes||[]).length)self.append(el('p','He has not described himself yet.','muted'));

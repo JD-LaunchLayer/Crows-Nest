@@ -617,3 +617,40 @@ that his life continued from the twin.
 ```bash
 python3 tests/test_speed.py
 ```
+
+## v0.12.0 — an internet café, a trading post, and a few unexplained things
+
+- **Internet café** (north of the clearing). `browse` runs a real web search
+  (DuckDuckGo's HTML page, or the Brave Search API if `brave_api_key` is set in
+  `crow-config.json`), lets Crow choose a result or none, reads the page and lets
+  him follow one link. Pages are stored like library readings (mode "web") with
+  their URL. Only public internet addresses on ordinary ports are opened, also
+  after redirects (never this PC or the home network); robots.txt is respected;
+  pages are capped in size and treated as untrusted text. The library stays
+  Wikipedia-only. DuckDuckGo may refuse automated visitors; that shows as an
+  honest failed search, and a Brave key is the fix.
+- **Trading post** (unattended, with posted rates and a credit ledger). `trade`
+  can buy stock, sell wood (3 kg = 1 credit), stone (5 kg = 1) or his carvings
+  (1–3 by quality), do a posted job (30 or 60 minutes of work for 1 or 2
+  credit), or ask for something to be stocked. Starting stock: provisions
+  bundles (+4 servings), an oil lantern (lets him make out a little detail when
+  observing or inspecting in the dark) and a whetstone (narrows carving error).
+  Requests are recorded, not fulfilled. Restock while he runs:
+
+  ```bash
+  python3 tools/stock_shop.py                       # stock, his credit, his requests
+  python3 tools/stock_shop.py add sketchbook "Sketchbook and pencils" 5 2 possession:sketchbook
+  ```
+
+  Effects are `pantry:N` or `possession:NAME`; possessions without a built-in
+  use are simply owned, with nothing invented about them.
+- **Unexplained things**: a weathered stone figure, a bronze dial on a plinth,
+  a ring of standing stones and hanging tubes on a frame. Inspecting them gives
+  only what can be seen (the dial's shadow position follows his clock); what
+  they are or mean is for him to work out.
+- The journal has an "At the trading post" section: credit, possessions, his
+  requests and the last transaction.
+
+```bash
+python3 tests/test_town.py
+```

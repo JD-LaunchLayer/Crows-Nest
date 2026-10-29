@@ -269,17 +269,21 @@ def _terms(text):
     return memory_recall.words(text)
 
 
-def observe(state, area, focus, doy, daylight, limit=5):
-    """Return what Crow notices in an area. Focus makes matching things likelier, not guaranteed."""
+def observe(state, area, focus, doy, daylight, limit=5, lamp=False):
+    """Return what Crow notices in an area. Focus makes matching things likelier, not guaranteed.
+
+    In darkness nothing can be made out, unless he carries a light: then only a couple of nearby details."""
     eco = ensure(state)
     if area not in AREAS:
         return {'success': False, 'text': 'That area is not part of the world.', 'findings': []}
     a = AREAS[area]
     # The edge is a ring; a single centre measurement would be meaningless, so light is reported per finding there.
     light = ground_light(state, a['x'], a['z'], doy) if 'r' in a else None
-    if daylight < .12:
+    if daylight < .12 and not lamp:
         text = f'Observed {a["name"]} in darkness. Only outlines of trunks and shrubs were visible; no plant detail could be made out.'
         return {'success': True, 'text': text, 'findings': [], 'area': area, 'dark': True}
+    if daylight < .12:
+        limit = 2  # a lantern's small circle of light
     facts = visible_facts(state, area, doy, daylight)
     want = _terms(focus)
     eco['observations'] += 1
@@ -310,13 +314,13 @@ def observe(state, area, focus, doy, daylight, limit=5):
             'new_details': new, 'focus': focus[:160]}
 
 
-def inspect(state, ident, doy, daylight):
+def inspect(state, ident, doy, daylight, lamp=False):
     eco = ensure(state)
     tree = state['built_world']['trees'].get(ident)
     plant = next((p for p in eco['plants'] if p['id'] == ident), None)
     if not tree and not plant:
         return None
-    if daylight < .12:
+    if daylight < .12 and not lamp:
         return {'success': True, 'text': f'Too dark to examine {ident} in detail.'}
     if tree:
         facts = _tree_facts(state, tree, doy)

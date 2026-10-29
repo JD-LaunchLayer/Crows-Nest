@@ -25,7 +25,7 @@ function mesh(geo,c,x,y,z,parent=scene){const m=new T.Mesh(geo,mat(c));m.positio
 function box(w,h,d,c,x,y,z,p=scene){return mesh(new T.BoxGeometry(w,h,d),c,x,y,z,p)}
 const obstacles=[];function block(x,z,w,d){obstacles.push({x,z,w:w/2+.3,d:d/2+.3})}
 const floor=mesh(new T.PlaneGeometry(110,110,1,1),'#74815a',0,-.03,0);floor.rotation.x=-Math.PI/2;floor.castShadow=false;
-const stations={cabin:new T.Vector3(-10,0,-6),range:new T.Vector3(10,0,-7),woods:new T.Vector3(13,0,10),workbench:new T.Vector3(0,0,10),library:new T.Vector3(-11,0,5)};
+const stations={cabin:new T.Vector3(-10,0,-6),range:new T.Vector3(10,0,-7),woods:new T.Vector3(13,0,10),workbench:new T.Vector3(0,0,10),library:new T.Vector3(-11,0,5),cafe:new T.Vector3(9,0,-14.2),shop:new T.Vector3(-3,0,-14.2)};
 for(const p of Object.values(stations)){const mid=p.clone().multiplyScalar(.5),path=box(1.5,.035,p.length(),'#a39d77',mid.x,0,mid.z);path.rotation.y=Math.atan2(p.x,p.z);path.castShadow=false;}
 // Open-front cabin: floor and three walls, so it is possible to look inside.
 box(6,.15,5,'#806c4b',-10,.05,-10);box(6,3,.2,'#76644b',-10,1.5,-12.5);box(.2,3,5,'#806c4b',-13,1.5,-10);box(.2,3,5,'#806c4b',-7,1.5,-10);
@@ -110,7 +110,7 @@ for(const [x,z,h]of [[17,10,5],[15,14,6],[20,12,5],[18,6,4],[-18,-9,5],[-20,-15,
 // Small details without textures or outside image services.
 for(let i=0;i<65;i++){let a=i*2.4,r=6+(i%11)*1.4;const x=Math.cos(a)*r,z=Math.sin(a)*r;if(Math.abs(x)<2||Math.abs(z)<2)continue;const stone=mesh(new T.DodecahedronGeometry(.13+(i%3)*.06,0),i%4?'#828771':'#b4ac7e',x,.13,z);stone.scale.y=.6;}
 function sign(text,x,z){const c=document.createElement('canvas');c.width=512;c.height=96;const q=c.getContext('2d');q.fillStyle='#283b2b';q.fillRect(0,0,512,96);q.fillStyle='#eee5c7';q.font='30px Georgia';q.textAlign='center';q.fillText(text,256,60);const texture=new T.CanvasTexture(c);const m=new T.Sprite(new T.SpriteMaterial({map:texture,depthTest:true}));m.position.set(x,2.9,z);m.scale.set(4,.75,1);scene.add(m)}
-sign('THE CABIN',-10,-6);sign('ARCHERY RANGE',10,-7);sign('WORKBENCH',0,11.5);sign('READING CABIN',-11,6.8);sign('WOODLAND',16,12);
+sign('THE CABIN',-10,-6);sign('ARCHERY RANGE',10,-7);sign('WORKBENCH',0,11.5);sign('READING CABIN',-11,6.8);sign('WOODLAND',16,12);sign('INTERNET CAFÉ',9,-14);sign('TRADING POST',-3,-14);
 // Jointed placeholder elf: hips, knees, shoulders and elbows support sitting and reaching.
 const crow=new T.Group();scene.add(crow);
 // An original low-poly elf: slate cloak, teal tunic, rust sash, silver hair tied back.
