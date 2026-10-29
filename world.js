@@ -82,8 +82,18 @@ const pond=mesh(new T.CylinderGeometry(3,3,.06,13),'#789a91',-18,.01,3);pond.cas
 const treeMeshes=new Map();let treeNumber=0;
 function tree(x,z,h=5){
  const id='tree-'+treeNumber++,group=new T.Group();group.position.set(x,0,z);scene.add(group);
- box(.35,h*.5,.35,'#655b40',0,h*.25,0,group);mesh(new T.ConeGeometry(h*.32,h*.75,5),'#455b3f',0,h*.7,0,group);mesh(new T.ConeGeometry(h*.26,h*.65,5),'#536a47',0,h*.99,0,group);
- block(x,z,.5,.5);treeMeshes.set(id,{group,stump:null,log:null,x,z,h});
+ box(.35,h*.5,.35,'#655b40',0,h*.25,0,group);const crowns=[mesh(new T.ConeGeometry(h*.32,h*.75,5),'#455b3f',0,h*.7,0,group),mesh(new T.ConeGeometry(h*.26,h*.65,5),'#536a47',0,h*.99,0,group)];
+ block(x,z,.5,.5);treeMeshes.set(id,{group,crowns,stump:null,log:null,x,z,h});
+}
+// Seasonal appearance comes from the server's ecology view (real UK date); bare trees show thin branch crowns.
+const plantGroup=new T.Group();scene.add(plantGroup);let ecologyKey='';
+const PLANT_LOOK={bramble:['#5a4a3e',1.6,.9],bracken:['#8a6a3a',1.3,.8],bluebell:['#4b6a3c',1.4,.12],'wood anemone':['#5e7a48',1,.1],'male fern':['#4a6a3a',1.1,.8],'fly agaric':['#b0302a',.25,.18],'holly seedlings':['#2f4a2c',.5,.3],nettles:['#4d6a3a',1.5,.9],grass:['#6f8a4f',3,.12]};
+function syncEcology(view){
+ if(!view)return;const key=JSON.stringify(view);if(key===ecologyKey)return;ecologyKey=key;
+ for(const [id,t]of Object.entries(view.trees||{})){const visual=treeMeshes.get(id);if(!visual)continue;
+  const bare=t.cover<.05;visual.crowns.forEach((c,i)=>{c.material=mat(bare?'#6d6150':t.colour);c.scale.setScalar(bare?.45:.55+.45*t.cover)});}
+ while(plantGroup.children.length){const c=plantGroup.children[0];plantGroup.remove(c);c.geometry.dispose()}
+ for(const p of view.plants||[]){const look=PLANT_LOOK[p.species];if(!look)continue;const [c,w,h]=look;const m=mesh(new T.DodecahedronGeometry(.5,0),c,p.x,h/2,p.z,plantGroup);m.scale.set(w,h,w);m.castShadow=false;}
 }
 function syncTrees(world){
  for(const [id,t]of Object.entries(world.trees||{})){
@@ -224,7 +234,7 @@ $('reading').replaceChildren();const source=s.pending?.reading;if(source){const 
 const pending=s.pending;txt('remaining',pending?(pending.decision?.action==='read'&&pending.duration===0?`${s.paused?'Paused · ':''}Quick research · finishes after processing the excerpt`:`${s.paused?'Paused · ':''}${Math.ceil(pending.remaining/60)} min remaining · ${Math.round(pending.duration/60)} min session`):s.reflection_pending?'Processing this experience.':'Choosing the next activity.');
 journal.update(s);
 lifeView.update(s);
-$('creations').replaceChildren();for(const c of s.creations.slice(-8).reverse())entry($('creations'),c.name,`${c.shape} · Day ${c.day}`);if(s.built_world){syncBuiltWorld(s.built_world)}else{creations(s.creations)}lamp.intensity=s.action==='read'&&s.pending?15:(s.daylight<.2?8:1.5);
+$('creations').replaceChildren();for(const c of s.creations.slice(-8).reverse())entry($('creations'),c.name,`${c.shape} · Day ${c.day}`);if(s.built_world){syncBuiltWorld(s.built_world)}else{creations(s.creations)}syncEcology(s.ecology_view);lamp.intensity=s.action==='read'&&s.pending?15:(s.daylight<.2?8:1.5);
 const celestial=sky.update(new Date(s.clock.iso));if($('skyInfo'))txt('skyInfo',`Sun ${celestial.sun.altitude.toFixed(0)}° · Moon ${celestial.moon.altitude.toFixed(0)}° above horizon · Wickford`);
 if($('worldPlans')&&s.built_world){$('worldPlans').replaceChildren();for(const p of s.built_world.plans.slice(-5).reverse())entry($('worldPlans'),`${p.name} · ${p.status}`,`Plan ${p.id} · ${Object.entries(p.bill).map(([m,q])=>q+' kg '+m).join(', ')||'No new materials'} · ${p.work_done_minutes||0}/${p.minutes} min work`);$('worldObjects').replaceChildren();for(const o of Object.values(s.built_world.objects))entry($('worldObjects'),o.name,`${o.id} · (${o.x.toFixed(1)}, ${o.z.toFixed(1)}) · ${o.parts.length} parts`);txt('sourceStocks',Object.entries(s.built_world.sources).map(([m,v])=>`${m}: ${v.stock} kg remains`).join(' · '));}
 }catch(e){if(updateRequested){txt('status','Reconnecting after the update…');txt('error','');}else{txt('status','Connection lost — keep the Python terminal open.');txt('error',e.message)}}}

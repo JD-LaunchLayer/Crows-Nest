@@ -7,6 +7,7 @@ import maintenance
 import reading_journal
 import life
 import memory_recall
+import ecology
 import sys
 import world_state
 import copy
@@ -29,11 +30,21 @@ ACCESS_TOKEN = None
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.6.0'
+APP_VERSION = '0.8.0'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
+# How much lived history stays in the save for recall. The event log keeps everything.
+MEMORY_LIMIT = 3000
 LOCK = threading.RLock()
+# Only the separate time-lapse twin (tools/timelapse.py) sets this. The live Crow always follows the real UK clock.
+CLOCK_OVERRIDE = None
+
+
+def now():
+    return CLOCK_OVERRIDE() if CLOCK_OVERRIDE else datetime.now(TZ)
+
+
 ACTIONS = {'rest': 'cabin', 'sleep': 'cabin', 'practise': 'range', 'explore': 'woods', 'craft': 'workbench', 'read': 'library', 'observe': 'woods', 'reflect': 'cabin', 'gather': 'woods', 'plan': 'workbench', 'construct': 'workbench', 'move_object': 'workbench', 'inspect': 'workbench', 'fell_tree': 'woods', 'eat':'cabin', 'drink':'cabin', 'resume_work':'cabin'}
 DURATIONS = {'rest': 900, 'practise': 1800, 'explore': 1200, 'craft': 2700, 'read': 900, 'observe': 600, 'reflect': 600, 'gather': 1200, 'plan': 600, 'construct': 1800, 'move_object': 300, 'inspect': 60, 'fell_tree': 5400, 'eat':300, 'drink':120}
 CONFIG = ROOT / 'crow-config.json'
@@ -57,13 +68,13 @@ if SAVE.exists():
     backup = ROOT / 'crow-save-before-v0.4.json'
     if not backup.exists():
         backup.write_bytes(old_bytes)
-now = datetime.now(TZ)
+_started = datetime.now(TZ)
 for key, value in {'version': 3, 'intentions': [], 'wishes': [], 'creations': [], 'current_intention': '',
                    'next_wish_id': 1, 'next_memory_id': 1, 'next_project_id': 1, 'projects': [],
                    'long_term': [], 'personality_notes': [], 'interests': {}, 'pending': None,
                    'emotions': {'joy': 50, 'calm': 60, 'curiosity': 65, 'frustration': 10, 'loneliness': 20},
                    'appraisals': [], 'last_reflection_count': 0, 'last_reflection_date': '',
-                   'completed': 0, 'clock_origin_date': now.date().isoformat(), 'clock_origin_day': state['day'],
+                   'completed': 0, 'clock_origin_date': _started.date().isoformat(), 'clock_origin_day': state['day'],
                    'life_log': [], 'last_heartbeat': time.time()}.items():
     state.setdefault(key, value)
 state.setdefault('next_step', '')
@@ -94,6 +105,7 @@ if state['pending']:
 reading_journal.ensure(state, ROOT)
 world_state.ensure(state)
 life.ensure(state)
+ecology.ensure(state)
 state['version']=5
 state['paused'] = True
 runtime = {'thinking': False, 'status': 'Ready — UK clock is live; press Begin life', 'generation': 0, 'maintenance':maintenance.load_status(ROOT), 'version':APP_VERSION}
@@ -104,7 +116,7 @@ def clamp(x, lo=0, hi=100):
 
 
 def clock(at=None):
-    dt = at or datetime.now(TZ)
+    dt = at or now()
     state['minute'] = dt.hour * 60 + dt.minute + dt.second / 60
     state['day'] = state['clock_origin_day'] + (dt.date() - datetime.fromisoformat(state['clock_origin_date']).date()).days
     state['clock'] = {'iso': dt.isoformat(), 'date': dt.strftime('%a %d %b'), 'time': dt.strftime('%H:%M:%S'), 'timezone': 'Europe/London', 'night': dt.hour < 7 or dt.hour >= 21}
@@ -129,7 +141,12 @@ def event(text, reason='', kind='experience', **details):
     m = {'id': state['next_memory_id'], 'at': dt.isoformat(), 'day': state['day'], 'time': dt.strftime('%H:%M'), 'event': text, 'reason': reason[:350], 'kind': kind, **details}
     state['next_memory_id'] += 1
     state['memories'].append(m)
-    state['memories'] = state['memories'][-500:]
+    state['memories'] = state['memories'][-MEMORY_LIMIT:]
+    # Older events keep their source reference; the full excerpt stays in crow-reading/, so the save stays small.
+    for old in state['memories'][:-60]:
+        source = old.get('source')
+        if source and 'text' in source and (ROOT / 'crow-reading' / f"article-{old['id']}.json").exists():
+            source.pop('text'); source['text_archived'] = True
     with (ROOT / 'crow-events.jsonl').open('a') as out:
         out.write(json.dumps(m, ensure_ascii=False)+'\n')
     return m
@@ -147,7 +164,7 @@ def model_call(prompt, schema, limit=650, purpose='other'):
     # Ollama reports actual token counts; keep them so context pressure is measured, not guessed.
     usage = {'prompt_tokens': result.get('prompt_eval_count'), 'output_tokens': result.get('eval_count'),
              'prompt_chars': len(prompt), 'output_limit': limit, 'num_ctx': NUM_CTX, 'seconds': seconds,
-             'at': datetime.now(TZ).isoformat()}
+             'at': now().isoformat()}
     if isinstance(usage['prompt_tokens'], int):
         usage['near_context_limit'] = usage['prompt_tokens'] + limit > NUM_CTX
     with LOCK:
@@ -165,13 +182,14 @@ STRING = {'type': 'string'}
 DECISION_DEFAULTS={'wish':'','wish_reason':'','object_id':'','plan_id':0,'destination_x':0,'destination_z':0,
     'material':'wood','plan_operation':'new','part_id':'','reading_spot':'standing','library_query':'',
     'reading_mode':'lookup','research_question':'','next_step':'','creation_name':'','creation_shape':'orb',
-    'project_id':-1,'project_title':'','project_status':'active','target_action':'rest','target_sessions':1}
+    'project_id':-1,'project_title':'','project_status':'active','target_action':'rest','target_sessions':1,
+    'observe_area':'woodland_edge','focus':''}
 # One neutral line per action. Details are requested only after an action is chosen.
 ACTION_MENU={'rest':'quiet rest in the cabin','sleep':'sleep (until 07:00 at night, 90 minutes by day)',
     'eat':'eat from an available food source','drink':'drink from the spring',
-    'observe':'watch the woodland without collecting anything','reflect':'think quietly in the cabin',
+    'observe':'look closely at one part of the woodland or clearing and notice what is actually there','reflect':'think quietly in the cabin',
     'explore':'walk the woodland; may pick up a little loose wood','practise':'archery practice (no measured accuracy yet)',
-    'read':'look something up on Wikipedia, or read at leisure','inspect':'examine one world object closely',
+    'read':'look something up on Wikipedia, or read at leisure','inspect':'examine one object, tree or plant closely',
     'gather':'carry 3 kg of wood or stone into inventory','fell_tree':'fell a standing tree with the axe; timber stays at the site',
     'craft':'carve a small piece from 1 kg wood with a measured outcome','plan':'draft a construction blueprint (builds nothing)',
     'construct':'work on an existing blueprint if materials allow','move_object':'carry a portable object somewhere',
@@ -286,8 +304,16 @@ def parameter_request(d):
                 {'loose_sources':world['sources'],'felled_trees':[{k:world['trees'][i][k] for k in ['id','stock']} for i in felled[:8]],
                  'inventory_kg':{'wood':state['materials'],'stone':state['stone']}})
     if a=='inspect':
-        return ('Choose an object to examine.',{'object_id':{'type':'string','enum':list(objects)}},
+        eco=ecology.ensure(state)
+        return ('Choose an object, tree or plant to examine. Trees and plants are named in your memories or observations.',
+                {'object_id':{'type':'string','enum':list(objects)+[p['id'] for p in eco['plants']]+list(world['trees'])}},
                 {'objects':[o['id']+' ('+o['name']+')' for o in world_state.nearby(state)['objects']]})
+    if a=='observe':
+        return ('Choose where to look. focus is what you are looking for, or empty for open attention. '
+                'You notice what is actually visible there now; things matching your focus are likelier to be noticed but not guaranteed. '
+                'In darkness little detail is visible.',
+                {'observe_area':{'type':'string','enum':list(ecology.AREAS)},'focus':STRING},
+                {'areas':ecology.area_summary(),'daylight':round(state.get('daylight',0),2)})
     if a=='move_object':
         portable=[i for i,o in objects.items() if o.get('portable')]
         return ('Choose a portable object and destination in metres (x east, z south; clearing -25..25).',
@@ -503,7 +529,7 @@ def wikipedia(query, question=''):
     if not pages or not pages[0].get('extract'):raise ValueError('Wikipedia article has no readable text.')
     page=pages[0]
     return {'query':query,'title':page['title'],'url':page.get('fullurl','https://en.wikipedia.org/?curid='+str(pageid)),
-            'text':page['extract'][:7000],'retrieved':datetime.now(TZ).isoformat()}
+            'text':page['extract'][:7000],'retrieved':now().isoformat()}
 
 
 def finish_action(geometry=None):
@@ -529,8 +555,11 @@ def finish_action(geometry=None):
         result=world_state.move(state,d.get('object_id',''),d.get('destination_x',0),d.get('destination_z',0));description=result['text']
     elif a=='inspect':
         obj=world_state.ensure(state)['objects'].get(d.get('object_id',''))
-        description=('Inspected '+json.dumps(obj,ensure_ascii=False)[:1500]) if obj else 'Inspection failed: that world object does not exist.'
-        result={'success':bool(obj),'text':description}
+        living=None if obj else ecology.inspect(state,d.get('object_id',''),now().timetuple().tm_yday,state.get('daylight',0))
+        if living:result=living;description=living['text']
+        else:
+            description=('Inspected '+json.dumps(obj,ensure_ascii=False)[:1500]) if obj else 'Inspection failed: that world object does not exist.'
+            result={'success':bool(obj),'text':description}
     elif a in ['rest','sleep']:
         description='Finished sleeping in his cabin.' if a=='sleep' else 'Finished a quiet rest in his cabin.'
     elif a=='explore':
@@ -554,7 +583,11 @@ def finish_action(geometry=None):
         reading=p.get('reading')
         if not reading:raise ValueError('No retrieved article; reading cannot finish')
         description='Retrieved a Wikipedia excerpt for processing: '+reading['title']+'.'
-    elif a=='observe':description='Spent time watching the woodland without collecting anything.'
+    elif a=='observe':
+        # Older saved observe decisions have no area; they are given open attention at the woodland edge.
+        result=ecology.observe(state,d.get('observe_area') or 'woodland_edge',d.get('focus',''),
+                               now().timetuple().tm_yday,state.get('daylight',0))
+        description=result['text']
     else:description='Spent quiet time reflecting in his cabin.'
     life.sync_energy(state);state['completed']+=1
     project=next((x for x in state['projects'] if x['id']==p['project_id']),None)
@@ -562,7 +595,7 @@ def finish_action(geometry=None):
         project['progress']+=1
         if project['progress']>=project['target']:
             if a=='craft' or (a=='construct' and result and result.get('built')):
-                project['status']='completed';project['finished']=datetime.now(TZ).isoformat()
+                project['status']='completed';project['finished']=now().isoformat()
                 description+=' Completed the planned making/building milestone for '+project['title']+'.'
             else:
                 project['status']='milestone_reached';project['milestone_done']=True
@@ -592,7 +625,7 @@ def reflect(memory):
             return True
         generation=runtime['generation']
         observed=copy.deepcopy(memory)
-        if 'source' in observed:observed['source']['text']=observed['source']['text'][:reading_journal.CONTEXT_CHARS]
+        if 'source' in observed:observed['source']['text']=observed['source'].get('text','')[:reading_journal.CONTEXT_CHARS]
         context={'completed_event':observed,'body':life.perceive(state),'affect':{k:state['affect'][k] for k in ['valence','arousal']},'interests':state['interests'], 'previous_notes':state['personality_notes'][-4:],
                  'related_memories':memory_recall.recall(state,900,exclude_ids=[memory['id']],limit=4), 'current_intention':state['current_intention'],
                  'available_actions':list(ACTIONS)}
@@ -629,14 +662,14 @@ def reflect(memory):
         # A pause cancels a reflection still in flight; it can be retried later.
         if state['paused'] or generation!=runtime['generation']:return False
         signal=life.appraise(state,memory,result)
-        appraisal={'at':datetime.now(TZ).isoformat(),'source_id':memory['id'],'feeling':result['feeling'][:350],'topic':result['topic'][:60],'enjoyment':clamp(result['enjoyment'],-2,2),'meaning':signal['meaning'],'concern':signal['concern'],'valence':signal['valence'],'importance':signal['importance']}
-        state['appraisals'].append(appraisal);state['appraisals']=state['appraisals'][-100:]
+        appraisal={'at':now().isoformat(),'source_id':memory['id'],'feeling':result['feeling'][:350],'topic':result['topic'][:60],'enjoyment':clamp(result['enjoyment'],-2,2),'meaning':signal['meaning'],'concern':signal['concern'],'valence':signal['valence'],'importance':signal['importance']}
+        state['appraisals'].append(appraisal);state['appraisals']=state['appraisals'][-400:]
         lesson=result['lesson'].strip()
         repeated_lesson=any(re.sub(r'\W+',' ',x['interpretation'].casefold()).strip()==re.sub(r'\W+',' ',lesson.casefold()).strip() for x in state['long_term'][-30:])
         fresh_evidence=memory.get('new_source_text',True)
         if lesson and not repeated_lesson and fresh_evidence:
             state['long_term'].append({'source_id':memory['id'],'fact':memory['event'],'source_url':memory.get('source',{}).get('url'),'interpretation':result['lesson'][:350],'at':appraisal['at']})
-            state['long_term']=state['long_term'][-120:]
+            state['long_term']=state['long_term'][-400:]
         topic=result['topic'].strip().lower()[:60]
         if topic and fresh_evidence:
             # Repeated experiential appraisals accumulate slowly; unknown topics never become orders.
@@ -736,6 +769,34 @@ def draft_geometry(pending):
         return {'invalid_geometry':str(exc)}
 
 
+REVIEWABLE=['craft','construct','fell_tree','practise','gather','explore','move_object']
+
+
+def decide_and_start(generation):
+    """Choose, prepare and begin the next activity; shared by the live loop and the time-lapse twin.
+
+    Returns the started decision, or None when nothing started (a failed search
+    is recorded as an honest event instead)."""
+    d,seconds=choose()
+    prepare_attempt(d)
+    reading=None
+    if d['action']=='read':
+        with LOCK:runtime['status']='Looking up '+d['library_query'][:100]+'…'
+        reading=wikipedia(d['library_query'],d.get('research_question') or d['intention'])
+        if reading.get('unavailable'):
+            with LOCK:
+                if state['paused'] or generation!=runtime['generation']:return None
+                feedback={'query':d['library_query'],'question':d.get('research_question') or d['intention'],'reason':reading['reason']}
+                state['research_feedback'].append(feedback);state['research_feedback']=state['research_feedback'][-30:]
+                event('Wikipedia search did not provide a relevant candidate. '+reading['reason'],d['reason'],'research_feedback',intention=d['intention'])
+                persist()
+            return None
+    with LOCK:
+        if not state['paused'] and generation==runtime['generation']:
+            start_action(d,seconds,reading);return d
+    return None
+
+
 def loop():
     last=time.monotonic();checkpoint=last
     while True:
@@ -748,7 +809,7 @@ def loop():
             if state['paused']:continue
             pending=state['pending']
             review_due=bool(pending and pending['remaining']>0 and pending.get('review_in',900)<=0 and
-                pending['decision']['action'] in ['craft','construct','fell_tree','practise','gather','explore','move_object'])
+                pending['decision']['action'] in REVIEWABLE)
             if pending and pending['remaining']>0 and not review_due:continue
             generation=runtime['generation']
             reflection_id=state.get('reflection_pending')
@@ -773,23 +834,7 @@ def loop():
             with LOCK:
                 if state['paused']:continue
                 generation=runtime['generation'];runtime.update(thinking=True,status='Choosing what matters next…')
-            d,seconds=choose()
-            prepare_attempt(d)
-            if d['action']=='read':
-                with LOCK:runtime['status']='Looking up '+d['library_query'][:100]+'…'
-                reading=wikipedia(d['library_query'],d.get('research_question') or d['intention'])
-                if reading.get('unavailable'):
-                    with LOCK:
-                        if state['paused'] or generation!=runtime['generation']:continue
-                        feedback={'query':d['library_query'],'question':d.get('research_question') or d['intention'],'reason':reading['reason']}
-                        state['research_feedback'].append(feedback);state['research_feedback']=state['research_feedback'][-30:]
-                        event('Wikipedia search did not provide a relevant candidate. '+reading['reason'],d['reason'],'research_feedback',intention=d['intention'])
-                        persist()
-                    continue
-            else:reading=None
-            with LOCK:
-                if not state['paused'] and generation==runtime['generation']:
-                    start_action(d,seconds,reading)
+            decide_and_start(generation)
         except Exception as exc:
             with LOCK:
                 state.update(paused=True,last_error=str(exc));runtime.update(status='Paused — see the error below',generation=runtime['generation']+1)
@@ -806,7 +851,7 @@ def loop():
 def update_report(**fields):
     with LOCK:
         status=dict(runtime.get('maintenance',{}));status.update(fields)
-        status['at']=datetime.now(TZ).isoformat()
+        status['at']=now().isoformat()
         runtime['maintenance']=status
         maintenance.save_status(ROOT,status)
 
@@ -861,7 +906,7 @@ class Handler(BaseHTTPRequestHandler):
             name,kind=static[self.path];return self.send(200,(ROOT/name).read_bytes(),kind)
         if self.path=='/api/state':
             with LOCK:
-                clock();body=json.dumps({**state,'reading_log':reading_journal.page(state)['items'],
+                clock();body=json.dumps({**state,'ecology_view':ecology.view(state,now().timetuple().tm_yday),'reading_log':reading_journal.page(state)['items'],
                     'reading_count':len(state['reading_log']),'runtime':runtime,
                     'maintenance_enabled':ACCESS_TOKEN is not None and (ROOT/'.git').exists()}).encode()
             return self.send(200,body,'application/json')

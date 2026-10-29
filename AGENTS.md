@@ -48,3 +48,11 @@ action-specific fields to the first step. Recall lives in memory_recall.py and
 must stay read-only over saved history. Run tests/test_decision.py for decision,
 recall or context-budget changes. Use tools/evaluate_decisions.py (copy-only) for
 real-model evidence; never point it at a live save path for writing.
+
+ecology.py supplies observable woodland facts from state and the real date. Do
+not let the model write ecology facts, and do not change tree IDs when assigning
+species. Run tests/test_ecology.py and node tests/animation.mjs for changes.
+
+Use crow.now() for time, never datetime.now(), so the time-lapse twin stays
+consistent. tools/timelapse.py must only read the real save when creating the
+twin and must refuse to run in the real folder. Run tests/test_timelapse.py.

@@ -60,7 +60,7 @@ with tempfile.TemporaryDirectory() as td:
     assert len(calls)==1 and d['object_id']==''
 
     # 6. Projects: continuing keeps the milestone he set; starting asks only then for its title.
-    calls=[];app.model_call=stub(calls,{**base,'action':'observe','project':'continue','project_id':1});d,_=app.choose()
+    calls=[];app.model_call=stub(calls,{**base,'action':'rest','project':'continue','project_id':1});d,_=app.choose()
     assert d['project_id']==1 and d['target_action']=='read' and d['target_sessions']==5 and len(calls)==1
     calls=[];app.model_call=stub(calls,{**base,'action':'observe','project':'start'},
         {'project_title':'Notice which birds visit','target_action':'observe','target_sessions':3});d,_=app.choose()
@@ -81,6 +81,14 @@ with tempfile.TemporaryDirectory() as td:
     recalled=memory_recall.recall(app.state,1700)
     keys=[m['text'] for m in recalled];assert len(keys)==len(set(keys))
     assert {m['type'] for m in recalled}>={'reading'} or {m['type'] for m in recalled}>={'lesson'}
+
+    # 10. Long lives: older event copies of source excerpts move to the archive only; the archive keeps the text.
+    app.state['memories']=[];source={'query':'q','title':'T','url':'u','text':'Excerpt text.','retrieved':''}
+    m=app.event('Retrieved a Wikipedia excerpt for processing: T.',kind='experience',source=copy.deepcopy(source))
+    app.reading_journal.save_article(app.ROOT,source,{'id':m['id']})
+    for i in range(65):app.event(f'Later event {i}.')
+    assert 'text' not in m['source'] and m['source']['text_archived'] and app.reading_journal.article(app.ROOT,m['id'])['text']=='Excerpt text.'
+    assert app.MEMORY_LIMIT>=3000
 
 print('PASS: small choice schema; details only for the chosen action; memory protected and relevance-ranked on a long life; '
       'unchanged save; uncited IDs rejected; single targets; project milestones; unavailable mechanics hidden; repetition observable.')
