@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import {readFile} from 'node:fs/promises';
+import * as T from '../vendor/three.module.js';
+import {celestialState,horizonVector,createSky} from '../sky.js';
+const sandbox={Date};vm.runInNewContext(await readFile(new URL('../vendor/astronomy.browser.min.js',import.meta.url),'utf8'),sandbox);
+globalThis.Astronomy=sandbox.Astronomy;
+const summer=celestialState(new Date('2026-06-21T12:00:00Z'));
+const midnight=celestialState(new Date('2026-12-21T00:00:00Z'));
+assert.ok(summer.sun.altitude>55);assert.ok(midnight.sun.altitude<0);assert.ok(midnight.phase>=0&&midnight.phase<360);
+const east=horizonVector(0,90);assert.ok(Math.abs(east.x-1)<1e-10&&Math.abs(east.z)<1e-10);
+const morning=celestialState(new Date('2026-10-29T06:00:00Z')),evening=celestialState(new Date('2026-10-29T18:00:00Z'));
+assert.ok(Math.abs(morning.sun.azimuth-evening.sun.azimuth)>90);assert.ok(Math.abs(morning.moon.azimuth-evening.moon.azimuth)>30);
+const scene=new T.Scene();scene.background=new T.Color();scene.fog=new T.Fog('#aaaaaa',1,100);
+const camera=new T.PerspectiveCamera(),sun=new T.DirectionalLight(),skyLight=new T.HemisphereLight();scene.add(sun,skyLight);
+const sky=createSky({T,scene,camera,sun,skyLight});sky.update(new Date('2026-06-21T12:00:00Z'));sky.frame();assert.ok(sun.intensity>0);
+sky.update(new Date('2026-12-21T00:00:00Z'));sky.frame();assert.equal(sun.intensity,0);
+console.log('PASS: astronomical sun/moon positions, time changes, world orientation and real Three.js sky scene construction.');

@@ -3,6 +3,7 @@
 import argparse
 import secrets
 import socket
+import world_state
 import copy
 import json
 import math
@@ -23,8 +24,8 @@ ACCESS_TOKEN = None
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 TZ = ZoneInfo('Europe/London')
 LOCK = threading.RLock()
-ACTIONS = {'rest': 'cabin', 'sleep': 'cabin', 'practise': 'range', 'explore': 'woods', 'craft': 'workbench', 'read': 'library', 'observe': 'woods', 'reflect': 'cabin'}
-DURATIONS = {'rest': 900, 'practise': 1800, 'explore': 1200, 'craft': 2700, 'read': 900, 'observe': 600, 'reflect': 600}
+ACTIONS = {'rest': 'cabin', 'sleep': 'cabin', 'practise': 'range', 'explore': 'woods', 'craft': 'workbench', 'read': 'library', 'observe': 'woods', 'reflect': 'cabin', 'gather': 'woods', 'plan': 'workbench', 'construct': 'workbench', 'move_object': 'workbench', 'inspect': 'workbench', 'fell_tree': 'woods'}
+DURATIONS = {'rest': 900, 'practise': 1800, 'explore': 1200, 'craft': 2700, 'read': 900, 'observe': 600, 'reflect': 600, 'gather': 1200, 'plan': 600, 'construct': 1800, 'move_object': 300, 'inspect': 60, 'fell_tree': 5400}
 CONFIG = ROOT / 'crow-config.json'
 if CONFIG.exists():
     config = json.loads(CONFIG.read_text())
@@ -32,7 +33,7 @@ if CONFIG.exists():
         if action in DURATIONS and isinstance(minutes, (int, float)) and 1 <= minutes <= 480:
             DURATIONS[action] = minutes * 60
 SHAPES = ['spire', 'orb', 'totem', 'bowl']
-BASELINE = 'Crow is a woodland elf beginning an independent life. His background does not prescribe his ambitions. He can change his mind, be uncertain and develop his own tastes.'
+BASELINE = 'Your name is Crow. Your elf appearance is visual only: it prescribes no temperament, hobbies, values or opinions. Your preferences may develop from your own actual experiences. Earlier prototype themes are history, not requirements for who you should become.'
 state = {'minute': 420, 'day': 1, 'location': 'cabin', 'action': 'rest', 'energy': 85, 'curiosity': 65,
          'skills': {'archery': 0, 'craft': 0}, 'materials': 0, 'objects': [], 'visits': {},
          'memories': [], 'diary': [], 'reason': 'Taking in the clearing.', 'last_error': '',
@@ -40,7 +41,7 @@ state = {'minute': 420, 'day': 1, 'location': 'cabin', 'action': 'rest', 'energy
 if SAVE.exists():
     old_bytes = SAVE.read_bytes()
     state.update(json.loads(old_bytes))
-    backup = ROOT / 'crow-save-before-v0.3.json'
+    backup = ROOT / 'crow-save-before-v0.4.json'
     if not backup.exists():
         backup.write_bytes(old_bytes)
 now = datetime.now(TZ)
@@ -61,6 +62,8 @@ for m in state['memories']:
 if state['pending']:
     state['pending']['remaining'] = max(1, state['pending'].get('remaining', 60))
     state['pending']['ends_at'] = None
+world_state.ensure(state)
+state['version']=4
 state['paused'] = True
 runtime = {'thinking': False, 'status': 'Ready — UK clock is live; press Begin life', 'generation': 0}
 
@@ -137,11 +140,11 @@ def choose():
         context = {'clock': state['clock'], 'energy': round(state['energy']), 'emotions': state['emotions'],
                    'location': state['location'], 'materials': state['materials'], 'skills': state['skills'],
                    'intention': state['current_intention'], 'projects': state['projects'][-4:],
-                   'interests': state['interests'], 'personality': state['personality_notes'][-5:],
-                   'long_term': state['long_term'][-5:], 'recalled': recalled(),
+                   'interests': state['interests'], 'personality': state['personality_notes'][-3:],
+                   'long_term': state['long_term'][-3:], 'recalled': recalled(),
                    'recent': [{k: m.get(k) for k in ['id', 'event', 'reason', 'at']} for m in state['memories'][-5:]],
                    'wishes': [{k: w[k] for k in ['id', 'text']} for w in state['wishes'][-5:]],
-                   'last_appraisal': state['appraisals'][-1:]}
+                   'last_appraisal': state['appraisals'][-1:], 'world':world_state.nearby(state)}
     # Keep retrieved context modest for the 4,096-token model on this machine.
     def compact(value):
         if isinstance(value,str):return value[:180]
@@ -149,31 +152,39 @@ def choose():
         if isinstance(value,dict):return {k:compact(v) for k,v in value.items()}
         return value
     context=compact(context)
+    for key in ['recalled','personality','long_term','recent']:
+        while context.get(key) and len(json.dumps(context))>6000:context[key].pop(0)
     durations = ', '.join(f'{a}: {int(v/60)} real minutes' for a,v in DURATIONS.items())
     prompt = (BASELINE+'\nChoose your own intention and an available action towards it; you can keep, revise or abandon goals. '
               'Tools: rest in cabin; sleep until 07:00 at night or nap 90 minutes by day; practise archery; '
               'explore for wood; craft a small sculpture using 1 wood; read a Wikipedia article on a subject YOU choose; '
-              'observe woodland; reflect quietly. Real session lengths: '+durations+'. '
+              'observe surroundings; reflect quietly. fell_tree uses an available axe to fell the tree identified by object_id, leaving a stump and finite timber at the site. Gathering wood can target a felled tree object_id, or use the fallen-wood source with an empty ID. There is no automatic tree regrowth. gather collects a finite stock of wood or stone (material). inspect describes a world object (object_id). move_object carries a portable object to destination_x/destination_z. plan drafts your own construction idea, with plan_operation new/add/remove; add/remove targets object_id, remove also needs part_id. Nothing is built by planning. construct executes a saved plan_id only if materials are in inventory. You can add walls or remove a wall to extend a structure, provided the parts and materials exist. Real session lengths: '+durations+'. '
               'For read, library_query is the subject you actually want to research (short search terms). '
-              'The library is a cabin with bookshelves, a chair, a lamp and floor space. For reading, choose reading_spot: chair, standing or floor. These are optional affordances; choose your posture yourself. No comfort preference is imposed. Reading retrieves the real article and keeps a source; you do not know its contents until reading completes. '
+              'World coordinates are metres: x east, z south. The library origin is (-11,10); geometry in an add plan is relative to its target origin. Plan descriptions go in intention; name in creation_name. These tools define possible actions, not prescribed interests. The library is a cabin with bookshelves, a chair, a lamp and floor space. For reading, choose reading_spot: chair, standing or floor. These are optional affordances; choose your posture yourself. No comfort preference is imposed. Reading retrieves the real article and keeps a source; you do not know its contents until reading completes. '
               'These are opportunities, not prescribed interests. Night can make you sleepy, but you choose your response. '
               'Emotions are simulated state; describe them without inventing experiences. '
               'No other people, shop, currency or tools are available. You can wish for unavailable things. '
               'Wish can be empty; reuse existing wording if unchanged. '
               'project_id: existing ID continues it; 0 starts a project only with a nonempty project_title. '
               'project_status: active, paused or abandoned. Completion is measured by actual sessions. '
-              'target_sessions: modest count of target_action sessions. Empty project_title means no new project. '
+              'Large construction plans take multiple work sessions of at most two hours; a partial session does not create a finished object. You can resume later, rest or abandon it. target_sessions: modest count of target_action sessions. Research or planning is a milestone, not proof of a finished creation. A reached milestone can be continued by choosing the existing project ID and an appropriate next target_action. Empty project_title means no new project. '
               'Keep text brief. '
               f'Allowed actions {allowed}. Actual state:\n'+json.dumps(context, ensure_ascii=False))
     schema = fields_schema({'action': {'type':'string','enum':allowed}, 'reason': STRING, 'intention':STRING, 'wish':STRING, 'wish_reason':STRING,
-              'reading_spot':{'type':'string','enum':['chair','standing','floor']}, 'library_query':STRING, 'creation_name':STRING, 'creation_shape':{'type':'string','enum':SHAPES},
+              'object_id':STRING,'plan_id':{'type':'integer'},'destination_x':{'type':'number'},'destination_z':{'type':'number'},'material':{'type':'string','enum':['wood','stone']},'plan_operation':{'type':'string','enum':['new','add','remove']},'part_id':STRING,'reading_spot':{'type':'string','enum':['chair','standing','floor']}, 'library_query':STRING, 'creation_name':STRING, 'creation_shape':{'type':'string','enum':SHAPES},
               'project_id':{'type':'integer'}, 'project_title':STRING, 'project_status':{'type':'string','enum':['active','paused','abandoned']},
               'target_action':{'type':'string','enum':list(ACTIONS)}, 'target_sessions':{'type':'integer'}})
-    d, seconds = model_call(prompt, schema)
+    d, seconds = model_call(prompt, schema, 950)
     for k in ['reason','intention','wish','wish_reason','creation_name','project_title','library_query']:
         if not isinstance(d.get(k),str): raise ValueError('Invalid decision text: '+k)
     if d.get('action') not in allowed or d.get('creation_shape') not in SHAPES or d.get('target_action') not in ACTIONS: raise ValueError('Invalid action or shape')
     if d.get('reading_spot') not in ['chair','standing','floor']:raise ValueError('Invalid reading posture')
+    if d.get('material') not in ['wood','stone'] or d.get('plan_operation') not in ['new','add','remove']:raise ValueError('Invalid world-tool parameter')
+    for key in ['object_id','part_id']:
+        if not isinstance(d.get(key),str):raise ValueError('Invalid object identifier')
+    if type(d.get('plan_id')) is not int:raise ValueError('Invalid plan identifier')
+    for key in ['destination_x','destination_z']:
+        if type(d.get(key)) not in [int,float] or not math.isfinite(d[key]):raise ValueError('Invalid destination')
     if d.get('project_status') not in ['active','paused','abandoned']: raise ValueError('Invalid project status')
     if type(d.get('project_id')) is not int or type(d.get('target_sessions')) is not int: raise ValueError('Invalid project reference')
     return d, seconds
@@ -198,6 +209,8 @@ def start_action(d, seconds, reading=None):
     if project and project['status'] != 'completed':
         project['status'] = d['project_status']
         if d['project_title'].strip(): project['title'] = d['project_title'][:150]
+        if project.get('status')=='active' and project.get('milestone_done'):
+            project['milestone_done']=False;project['target_action']=d['target_action'];project['target']=clamp(d['target_sessions'],1,20);project['progress']=0
     elif not project and d['project_id']==0 and d['project_title'].strip():
         title = d['project_title'].strip()[:150]
         project = next((p for p in state['projects'] if p['title'].casefold()==title.casefold() and p['status']!='completed'), None)
@@ -215,6 +228,14 @@ def start_action(d, seconds, reading=None):
             duration=wake.timestamp()-dt.timestamp()
         else:duration=5400
     else: duration=DURATIONS[action]
+    if action=='construct':
+        plan=world_state.plan_by_id(state,d.get('plan_id'))
+        if plan:
+            duration=min(120,max(1,plan['minutes']-plan.get('work_done_minutes',0)))*60
+            if not world_state.affordable(state,plan) or plan['status'] not in ['proposed','in_progress']:duration=60
+    if action=='move_object':
+        obj=world_state.ensure(state)['objects'].get(d.get('object_id'))
+        if obj:duration=max(120,math.hypot(obj['x']-d.get('destination_x',obj['x']),obj['z']-d.get('destination_z',obj['z']))/1.2+90)
     state.update(action=action,location=ACTIONS[action],reason=d['reason'][:350],last_seconds=seconds,last_error='')
     state['decisions'] += 1
     state['pending']={'decision':copy.deepcopy(d),'project_id':project['id'] if project and project['status']=='active' else None,'remaining':duration,'duration':duration,'ends_at':time.time()+duration,'start':dt.isoformat(),'reading':reading}
@@ -247,14 +268,34 @@ def wikipedia(query):
             'text':page['extract'][:7000],'retrieved':datetime.now(TZ).isoformat()}
 
 
-def finish_action():
+def finish_action(geometry=None):
     p=state['pending']; d=p['decision']; a=d['action']
     state['visits'][a]=state['visits'].get(a,0)+1
-    if a in ['rest','sleep']:
+    result=None
+    if a=='fell_tree':
+        result=world_state.fell_tree(state,d.get('object_id',''));description=result['text']
+        if result['success']:state['energy']=clamp(state['energy']-12)
+    elif a=='gather':
+        result=world_state.collect(state,d.get('material','wood'),3,d.get('object_id',''));description=result['text']
+    elif a=='plan':
+        try:
+            plan=world_state.propose(state,d['creation_name'],d.get('plan_operation','new'),d.get('object_id',''),d.get('destination_x',0),d.get('destination_z',0),geometry,d.get('part_id',''))
+            description=f'Prepared construction plan {plan["id"]}: {plan["name"]}. Required inventory: {plan["bill"]} kg; estimated work {plan["minutes"]} real minutes. Not built yet.'
+        except ValueError as exc:
+            result={'success':False,'text':'Construction planning failed: '+str(exc)};description=result['text']
+    elif a=='construct':
+        result=world_state.construct(state,d.get('plan_id'),p['duration']/60);description=result['text']
+    elif a=='move_object':
+        result=world_state.move(state,d.get('object_id',''),d.get('destination_x',0),d.get('destination_z',0));description=result['text']
+    elif a=='inspect':
+        obj=world_state.ensure(state)['objects'].get(d.get('object_id',''))
+        description=('Inspected '+json.dumps(obj,ensure_ascii=False)[:1500]) if obj else 'Inspection failed: that world object does not exist.'
+        result={'success':bool(obj),'text':description}
+    elif a in ['rest','sleep']:
         state['energy']=clamp(state['energy']+(45 if a=='sleep' else 9))
         description='Finished sleeping in his cabin.' if a=='sleep' else 'Finished a quiet rest in his cabin.'
     elif a=='explore':
-        state['materials']+=1; state['energy']-=3; description='Explored the woodland and gathered one piece of fallen wood.'
+        result=world_state.collect(state,'wood',1);state['energy']-=3;description='Explored the woodland. '+result['text']
     elif a=='practise':
         state['skills']['archery']+=1; state['energy']-=4
         description=f"Finished archery practice session {state['skills']['archery']}. Practice precision level: {min(10,1+state['skills']['archery']//5)}."
@@ -273,11 +314,18 @@ def finish_action():
     else:description='Spent quiet time reflecting in his cabin.'
     state['energy']=clamp(state['energy']);state['completed']+=1
     project=next((x for x in state['projects'] if x['id']==p['project_id']),None)
-    if project and project['status']=='active' and project['target_action']==a:
+    if project and project['status']=='active' and project['target_action']==a and (result is None or result.get('success')):
         project['progress']+=1
         if project['progress']>=project['target']:
-            project['status']='completed'; project['finished']=datetime.now(TZ).isoformat();description+=' Finished the planned sessions for project: '+project['title']+'.'
+            if a=='craft' or (a=='construct' and result and result.get('built')):
+                project['status']='completed';project['finished']=datetime.now(TZ).isoformat()
+                description+=' Completed the planned making/building milestone for '+project['title']+'.'
+            else:
+                project['status']='milestone_reached';project['milestone_done']=True
+                description+=' Reached a session milestone for '+project['title']+'; the larger goal is not verified complete.'
+    world_state.ensure(state)
     m=event(description,d['reason'])
+    if result:m['world_result']=result
     if a=='read':
         m['source']=copy.deepcopy(p['reading'])
         (ROOT/'crow-reading').mkdir(exist_ok=True)
@@ -348,6 +396,27 @@ def tick(elapsed):
         p['ends_at']=time.time()+p['remaining']
 
 
+def draft_geometry(pending):
+    d=pending['decision']
+    if d.get('plan_operation')=='remove':return None
+    props={'shape':{'type':'string','enum':['box','sphere','cone','cylinder']},'material':{'type':'string','enum':['wood','stone']},'color':STRING}
+    props.update({k:{'type':'number'} for k in ['x','y','z','width','height','depth']})
+    schema=fields_schema({'parts':{'type':'array','minItems':1,'maxItems':8,'items':fields_schema(props)}})
+    with LOCK:
+        obj=world_state.ensure(state)['objects'].get(d.get('object_id'))
+        target=copy.deepcopy(obj) if obj else None
+        if target and len(target['parts'])>16:
+            target['parts_omitted']=len(target['parts'])-16;target['parts']=target['parts'][:16]
+    prompt=('Design geometry for the construction idea YOU chose: '+d['intention']+' Name: '+d['creation_name']+'. '+
+            'Use 1–8 solid parts. Coordinates are local metres around the target origin, with y up. Part x/z -12..12, y 0..8, dimensions width/depth .03..8 and height .03..6. Bottom of each part must be at or above ground. Materials wood or stone; hex colour. '+
+            'This produces a quoted blueprint only, not a finished object. Density is wood 500 kg/m3, stone 2200 kg/m3. You may plan more than you can afford. Existing target: '+json.dumps(target))
+    try:
+        data,_=model_call(prompt,schema,1700)
+        return world_state.validate_parts(data.get('parts'))
+    except (ValueError,KeyError,TypeError) as exc:
+        return {'invalid_geometry':str(exc)}
+
+
 def loop():
     last=time.monotonic();checkpoint=last
     while True:
@@ -363,8 +432,10 @@ def loop():
             generation=runtime['generation']
         try:
             if pending:
+                geometry=draft_geometry(pending) if pending['decision']['action']=='plan' else None
                 with LOCK:
-                    m=finish_action();runtime.update(thinking=True,status='Reflecting on what happened…')
+                    if state['paused']:continue
+                    m=finish_action(geometry);runtime.update(thinking=True,status='Reflecting on what happened…')
                 reflect(m)
                 with LOCK:runtime['thinking']=False
             with LOCK:
@@ -399,7 +470,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path.startswith('/api/') and not self.authorised():
             return self.send(401,b'Open the full phone access link from the terminal.','text/plain')
-        static={'/':('index.html','text/html; charset=utf-8'),'/world.js':('world.js','application/javascript'),'/mobile_controls.js':('mobile_controls.js','application/javascript'),'/vendor/three.module.js':('vendor/three.module.js','application/javascript')}
+        static={'/':('index.html','text/html; charset=utf-8'),'/world.js':('world.js','application/javascript'),'/mobile_controls.js':('mobile_controls.js','application/javascript'),'/sky.js':('sky.js','application/javascript'),'/vendor/astronomy.browser.min.js':('vendor/astronomy.browser.min.js','application/javascript'),'/vendor/three.module.js':('vendor/three.module.js','application/javascript')}
         if self.path in static:
             name,kind=static[self.path];return self.send(200,(ROOT/name).read_bytes(),kind)
         if self.path=='/api/state':
@@ -426,7 +497,7 @@ if __name__=='__main__':
     if args.lan:ACCESS_TOKEN=secrets.token_urlsafe(24)
     clock();server=ThreadingHTTPServer(('0.0.0.0' if args.lan else '127.0.0.1',8765),Handler)
     threading.Thread(target=loop,daemon=True).start()
-    print('\nCrow v0.3.2: http://127.0.0.1:8765'+('/#token='+ACCESS_TOKEN if ACCESS_TOKEN else '')+'\nUK clock · real-time activities · Ctrl+C stops safely\n')
+    print('\nCrow v0.4: http://127.0.0.1:8765'+('/#token='+ACCESS_TOKEN if ACCESS_TOKEN else '')+'\nUK clock · real-time activities · Ctrl+C stops safely\n')
     if args.lan:
         try:
             with socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as probe:

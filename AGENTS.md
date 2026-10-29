@@ -29,3 +29,10 @@ Do not add user controls for selecting his mood, posture, goals or passions.
 The observer camera must not be presented as a conversational actor. Experience-
 led personality is the target; seeded emotion values and activity counters
 are still prototype limitations. See the final section of DESIGN.md.
+
+World geometry and finite supplies live in world_state.py and the saved
+built_world state. Do not reset stocks, tree IDs or built objects on reload.
+The tree IDs depend on the initial forest generation order. Construction must
+check inventories, time and target revisions; never fulfil wishes by spawning
+completed structures. sky.js uses bundled Astronomy Engine for the UK clock.
+Run tests/test_world.py and tests/sky.mjs for relevant changes as well.

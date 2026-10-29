@@ -2,6 +2,8 @@ import importlib.util,json,pathlib,shutil,tempfile,threading,urllib.request
 from datetime import datetime
 from zoneinfo import ZoneInfo
 src=pathlib.Path(__file__).resolve().parents[1]
+import sys
+sys.path.insert(0,str(src))
 with tempfile.TemporaryDirectory() as temp:
  d=pathlib.Path(temp)
  for f in ['crow.py','index.html','world.js']:shutil.copy(src/f,d/f)
@@ -9,7 +11,7 @@ with tempfile.TemporaryDirectory() as temp:
  old={'day':4,'materials':6,'objects':['old carving'],'skills':{'archery':7,'craft':2},'decisions':42,'memories':[{'day':2,'time':'12:00','event':'Explored the woods.','reason':'Curious.'}]}
  (d/'crow-save.json').write_text(json.dumps(old))
  spec=importlib.util.spec_from_file_location('crow03',d/'crow.py');m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
- assert json.loads((d/'crow-save-before-v0.3.json').read_text())==old
+ assert json.loads((d/'crow-save-before-v0.4.json').read_text())==old
  assert m.state['memories'][0]['legacy_time'] and m.state['materials']==6
  tz=ZoneInfo('Europe/London')
  m.clock(datetime(2026,10,28,23,15,0,tzinfo=tz));assert m.state['clock']['night'] and m.state['daylight']==0

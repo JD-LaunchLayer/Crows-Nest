@@ -9,9 +9,11 @@ import urllib.error
 import urllib.request
 
 root = pathlib.Path(__file__).resolve().parents[1]
+import sys
+sys.path.insert(0,str(root))
 with tempfile.TemporaryDirectory() as td:
     folder=pathlib.Path(td)
-    for name in ['crow.py','index.html','world.js','mobile_controls.js']:
+    for name in ['crow.py','index.html','world.js','mobile_controls.js','sky.js']:
         shutil.copy(root/name,folder/name)
     spec=importlib.util.spec_from_file_location('crow_mobile',folder/'crow.py')
     app=importlib.util.module_from_spec(spec);spec.loader.exec_module(app)
@@ -28,6 +30,7 @@ with tempfile.TemporaryDirectory() as td:
         except urllib.error.HTTPError as error:assert error.code==401
     assert b'installTouchControls' in get('/mobile_controls.js')
     assert b'touchPad' in get('/')
+    assert b'celestialState' in get('/sky.js')
     assert json.loads(get('/api/state',{'Authorization':'Bearer '+app.ACCESS_TOKEN}))['paused']
     for headers,expected in [({'X-Crow':'local'},401),({'X-Crow':'local','Authorization':'Bearer '+app.ACCESS_TOKEN},200)]:
         req=urllib.request.Request(base+'/api/toggle',method='POST',headers=headers)

@@ -1,5 +1,6 @@
 import * as T from '/vendor/three.module.js';
 import {installTouchControls} from '/mobile_controls.js';
+import {createSky} from '/sky.js';
 const $=id=>document.getElementById(id),txt=(id,v)=>$(id).textContent=v;
 // A LAN access token is kept in this tab, removed from the visible URL, and sent in headers.
 const tokenParams=new URLSearchParams(globalThis.location?.hash?.slice(1)||'');
@@ -11,6 +12,7 @@ let renderer;try{renderer=new T.WebGLRenderer({antialias:true,powerPreference:'l
 renderer.setPixelRatio(Math.min(devicePixelRatio,globalThis.matchMedia?.('(pointer:coarse)').matches?1:1.5));renderer.shadowMap.enabled=true;renderer.shadowMap.type=T.PCFSoftShadowMap;holder.prepend(renderer.domElement);
 const camera=new T.PerspectiveCamera(65,1,.1,100);camera.position.set(0,1.7,17);camera.rotation.order='YXZ';let yaw=0,pitch=0,s=null,last=performance.now(),initialized=false;
 const skyLight=new T.HemisphereLight(0xe4eedb,0x45503c,2);scene.add(skyLight);const sun=new T.DirectionalLight(0xffe4b5,2.4);sun.position.set(-12,25,8);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-25,right:25,top:25,bottom:-25,near:1,far:70});scene.add(sun);
+const sky=createSky({T,scene,camera,sun,skyLight});
 const mats={};function mat(c){return mats[c]??=new T.MeshStandardMaterial({color:c,roughness:1,flatShading:true})}
 function mesh(geo,c,x,y,z,parent=scene){const m=new T.Mesh(geo,mat(c));m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;parent.add(m);return m}
 function box(w,h,d,c,x,y,z,p=scene){return mesh(new T.BoxGeometry(w,h,d),c,x,y,z,p)}
@@ -27,6 +29,8 @@ box(1.5,.4,2.6,'#a3a782',-11.5,.35,-10.3);box(1.3,.18,.55,'#d5ccb1',-11.5,.65,-1
 box(.18,2.5,.18,'#6e593e',10,1.25,-10);for(const [r,col,z] of [[1,'#dfd6b4',-9.9],[.7,'#877249',-9.86],[.45,'#d6c99e',-9.82],[.17,'#935d3e',-9.78]]){mesh(new T.CylinderGeometry(r,r,.07,16),'#'+col.replace('#',''),10,2,z).rotation.x=Math.PI/2;}block(10,-10,2,.5);
 // Workbench, reading cabin and a small quiet pond.
 box(3,.23,1.4,'#a58c5c',0,1.2,12);for(const x of [-1.2,1.2])for(const z of [11.5,12.5])box(.17,1.2,.17,'#645739',x,.6,z);block(0,12,3,1.4);
+// Reading cabin: legacy shell is replaced by persistent world geometry on sync.
+const shellStart=scene.children.length,blockStart=obstacles.length;
 // Reading cabin: open doorway, low-poly timber shell and shelves.
 const LIB={door:new T.Vector3(-11,0,5),aisle:new T.Vector3(-11,0,9.4),shelf:new T.Vector3(-11.8,0,11.4),approach:new T.Vector3(-9.1,0,8.5),seat:new T.Vector3(-9.1,0,9.3),floor:new T.Vector3(-12.0,0,9.1)};
 box(7,.12,6,'#8a7756',-11,.01,10);
@@ -37,6 +41,7 @@ for(const x of [-13.5,-8.5]){box(2,3,.18,'#89775b',x,1.5,7);block(x,7,2,.18)}
 box(3, .5,.2,'#89775b',-11,2.75,7);
 // Two pitched roof panels leave the front doorway unobstructed.
 for(const side of [-1,1]){const panel=box(4.05,.18,6.8,'#4e5946',-11+side*1.75,3.5,10);panel.rotation.z=-side*.37;}
+const legacyShell=scene.children.slice(shellStart);const legacyShellBlocks=obstacles.slice(blockStart);let shellReplaced=false;
 let shelfBook=null;
 for(const x of [-13.7,-11.8]){
  box(1.65,2.25,.42,'#574a35',x,1.15,12.6);
@@ -68,7 +73,21 @@ const lamp=new T.PointLight('#ffce84',12,9,2);lamp.position.set(-8.15,1.36,9.3);
 mesh(new T.SphereGeometry(.075,8,6),'#fff0c2',-8.15,1.38,9.3);
 const rug=box(2.2,.015,2.2,'#766f52',-9.1,.09,9.2);rug.castShadow=false;
 const pond=mesh(new T.CylinderGeometry(3,3,.06,13),'#789a91',-18,.01,3);pond.castShadow=false;
-function tree(x,z,h=5){box(.35,h*.5,.35,'#655b40',x,h*.25,z);mesh(new T.ConeGeometry(h*.32,h*.75,5),'#455b3f',x,h*.7,z);mesh(new T.ConeGeometry(h*.26,h*.65,5),'#536a47',x,h*.99,z);block(x,z,.5,.5)}
+const treeMeshes=new Map();let treeNumber=0;
+function tree(x,z,h=5){
+ const id='tree-'+treeNumber++,group=new T.Group();group.position.set(x,0,z);scene.add(group);
+ box(.35,h*.5,.35,'#655b40',0,h*.25,0,group);mesh(new T.ConeGeometry(h*.32,h*.75,5),'#455b3f',0,h*.7,0,group);mesh(new T.ConeGeometry(h*.26,h*.65,5),'#536a47',0,h*.99,0,group);
+ block(x,z,.5,.5);treeMeshes.set(id,{group,stump:null,log:null,x,z,h});
+}
+function syncTrees(world){
+ for(const [id,t]of Object.entries(world.trees||{})){
+  const visual=treeMeshes.get(id);if(!visual)continue;
+  visual.group.visible=t.stage==='standing';
+  if(t.stage==='felled'&&!visual.stump){visual.stump=mesh(new T.CylinderGeometry(.2,.25,.4,6),'#8a7350',visual.x,.2,visual.z);visual.log=mesh(new T.CylinderGeometry(.16,.20,visual.h*.65,6),'#856a43',visual.x+.7,.22,visual.z);visual.log.rotation.z=Math.PI/2;}
+  if(visual.log){visual.log.visible=t.stock>0;visual.log.scale.y=Math.max(.02,t.stock/t.timber_kg)}
+ }
+}
+
 for(let i=0;i<65;i++){const a=i*2.39996,r=23+(i%7)*1.1;tree(Math.cos(a)*r,Math.sin(a)*r,4+(i%5)*.65)}
 for(const [x,z,h]of [[17,10,5],[15,14,6],[20,12,5],[18,6,4],[-18,-9,5],[-20,-15,6]])tree(x,z,h);
 // Small details without textures or outside image services.
@@ -95,6 +114,7 @@ for(const x of [-.15,.15]){
  const elbow=new T.Group();elbow.position.y=-.3;shoulder.add(elbow);elbows.push(elbow);
  box(.11,.27,.13,'#a8b38a',0,-.135,0,elbow);box(.11,.11,.13,'#d6b78e',0,-.29,0,elbow);
 }
+const heldAxe=new T.Group();box(.055,.55,.055,'#937449',0,0,0,heldAxe);box(.30,.14,.07,'#a8afaa',.10,.21,0,heldAxe);elbows[1].add(heldAxe);heldAxe.position.set(0,-.29,.08);heldAxe.visible=false;
 const bow=mesh(new T.TorusGeometry(.47,.025,4,12,Math.PI),'#b09a68',.48,1.14,-.2,crow);bow.rotation.z=-Math.PI/2;
 const heldBook=new T.Group();heldBook.position.set(0,1.05,.44);heldBook.rotation.x=.28;crow.add(heldBook);heldBook.visible=false;
 for(const x of [-.17,.17]){box(.34,.025,.43,'#79523c',x,0,0,heldBook);box(.30,.045,.39,'#eee4c7',x,.033,0,heldBook)}
@@ -119,12 +139,13 @@ function beginDesired(){
  const d=anim.desired;if(!d)return;
  if(d.pending&&d.action==='read'){readingPlan();return}
  anim.activeAction=d.pending?d.action:'idle';
- const place=stations[d.location]||stations.cabin;
+ let place=stations[d.location]||stations.cabin;
+ if(d.pending&&d.action==='fell_tree'){const tree=s.built_world?.trees[d.objectId];if(tree)place=new T.Vector3(tree.x-.9,0,tree.z);}
  anim.steps=[walk(new T.Vector3(0,0,0)),walk(place),wait(d.pending?d.action:'idle',Infinity)];
 }
 function setActivity(data){
  const key=`${data.decisions}:${Boolean(data.pending)}`;if(key===anim.key)return;
- anim.key=key;anim.desired={action:data.action,location:data.location,pending:Boolean(data.pending),spot:data.pending?.decision?.reading_spot||'standing'};
+ anim.key=key;anim.desired={action:data.action,location:data.location,pending:Boolean(data.pending),spot:data.pending?.decision?.reading_spot||'standing',objectId:data.pending?.decision?.object_id||''};
  if(!initialized){initialized=true;crow.position.copy(stations[data.location]||stations.cabin);}
  if(anim.returning)return;
  if(anim.book){
@@ -137,6 +158,29 @@ function setActivity(data){
 }
 const made=new T.Group();scene.add(made);let creationKey='';
 function creations(items){const key=JSON.stringify(items);if(key===creationKey)return;creationKey=key;while(made.children.length){const c=made.children[0];made.remove(c);c.geometry.dispose()}for(const [i,obj]of items.slice(-20).entries()){const x=3+(i%5)*.9,z=9+Math.floor(i/5)*1;let geo;switch(obj.shape){case'orb':geo=new T.IcosahedronGeometry(.3,0);break;case'spire':geo=new T.ConeGeometry(.24,.85,5);break;case'bowl':geo=new T.CylinderGeometry(.35,.15,.25,8);break;default:geo=new T.BoxGeometry(.3,.65,.3)}mesh(geo,'#bb9564',x,.45,z,made);}}
+const worldMeshes=new Map();let worldObstacleRecords=[];
+function syncBuiltWorld(world){
+ if(!world)return;syncTrees(world);
+ if(!shellReplaced){for(const m of legacyShell){scene.remove(m);m.geometry?.dispose()}for(const b of legacyShellBlocks){const i=obstacles.indexOf(b);if(i>=0)obstacles.splice(i,1)}shellReplaced=true;}
+ for(const c of worldObstacleRecords){const i=obstacles.indexOf(c);if(i>=0)obstacles.splice(i,1)}worldObstacleRecords=[];
+ for(const [id,record]of worldMeshes)if(!world.objects[id]){scene.remove(record.group);record.group.traverse(m=>m.geometry?.dispose());worldMeshes.delete(id)}
+ for(const [id,obj]of Object.entries(world.objects)){
+  const key=JSON.stringify(obj);let record=worldMeshes.get(id);
+  if(!record||record.key!==key){
+   if(record){scene.remove(record.group);record.group.traverse(m=>m.geometry?.dispose())}
+   const group=new T.Group();group.position.set(obj.x,0,obj.z);scene.add(group);
+   for(const p of obj.parts){let geo;
+    if(p.shape==='sphere')geo=new T.SphereGeometry(.5,8,6);
+    else if(p.shape==='cone')geo=new T.ConeGeometry(.5,1,6);
+    else if(p.shape==='cylinder')geo=new T.CylinderGeometry(.5,.5,1,8);
+    else geo=new T.BoxGeometry(1,1,1);
+    const m=mesh(geo,p.color,p.x,p.y,p.z,group);m.scale.set(p.width,p.height,p.depth);m.rotation.z=p.rotation_z||0;
+   }
+   record={key,group};worldMeshes.set(id,record);
+  }
+  for(const p of obj.parts)if(p.y-p.height/2<1.8&&p.y+p.height/2>.2){const c={x:obj.x+p.x,z:obj.z+p.z,w:p.width/2+.3,d:p.depth/2+.3};obstacles.push(c);worldObstacleRecords.push(c)}
+ }
+}
 function fits(x,z){return Math.abs(x)<31&&Math.abs(z)<31&&!obstacles.some(o=>Math.abs(x-o.x)<o.w&&Math.abs(z-o.z)<o.d)}
 const keys=new Set();addEventListener('keydown',e=>{if(['KeyW','KeyA','KeyS','KeyD','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home'].includes(e.code)){e.preventDefault();keys.add(e.code)}if(e.code==='Home'){camera.position.set(0,1.7,17);yaw=0;pitch=0}});addEventListener('keyup',e=>keys.delete(e.code));addEventListener('blur',()=>keys.clear());
 renderer.domElement.onclick=()=>{renderer.domElement.requestPointerLock?.()};document.addEventListener('mousemove',e=>{if(document.pointerLockElement!==renderer.domElement)return;yaw-=e.movementX*.002;pitch=T.MathUtils.clamp(pitch-e.movementY*.002,-1.1,1.1)});document.addEventListener('pointerlockerror',()=>txt('help','Mouse capture unavailable. Use WASD to walk and arrow keys to turn.'));
@@ -147,7 +191,7 @@ $('mobileFind').onclick=()=>$('find').onclick();
 $('mobileMenu').onclick=()=>{const opened=document.body.classList.toggle('panel-open');$('mobileMenu').textContent=opened?'Close':'Journal';$('mobileMenu').setAttribute('aria-expanded',String(opened));};
 if(globalThis.matchMedia?.('(pointer:coarse)').matches)txt('help','Left thumb: walk · Drag the world: look around');
 function entry(parent,title,detail){const d=document.createElement('div');d.className='entry';d.textContent=title;if(detail){const em=document.createElement('em');em.textContent=detail;d.append(em)}parent.append(d)}
-async function refresh(){try{const r=await apiFetch('/api/state');if(!r.ok)throw Error(r.status===401?'Open the full phone link printed by Crow’s terminal to connect.':'Server unavailable');s=await r.json();txt('toggle',s.paused?'Begin life':'Pause');txt('clock',`${s.clock.date} · ${s.clock.time} · UK time`);txt('status',s.runtime.status+(s.last_seconds!==null?' · Last choice '+s.last_seconds+'s':''));txt('error',s.last_error);txt('activity',({rest:'Resting',practise:'Practising archery',explore:'Exploring',craft:'Making a carving',read:'Reading Wikipedia',sleep:'Sleeping',observe:'Watching the woodland',reflect:'Reflecting'})[s.action]);txt('reason',s.reason);$('energy').value=s.energy;txt('resources',`Wood: ${s.materials} · Archery sessions: ${s.skills.archery} · Carvings: ${s.skills.craft}`);txt('intention',s.current_intention||'Crow has not expressed an intention yet.');
+async function refresh(){try{const r=await apiFetch('/api/state');if(!r.ok)throw Error(r.status===401?'Open the full phone link printed by Crow’s terminal to connect.':'Server unavailable');s=await r.json();txt('toggle',s.paused?'Begin life':'Pause');txt('clock',`${s.clock.date} · ${s.clock.time} · UK time`);txt('status',s.runtime.status+(s.last_seconds!==null?' · Last choice '+s.last_seconds+'s':''));txt('error',s.last_error);txt('activity',({rest:'Resting',practise:'Practising archery',explore:'Exploring',craft:'Making a carving',read:'Reading Wikipedia',sleep:'Sleeping',observe:'Watching the woodland',reflect:'Reflecting',gather:'Gathering materials',plan:'Preparing a construction plan',construct:'Constructing',move_object:'Carrying and placing an object',inspect:'Inspecting an object',fell_tree:'Felling a tree'})[s.action]);txt('reason',s.reason);$('energy').value=s.energy;txt('resources',`Wood: ${s.materials} kg · Stone: ${s.stone||0} kg · Archery sessions: ${s.skills.archery} · Carvings: ${s.skills.craft}`);txt('intention',s.current_intention||'Crow has not expressed an intention yet.');
 setActivity(s);
 $('feed').replaceChildren();for(const m of s.memories.slice(-8).reverse())entry($('feed'),m.event,m.at?new Date(m.at).toLocaleString('en-GB',{timeZone:'Europe/London'}):`Earlier prototype · Day ${m.day} · ${m.time}`);
 $('wishes').replaceChildren();for(const w of s.wishes.slice(-10).reverse())entry($('wishes'),w.text,`${w.reason} · First expressed day ${w.day} · ${w.mentions} mention(s)`);if(!s.wishes.length)entry($('wishes'),'No wishes expressed yet.');
@@ -157,8 +201,9 @@ txt('feeling',s.appraisals.length?s.appraisals.at(-1).feeling:'He has not reflec
 $('longterm').replaceChildren();for(const m of s.long_term.slice(-6).reverse())entry($('longterm'),m.interpretation,'Based on: '+m.fact);
 $('reading').replaceChildren();const source=s.pending?.reading;if(source){const a=document.createElement('a');a.textContent=source.title;a.href=source.url;a.target='_blank';a.rel='noopener noreferrer';$('reading').append(a)}
 const pending=s.pending;txt('remaining',pending?`${s.paused?'Paused · ':''}${Math.ceil(pending.remaining/60)} min remaining · ${Math.round(pending.duration/60)} min session`:'Choosing the next activity.');
-$('creations').replaceChildren();for(const c of s.creations.slice(-8).reverse())entry($('creations'),c.name,`${c.shape} · Day ${c.day}`);creations(s.creations);lamp.intensity=s.action==='read'&&s.pending?15:(s.daylight<.2?8:1.5);
-const light=.10+.90*s.daylight;sun.intensity=2.4*s.daylight;skyLight.intensity=.25+1.75*s.daylight;scene.background.setRGB(.72*light,.78*light,.69*light);scene.fog.color.copy(scene.background);
+$('creations').replaceChildren();for(const c of s.creations.slice(-8).reverse())entry($('creations'),c.name,`${c.shape} · Day ${c.day}`);if(s.built_world){syncBuiltWorld(s.built_world)}else{creations(s.creations)}lamp.intensity=s.action==='read'&&s.pending?15:(s.daylight<.2?8:1.5);
+const celestial=sky.update(new Date(s.clock.iso));if($('skyInfo'))txt('skyInfo',`Sun ${celestial.sun.altitude.toFixed(0)}° · Moon ${celestial.moon.altitude.toFixed(0)}° above horizon · Wickford`);
+if($('worldPlans')&&s.built_world){$('worldPlans').replaceChildren();for(const p of s.built_world.plans.slice(-5).reverse())entry($('worldPlans'),`${p.name} · ${p.status}`,`Plan ${p.id} · ${Object.entries(p.bill).map(([m,q])=>q+' kg '+m).join(', ')||'No new materials'} · ${p.work_done_minutes||0}/${p.minutes} min work`);$('worldObjects').replaceChildren();for(const o of Object.values(s.built_world.objects))entry($('worldObjects'),o.name,`${o.id} · (${o.x.toFixed(1)}, ${o.z.toFixed(1)}) · ${o.parts.length} parts`);txt('sourceStocks',Object.entries(s.built_world.sources).map(([m,v])=>`${m}: ${v.stock} kg remains`).join(' · '));}
 }catch(e){txt('status','Connection lost — keep the Python terminal open.');txt('error',e.message)}}
 function resize(){renderer.setSize(holder.clientWidth,holder.clientHeight);camera.aspect=holder.clientWidth/holder.clientHeight;camera.updateProjectionMatrix()}addEventListener('resize',resize);resize();
 function frame(now){const dt=Math.min(.08,(now-last)/1000);last=now;if(keys.has('ArrowLeft'))yaw+=dt*1.5;if(keys.has('ArrowRight'))yaw-=dt*1.5;let f=(keys.has('KeyW')||keys.has('ArrowUp')?1:0)-(keys.has('KeyS')||keys.has('ArrowDown')?1:0),r=(keys.has('KeyD')?1:0)-(keys.has('KeyA')?1:0);f+=touchInput.forward;r+=touchInput.right;const norm=Math.max(1,Math.hypot(f,r)),speed=4*dt/norm;const dx=(-Math.sin(yaw)*f+Math.cos(yaw)*r)*speed,dz=(-Math.cos(yaw)*f-Math.sin(yaw)*r)*speed;if(fits(camera.position.x+dx,camera.position.z))camera.position.x+=dx;if(fits(camera.position.x,camera.position.z+dz))camera.position.z+=dz;camera.rotation.set(pitch,yaw,0,'YXZ');
@@ -195,11 +240,12 @@ if(anim.pose==='take'||anim.pose==='putback'){arms[1].rotation.x=-1.4*Math.sin(M
 headPivot.rotation.x=anim.book?.22+Math.sin(anim.elapsed*.5)*.015:0;
 crow.position.y=-.28*seated-.36*anim.floor+(moving?Math.abs(walking)*.025:0);
 torso.scale.y=1+Math.sin(anim.elapsed*1.8)*.008;
-heldBook.visible=anim.book;if(shelfBook)shelfBook.visible=!anim.book;bow.visible=!anim.book&&!seated;
+heldBook.visible=anim.book;if(shelfBook)shelfBook.visible=!anim.book;heldAxe.visible=anim.pose==='fell_tree'&&!moving;bow.visible=!anim.book&&!seated&&!heldAxe.visible;
 const turn=anim.elapsed%24;pagePivot.rotation.z=anim.pose.startsWith('reading')&&turn<1.8?Math.PI*T.MathUtils.smoothstep(turn,0,1.8):0;
 if(anim.pose==='practise'&&!moving){arms[0].rotation.x=-1.25;arms[1].rotation.x=-1.1;elbows[1].rotation.x=-.8;}
+if(heldAxe.visible){arms[1].rotation.x=-.75+Math.sin(anim.elapsed*2)*.55;elbows[1].rotation.x=-.4;}
 if(anim.pose==='craft'&&!moving){arms[1].rotation.x=-.8+Math.sin(anim.elapsed*4)*.12;elbows[1].rotation.x=-.5;headPivot.rotation.x=.18;}
 if(anim.pose==='observe'&&!moving)headPivot.rotation.y=Math.sin(anim.elapsed*.2)*.35;else headPivot.rotation.y=0;
 crow.visible=!(anim.pose==='sleep');
-renderer.render(scene,camera);requestAnimationFrame(frame)}
+sky.frame();renderer.render(scene,camera);requestAnimationFrame(frame)}
 $('loading').remove();refresh();setInterval(refresh,2500);requestAnimationFrame(frame);

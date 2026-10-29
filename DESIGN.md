@@ -42,7 +42,7 @@ The same world is explorable by Jordan in first person. Visual detail stays
 simple and low-poly; a more accurate Crow likeness can come later. Runtime
 clock is Europe/London with real day/night. Local inference uses Ollama.
 
-## Current implementation: 0.3.1
+## Current implementation: 0.4
 
 A walkable low-poly clearing; local model decisions; UK clock; real-duration
 sessions; saved wishes, intentions, session-based projects and reflective
@@ -52,19 +52,26 @@ explicitly chooses chair, standing or floor. The rig reaches for a book and
 animates that selection. Earlier saved reading decisions without a posture
 remain standing rather than being silently assigned a chair.
 
+The 0.4 world ledger gives creations stable IDs, editable positions and
+material-checked plans for adding/removing solid geometry, including the
+library shell. Finite resource sources and individual tree yields support
+construction without inventing materials. These effects are persistent and
+visible in both desktop and phone views. See README.md for exact limits.
+
 ## Not implemented yet
 
 The current action vocabulary and environment description are still mostly
-fixed in Python. A general dynamic object registry, perception, experimental
-object use, multi-step project verification, awareness of Jordan's presence,
+fixed in Python. General interaction with every furnishing, richer perception, experimental
+object use beyond the supported tools, general project verification, awareness of Jordan's presence,
 conversation and unrestricted creative tools are not implemented. These are
 architectural work ahead, not features implied by the visuals.
 
 Wikipedia currently uses its top search result, which can be irrelevant.
 Research needs candidate selection, article relevance checking and correction.
-Projects currently count matching sessions; completing research does not
-prove a sculpture or larger goal has been completed. Do not present those
-counters as general goal verification.
+Projects track supported milestones. Research/planning milestones do not
+prove a sculpture or larger goal has been completed. Physical plans have
+actual geometry, inventories and work progress, but do not prove general
+semantic goals or structural soundness.
 
 Simulated emotion and memory-based adaptation are not proof of subjective
 experience. Local model weights are not retrained. No claim is made that

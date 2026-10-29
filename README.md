@@ -120,3 +120,70 @@ node tests/touch.mjs
 Tests cover backend state/timing and Three.js animation logic with a stub
 renderer. They do not replace visual testing in Firefox on the running machine.
 Three.js 0.170.0 is bundled under its [MIT licence](vendor/THREE-LICENSE.txt).
+
+## v0.4 — persistent world editing and time-based sky
+
+Creations are now saved world objects with stable IDs and positions. Existing
+carvings keep their locations beside the workbench. Crow can choose to inspect
+an object, carry a portable creation to another location, prepare construction
+plans, or work on a plan. These are model-selected tools, not assigned projects.
+His elf appearance no longer supplies a personality or preferred hobby.
+
+A construction plan contains actual bounded solid geometry, a site, a material
+bill and an estimated work duration. Planning does not create the object. Crow
+must choose to construct, have enough material, and spend the work time. Larger
+jobs use sessions of at most two real hours with saved progress. Materials are
+charged once when the plan completes. He can choose other activities between
+sessions. Plans may create objects, add parts to an existing structure or remove
+a part. The library shell is editable geometry; a real wall can be removed to
+make an opening. Removing a part recovers half its modelled material mass.
+
+Wood and stone supplies are finite. Initial world opportunities are loose wood,
+loose stone and an axe; providing these does not direct Crow to use them. Each
+standing tree has an individual finite yield. Felling with the axe takes a
+90-minute session and leaves a stump plus timber at the site. Gathering takes
+material from that source into inventory. Trees do not instantly respawn or
+regrow. Existing wood units migrate as kilograms, and legacy carvings are sized
+as small one-kilogram works. Construction density is modelled as wood 500 kg/m³
+or stone 2200 kg/m³. These are transparent gameplay estimates, not engineering
+validation or exact durations for every real-world tree/build.
+
+The sky uses the local PC clock and Wickford's approximate coordinates
+(51.61 N, 0.52 E). Sun and moon positions are calculated using bundled Astronomy
+Engine 2.1.19; sunrise, sunset and lunar phase follow date/time. Twilight and
+moon phase shading are rendered locally. Celestial disc sizes are exaggerated
+for visibility. Stars are decorative, not a star catalogue. No online sky API
+or additional AI fees are involved. See vendor/ASTRONOMY-LICENSE.txt.
+
+### Limits of this milestone
+
+This is bounded geometry and resource accounting, not unrestricted world physics.
+Available building materials are wood and stone, and plans use up to eight
+basic solid parts at a time. Additional parts can be added in further plans.
+The renderer supports collision changes, but not structural load calculations,
+falling/unsupported structures, weather damage or a general crafting chemistry.
+Some furnishings remain static scene props. Observation is area-based structured
+state, not pixel vision. Carrying/building is a timed macro with basic poses,
+not a full physical animation of every step. Construction is not guaranteed
+useful, stable or aesthetically good merely because geometry is valid.
+
+Session milestones in reading/planning no longer claim a larger physical goal
+is complete. Existing historical project records are preserved. The broader
+experience-led personality/learning architecture remains development work;
+this release provides concrete world effects and resources for it to build on.
+
+Updates create crow-save-before-v0.4.json before migration. New state remains
+inside the ignored crow-save.json; nothing about Crow's private life is uploaded.
+
+Additional checks:
+
+```bash
+python3 tests/test_world.py
+node tests/sky.mjs
+```
+
+These include material conservation, tool requirements, tree stock/stumps,
+insufficient-material refusal, resumable construction, double-spend prevention,
+placement collision, library editing/salvage, state persistence and astronomical
+position/scene calculations. Browser shader rendering and model-generated v0.4
+decision quality still need validation on the running PC and phone.
