@@ -3,6 +3,19 @@ export function createLifeView({document}){
  const $=id=>document.getElementById(id);let previous='';
  function line(parent,text,cls=''){const p=document.createElement('p');p.textContent=text;if(cls)p.className=cls;parent.append(p);return p;}
  function card(parent,title){const div=document.createElement('article');div.className='entry';line(div,title);parent.append(div);return div;}
+ let mindKey='';
+ const NAMES={life:'What mattered and what he believes',skills:'How to do things',world:'What the world allows'};
+ function renderMind(mind){
+  const box=$('mind');if(!box)return;const key=JSON.stringify(mind||{});if(key===mindKey)return;mindKey=key;box.replaceChildren();
+  if(!mind||!Object.keys(NAMES).some(k=>(mind[k]||[]).length)){line(box,'Nothing consolidated yet. This happens after he sleeps.','muted');return;}
+  for(const [k,title]of Object.entries(NAMES)){
+   const items=[...(mind[k]||[])].sort((a,b)=>b.strength-a.strength);const div=card(box,`${title} · ${items.length}/24`);
+   for(const e of items)line(div,`${'●'.repeat(Math.max(1,Math.min(5,Math.round(e.strength*4))))} ${e.text}${e.previous?.length?' (revised)':''}${e.contested?' (contested)':''}`);
+   if(items.length)line(div,'Closest to fading: '+items.at(-1).text,'muted');
+  }
+  const lost=(mind.forgotten||[]).slice(-3).reverse();
+  if(lost.length){const div=card(box,'Recently forgotten');for(const e of lost)line(div,e.text,'muted');}
+ }
  function update(state){
   if(!state.body||!state.provisions)return;
   const b=state.body,signals=[];
@@ -16,6 +29,10 @@ export function createLifeView({document}){
   $('provisions').textContent=`Ready food: ${p.pantry.toFixed(1)} servings · Fruit available: ${p.berries.toFixed(1)} servings · Spring basin: ${p.water_litres.toFixed(1)} litres`;
   const last=state.appraisals?.at(-1);
   $('affectContext').textContent=last?.meaning?`${last.meaning}${last.concern?' · Concern: '+last.concern:''}`:'';
+  renderMind(state.mind);
+  const used=state.runtime?.model_usage?.choose_action,spendLine=state.model_spend;
+  if($('modelSpend'))$('modelSpend').textContent=(used?`Last decision: ${used.provider==='anthropic'?'Claude '+used.model:'local '+used.model}. `:'')+
+   (spendLine?`Cloud spend today $${spendLine.usd.toFixed(3)} · total $${spendLine.total_usd.toFixed(2)}${spendLine.fallbacks?` · ${spendLine.fallbacks} fallbacks to local today`:''}.`:'');
   const pending=state.pending?.decision?.action==='craft'?state.pending.decision:null;
   const key=JSON.stringify([state.practical||{},state.suspended_work||[],pending]);if(key===previous)return;previous=key;
   const trials=$('experiments'),methods=$('testedMethods');trials.replaceChildren();methods.replaceChildren();

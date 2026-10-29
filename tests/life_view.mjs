@@ -12,4 +12,6 @@ assert.ok(get('experiments').includes('He predicted: success'));assert.ok(get('e
 assert.ok(get('affectContext').includes('Test a shape.'));
 state.suspended_work=[{id:3,pending:{decision:{intention:'Continue my object.'},remaining:1200}}];view.update(state);assert.ok(get('experiments').includes('20 minutes remain'));
 state.pending={decision:{action:'craft',intention:'A second test.',attempt:{hypothesis:'Support might help.',target_error_mm:6,expected_error_mm:4}}};view.update(state);assert.ok(get('experiments').includes('Result pending'));
-console.log('PASS: bodily signals, supplies, current prediction, measured outcomes, tentative correction, tested-method evidence and paused work remain read-only.');
+state.mind={life:[{id:1,text:'Wasps visit ivy flowers.',strength:.9,previous:[{text:'old'}]}],skills:[],world:[],forgotten:[{text:'Lost detail.'}]};state.model_spend={usd:.012,total_usd:.5,fallbacks:1};state.runtime={model_usage:{choose_action:{provider:'anthropic',model:'claude-haiku-5-5'}}};view.update(state);
+assert.ok(get('mind').includes('Wasps visit ivy flowers. (revised)'));assert.ok(get('mind').includes('Lost detail.'));assert.ok(get('modelSpend').includes('Claude claude-haiku-5-5'));assert.ok(get('modelSpend').includes('1 fallbacks'));
+console.log('PASS: held memories with revisions and forgetting; model and spend line; bodily signals, supplies, current prediction, measured outcomes, tentative correction, tested-method evidence and paused work remain read-only.');

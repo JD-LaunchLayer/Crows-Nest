@@ -39,6 +39,10 @@ sys.path.insert(0, str(ROOT))
 OUTAGE = (urllib.error.URLError, ConnectionError, http.client.RemoteDisconnected, socket.timeout, TimeoutError)
 
 
+class ModelOutage(Exception):
+    """The model server (not Wikipedia, not his own choices) could not be reached."""
+
+
 def create(twin, source):
     """Copy the real life once. Never writes to the source folder."""
     twin.mkdir(parents=True, exist_ok=True)
@@ -56,6 +60,9 @@ def create(twin, source):
 def load(twin):
     # The twin always runs the current code from this checkout, against its own saved life.
     shutil.copy2(ROOT / 'crow.py', twin / 'crow.py')
+    # Owner settings (model provider, key) follow the real checkout; his life does not.
+    if (ROOT / 'crow-config.json').exists():
+        shutil.copy2(ROOT / 'crow-config.json', twin / 'crow-config.json')
     spec = importlib.util.spec_from_file_location('crow_twin', twin / 'crow.py')
     app = importlib.util.module_from_spec(spec)
     with contextlib.redirect_stdout(io.StringIO()):
@@ -69,11 +76,13 @@ def main():
     parser.add_argument('--from-save', default=str(ROOT / 'crow-save.json'), help='Real save to copy when creating the twin.')
     parser.add_argument('--days', type=float, required=True, help='Run until this many simulated days after the twin began.')
     parser.add_argument('--max-errors', type=int, default=25, help='Stop after this many consecutive failures.')
+    parser.add_argument('--max-spend', type=float, default=40., help='Cloud-model spend limit in US dollars for the whole twin (then local Qwen).')
     args = parser.parse_args()
-    run(Path(args.twin).expanduser().resolve(), Path(args.from_save).expanduser().resolve(), args.days, args.max_errors)
+    run(Path(args.twin).expanduser().resolve(), Path(args.from_save).expanduser().resolve(), args.days, args.max_errors,
+        max_spend=args.max_spend)
 
 
-def run(twin, source, days, max_errors=25, model=None):
+def run(twin, source, days, max_errors=25, model=None, max_spend=40.):
     """Advance the twin until `days` simulated days after it began. `model` replaces Ollama in tests."""
     if twin == source.parent or twin == ROOT or ROOT in twin.parents:
         raise SystemExit('The twin folder must be separate from the real Crow and from this checkout.')
@@ -94,8 +103,17 @@ def run(twin, source, days, max_errors=25, model=None):
 
     original_call = model or app.model_call
 
+    # The twin has its own whole-run budget instead of the real Crow's daily one.
+    app.DAILY_BUDGET = float('inf')
+
     def counted(*a, **k):
-        result = original_call(*a, **k)
+        if app.PROVIDER == 'anthropic' and st.get('model_spend', {}).get('total_usd', 0) >= max_spend:
+            app.PROVIDER = 'ollama'
+            print(f'Cloud spend reached ${max_spend:.2f}; continuing on the local model.', flush=True)
+        try:
+            result = original_call(*a, **k)
+        except OUTAGE as exc:
+            raise ModelOutage(str(exc)) from exc
         meta['model_calls'] += 1
         purpose = a[3] if len(a) > 3 else k.get('purpose', 'other')
         if app.runtime.get('model_usage', {}).get(purpose, {}).get('near_context_limit'):
@@ -146,6 +164,8 @@ def run(twin, source, days, max_errors=25, model=None):
                 if pending:
                     geometry = app.draft_geometry(pending) if pending['decision']['action'] == 'plan' else None
                     memory = app.finish_action(geometry)
+                    if memory.get('action') == 'sleep':
+                        app.consolidate_after_sleep()
                 elif st.get('reflection_pending') is not None:
                     memory = next((m for m in st['memories'] if m['id'] == st['reflection_pending']), None)
                     if memory is None:
@@ -155,7 +175,7 @@ def run(twin, source, days, max_errors=25, model=None):
                 app.decide_and_start(generation)
                 failures = 0
                 outage_started = None
-            except OUTAGE as exc:
+            except ModelOutage as exc:
                 # Ollama or the network being down is not part of his life: wait in real time, keep the twin's clock still.
                 outage_started = outage_started or time.monotonic()
                 if time.monotonic() - outage_started > 1800:

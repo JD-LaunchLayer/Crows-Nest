@@ -46,7 +46,7 @@ def candidates(state):
     """Every recallable item, labelled by evidence type. Nothing is generated."""
     items = []
     for m in state.get('memories', []):
-        if m.get('kind') in ('started', 'resumed'):
+        if m.get('kind') in ('started', 'resumed', 'consolidated'):
             continue  # "Started X." carries little; its outcome event is recalled instead.
         items.append({'type': 'event', 'id': m.get('id'), 'order': m.get('id') or 0,
                       'text': _short(m.get('event'), 220), 'why': _short(m.get('reason'), 120),
@@ -83,6 +83,9 @@ def candidates(state):
         items.append({'type': 'search_miss', 'id': None, 'order': 0,
                       'text': _short(f"Search '{f.get('query')}' found nothing relevant: {f.get('reason')}", 200),
                       'why': _short(f.get('question'), 120), 'when': '', 'importance': .1})
+    import consolidation  # local import: consolidation itself uses this module
+    if state.get('mind'):
+        items += consolidation.recall_items(state)
     return items
 
 

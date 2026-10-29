@@ -46,7 +46,7 @@ with tempfile.TemporaryDirectory() as td:
     import urllib.error
     down={'n':3}
     def flaky(*a,**k):
-        if down['n']>0:down['n']-=1;raise urllib.error.URLError('Connection refused')
+        if down['n']>0:down['n']-=1;raise urllib.error.URLError('Connection refused')  # model server down
         return model(*a,**k)
     real_sleep=timelapse.time.sleep;timelapse.time.sleep=lambda s:None
     before_outage=json.loads((twin/'crow-save.json').read_text())['twin']
