@@ -82,5 +82,13 @@ with tempfile.TemporaryDirectory() as td:
     keys=[m['text'] for m in recalled];assert len(keys)==len(set(keys))
     assert {m['type'] for m in recalled}>={'reading'} or {m['type'] for m in recalled}>={'lesson'}
 
+    # 10. Long lives: older event copies of source excerpts move to the archive only; the archive keeps the text.
+    app.state['memories']=[];source={'query':'q','title':'T','url':'u','text':'Excerpt text.','retrieved':''}
+    m=app.event('Retrieved a Wikipedia excerpt for processing: T.',kind='experience',source=copy.deepcopy(source))
+    app.reading_journal.save_article(app.ROOT,source,{'id':m['id']})
+    for i in range(65):app.event(f'Later event {i}.')
+    assert 'text' not in m['source'] and m['source']['text_archived'] and app.reading_journal.article(app.ROOT,m['id'])['text']=='Excerpt text.'
+    assert app.MEMORY_LIMIT>=3000
+
 print('PASS: small choice schema; details only for the chosen action; memory protected and relevance-ranked on a long life; '
       'unchanged save; uncited IDs rejected; single targets; project milestones; unavailable mechanics hidden; repetition observable.')

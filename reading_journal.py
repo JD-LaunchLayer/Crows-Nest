@@ -101,11 +101,17 @@ def appraise(state, memory, result, root):
     record = next((record for record in state['reading_log'] if record['id'] == memory['id']), None)
     if record is None:
         return
+    source = memory['source']
+    if 'text' not in source:  # an older event whose excerpt lives only in the archive
+        try:
+            source = {**source, 'text': article(root, memory['id']).get('text', '')}
+        except (OSError, ValueError):
+            pass
     record.update(status='processed', summary=result.get('reading_summary', '')[:900],
                   lesson=result.get('lesson', '')[:350], answer_status=result.get('answer_status', 'unknown'),
                   next_step=result.get('next_step', '')[:300],
-                  processed_chars=min(CONTEXT_CHARS, len(memory['source'].get('text', ''))))
-    save_article(root, memory['source'], record)
+                  processed_chars=min(CONTEXT_CHARS, len(source.get('text', ''))))
+    save_article(root, source, record)
 
 
 def page(state, before=None, limit=20):
