@@ -19,6 +19,7 @@ import re
 import threading
 import time
 import urllib.request
+import urllib.error
 import urllib.parse
 from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -31,7 +32,7 @@ ACCESS_TOKEN = None
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.9.0'
+APP_VERSION = '0.9.1'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -166,10 +167,20 @@ def ollama_call(prompt, schema, limit, purpose):
     payload = {'model': MODEL, 'stream': False, 'think': False,
                'messages': [{'role': 'system', 'content': BASELINE+' Reply only with the requested JSON. Be concise.'}, {'role': 'user', 'content': prompt}],
                'format': schema, 'options': {'num_ctx': num_ctx, 'num_predict': limit, 'temperature': .8}}
-    req = urllib.request.Request('http://127.0.0.1:11434/api/chat', data=json.dumps(payload).encode(), headers={'Content-Type': 'application/json'})
     start = time.monotonic()
-    with urllib.request.urlopen(req, timeout=180) as response:
-        result = json.load(response)
+    for attempt in range(2):
+        req = urllib.request.Request('http://127.0.0.1:11434/api/chat', data=json.dumps(payload).encode(), headers={'Content-Type': 'application/json'})
+        with urllib.request.urlopen(req, timeout=180) as response:
+            result = json.load(response)
+        try:
+            data = json.loads(result['message']['content'])
+            break
+        except json.JSONDecodeError:
+            # The reply ran out of room mid-answer. Ask once more with more room and briefer text, rather than stopping his life.
+            if attempt:
+                raise ValueError('The local model reply was cut off twice')
+            payload['options']['num_predict'] = limit * 2
+            payload['messages'][1]['content'] = prompt + ' Keep every text field under 25 words.'
     seconds = round(time.monotonic()-start, 1)
     # Ollama reports actual token counts; keep them so context pressure is measured, not guessed.
     usage = {'provider': 'ollama', 'model': MODEL, 'prompt_tokens': result.get('prompt_eval_count'), 'output_tokens': result.get('eval_count'),
@@ -177,7 +188,8 @@ def ollama_call(prompt, schema, limit, purpose):
              'at': now().isoformat()}
     if isinstance(usage['prompt_tokens'], int):
         usage['near_context_limit'] = usage['prompt_tokens'] + limit > num_ctx
-    return json.loads(result['message']['content']), seconds, usage
+    usage['retried'] = bool(attempt)
+    return data, seconds, usage
 
 
 def anthropic_call(prompt, schema, limit, purpose):
@@ -185,7 +197,7 @@ def anthropic_call(prompt, schema, limit, purpose):
     key = os.environ.get('ANTHROPIC_API_KEY') or SETTINGS.get('anthropic_api_key', '')
     if not key:
         raise ValueError('No Anthropic API key configured')
-    body = {'model': ANTHROPIC_MODEL, 'max_tokens': max(limit, 400), 'temperature': .8,
+    body = {'model': ANTHROPIC_MODEL, 'max_tokens': max(limit, 400),
             'system': BASELINE + ' Answer by calling the respond tool. Be concise.',
             'messages': [{'role': 'user', 'content': prompt}],
             'tools': [{'name': 'respond', 'description': 'Your answer in the requested structure.', 'input_schema': schema}],
@@ -193,8 +205,13 @@ def anthropic_call(prompt, schema, limit, purpose):
     req = urllib.request.Request('https://api.anthropic.com/v1/messages', data=json.dumps(body).encode(),
                                  headers={'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json'})
     start = time.monotonic()
-    with urllib.request.urlopen(req, timeout=120) as response:
-        result = json.load(response)
+    try:
+        with urllib.request.urlopen(req, timeout=120) as response:
+            result = json.load(response)
+    except urllib.error.HTTPError as exc:
+        # Keep Anthropic's own explanation (never the key) so a fallback can be diagnosed.
+        detail = exc.read().decode(errors='replace')[:300]
+        raise ValueError(f'Anthropic HTTP {exc.code}: {detail}') from exc
     seconds = round(time.monotonic()-start, 1)
     block = next((b for b in result.get('content', []) if b.get('type') == 'tool_use'), None)
     if block is None or not isinstance(block.get('input'), dict):
@@ -231,7 +248,7 @@ def model_call(prompt, schema, limit=650, purpose='other'):
                     ledger['total_usd'] = round(ledger['total_usd'] + usage['cost_usd'], 6);ledger['calls'] += 1
             except Exception as exc:  # outage, rate limit, bad key or bad answer: fall back rather than stop
                 with LOCK:
-                    ledger = spend();ledger['fallbacks'] += 1;ledger['last_fallback'] = str(exc)[:200]
+                    ledger = spend();ledger['fallbacks'] += 1;ledger['last_fallback'] = (purpose+': '+str(exc))[:400]
                 usage = None
         else:
             with LOCK:

@@ -38,4 +38,12 @@ with tempfile.TemporaryDirectory() as td:
     app.model_call('Fourth.',schema,100,'test');assert app.state['model_spend']['usd']>0 and app.state['model_spend']['total_usd']>total
     # The key is never part of his saved life or the observer API.
     app.persist();assert KEY not in (folder/'crow-save.json').read_text() and KEY not in json.dumps(app.runtime)
-print('PASS: Haiku via forced structured tool call; real token cost ledger; outage and over-budget fall back to local; daily reset; key never saved in his life.')
+    # A local reply cut off mid-JSON is retried once with more room instead of stopping his life.
+    replies=iter(['{"answer": "unfinish','{"answer":"complete"}'])
+    def cut(req,timeout):
+        sent.append((req.full_url,json.loads(req.data),{}))
+        return Reply(json.dumps({'message':{'content':next(replies)},'prompt_eval_count':5,'eval_count':5}).encode())
+    app.urllib.request.urlopen=cut;app.PROVIDER='ollama'
+    data,_=app.model_call('Answer.',schema,100,'test')
+    assert data=={'answer':'complete'} and sent[-1][1]['options']['num_predict']==200 and app.runtime['model_usage']['test']['retried']
+print('PASS: cut-off local replies retried; Haiku via forced structured tool call; real token cost ledger; outage and over-budget fall back to local; daily reset; key never saved in his life.')
