@@ -548,3 +548,12 @@ out local-model outages without ageing.
 python3 tests/test_consolidation.py
 python3 tests/test_provider.py
 ```
+
+## v0.9.1 — Haiku request fix and retry of cut-off local replies
+
+The first live Haiku call was rejected by Anthropic with "400 Bad Request";
+Crow correctly fell back to Qwen, whose reply was then cut off mid-answer and
+paused him. Requests no longer send a sampling temperature (newer Claude
+models reject it), the full reason for any cloud fallback is recorded in
+`model_spend.last_fallback`, and a cut-off local reply is retried once with
+more room instead of pausing his life.
