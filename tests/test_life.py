@@ -98,18 +98,22 @@ with tempfile.TemporaryDirectory() as temp:
     app.model_call=lambda *args,**kwargs:(good['attempt'],1);app.prepare_attempt(chosen)
     assert chosen['attempt']['predicted_success'] is True
     app.persist();snapshot=copy.deepcopy(app.state);life.ensure(app.state);assert app.state==snapshot
-    captured={}
-    def choose_stub(prompt,schema,limit):
-        captured['prompt']=prompt;captured['schema']=schema
+    calls=[]
+    def choose_stub(prompt,schema,limit,*purpose,pick='rest'):
+        calls.append({'prompt':prompt,'schema':schema})
         out={}
         for key in schema['required']:
             prop=schema['properties'][key]
-            out[key]=prop['enum'][0] if 'enum' in prop else '' if prop['type']=='string' else 0
+            out[key]=(pick if key=='action' else prop['enum'][0]) if 'enum' in prop else '' if prop['type']=='string' else [] if prop['type']=='array' else False if prop['type']=='boolean' else 1
         return out,1
     app.model_call=choose_stub;app.state['energy']=0;app.choose()
-    assert {'eat','drink','resume_work','read'}.issubset(set(captured['schema']['properties']['action']['enum']))
-    assert 'body' in captured['prompt'] and 'recent_trials' in captured['prompt']
-    assert len(captured['prompt'])<12000
+    action_schema=calls[0]['schema']
+    assert {'eat','drink','read','craft'}.issubset(set(action_schema['properties']['action']['enum']))
+    assert 'body' in calls[0]['prompt'] and len(calls[0]['prompt'])<9000
+    # Choosing craft brings its measured trial evidence and precommitment into the details step only.
+    calls.clear();app.model_call=lambda *a,**k:choose_stub(*a,pick='craft');chosen=app.choose()[0]
+    assert len(calls)==2 and 'recent_trials' in calls[1]['prompt'] and 'recent_trials' not in calls[0]['prompt']
+    assert chosen['action']=='craft' and set(chosen['attempt'])>={'hypothesis','predicted_success','target_error_mm','support'}
 
 print('PASS: digestion, effort and sleep processes; renewable supplies; no offline refill; '
       'prediction errors and method correction; fatigue and practice transfer; contextual affect; '

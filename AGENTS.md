@@ -42,3 +42,9 @@ repositories from HTTP. Preserve token and pause/running state across the
 exec restart. Pause and save before backup; back up before pulling. Keep
 fast-forward-only updates and refuse dirty source/unknown origins. Run
 tests/test_maintenance.py for updater or restart changes.
+
+Decisions are two-step (choose_action, then choose_parameters). Do not add
+action-specific fields to the first step. Recall lives in memory_recall.py and
+must stay read-only over saved history. Run tests/test_decision.py for decision,
+recall or context-budget changes. Use tools/evaluate_decisions.py (copy-only) for
+real-model evidence; never point it at a live save path for writing.
