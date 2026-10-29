@@ -187,3 +187,43 @@ insufficient-material refusal, resumable construction, double-spend prevention,
 placement collision, library editing/salvage, state persistence and astronomical
 position/scene calculations. Browser shader rendering and model-generated v0.4
 decision quality still need validation on the running PC and phone.
+
+
+## v0.4.1 — phone maintenance
+
+In the phone's **Journal**, **Maintenance → Back up and update** pauses Crow,
+saves his current activity progress, copies his life files into `backups/`,
+and pulls `origin/main` with fast-forward-only Git. If code changed, the same
+Python process is replaced by the updated program and the previous pause/running
+state is restored. The phone token survives this automatic restart, so existing
+links remain valid. The page reconnects and reloads when the app version changes.
+A normal manual restart still generates a new token as before.
+
+The control requires the authenticated `--lan` mode and a valid token. It accepts
+no commands, repository URLs or file paths from the browser. The updater checks
+that the process runs at the checkout root, on `main`, with the configured
+Crows-Nest origin and no tracked source edits. Diverged histories and local edits
+are refused, not reset or overwritten. Multiple requests cannot run two updates.
+
+If something fails, Crow remains running but paused, with the error shown in the
+journal. His backup path is recorded in the ignored `crow-update-status.json`.
+Inspect the problem on the PC before retrying. This backs up life data; it does
+not promise an automatic source-code rollback if a future release cannot start.
+The owner phone link now grants update access as well as pause access; keep it
+private and use it only on your private home network.
+
+**One initial Terminal update is necessary to install this feature:** stop Crow,
+run `bash update.sh`, then `python3 crow.py --lan`. Keep that terminal or process
+running. Grok with actual local shell access can perform this setup; a chat
+without machine tools cannot. Updating a remote Git repository alone does not
+update the running PC.
+
+Check the maintenance path with:
+
+```bash
+python3 tests/test_maintenance.py
+```
+
+Tests exercise a real local Git remote and backups, refusal paths, authenticated
+HTTP requests, update exclusivity and the restart token/resume contract. Full
+self-restart and reconnect still need verification on the running PC/phone.

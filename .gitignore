@@ -9,3 +9,7 @@ __pycache__/
 *.pyc
 .env
 .env.*
+
+# Local updater status (never Crow source)
+crow-update-status.json
+crow-update-status.tmp

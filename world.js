@@ -2,6 +2,8 @@ import * as T from '/vendor/three.module.js';
 import {installTouchControls} from '/mobile_controls.js';
 import {createSky} from '/sky.js';
 const $=id=>document.getElementById(id),txt=(id,v)=>$(id).textContent=v;
+const clientVersion=document.querySelector?.('meta[name="crow-version"]')?.content||null;
+let updateRequested=false;
 // A LAN access token is kept in this tab, removed from the visible URL, and sent in headers.
 const tokenParams=new URLSearchParams(globalThis.location?.hash?.slice(1)||'');
 let accessToken=tokenParams.get('token')||globalThis.sessionStorage?.getItem('crow-access-token')||'';
@@ -190,8 +192,22 @@ const touchInput=typeof $('touchPad').addEventListener==='function'?installTouch
 $('mobileFind').onclick=()=>$('find').onclick();
 $('mobileMenu').onclick=()=>{const opened=document.body.classList.toggle('panel-open');$('mobileMenu').textContent=opened?'Close':'Journal';$('mobileMenu').setAttribute('aria-expanded',String(opened));};
 if(globalThis.matchMedia?.('(pointer:coarse)').matches)txt('help','Left thumb: walk · Drag the world: look around');
+if($('updateCrow'))$('updateCrow').onclick=async()=>{
+ const button=$('updateCrow');button.disabled=true;updateRequested=true;
+ txt('updateStatus','Requesting backup and update…');
+ try{
+  const response=await apiFetch('/api/update',{method:'POST',headers:{'X-Crow':'local'}});
+  if(!response.ok)throw Error(await response.text());
+  txt('updateStatus','Crow is saving and backing up. This page will reconnect after the restart.');
+ }catch(error){updateRequested=false;button.disabled=false;txt('updateStatus',error.message)}
+};
 function entry(parent,title,detail){const d=document.createElement('div');d.className='entry';d.textContent=title;if(detail){const em=document.createElement('em');em.textContent=detail;d.append(em)}parent.append(d)}
-async function refresh(){try{const r=await apiFetch('/api/state');if(!r.ok)throw Error(r.status===401?'Open the full phone link printed by Crow’s terminal to connect.':'Server unavailable');s=await r.json();txt('toggle',s.paused?'Begin life':'Pause');txt('clock',`${s.clock.date} · ${s.clock.time} · UK time`);txt('status',s.runtime.status+(s.last_seconds!==null?' · Last choice '+s.last_seconds+'s':''));txt('error',s.last_error);txt('activity',({rest:'Resting',practise:'Practising archery',explore:'Exploring',craft:'Making a carving',read:'Reading Wikipedia',sleep:'Sleeping',observe:'Watching the woodland',reflect:'Reflecting',gather:'Gathering materials',plan:'Preparing a construction plan',construct:'Constructing',move_object:'Carrying and placing an object',inspect:'Inspecting an object',fell_tree:'Felling a tree'})[s.action]);txt('reason',s.reason);$('energy').value=s.energy;txt('resources',`Wood: ${s.materials} kg · Stone: ${s.stone||0} kg · Archery sessions: ${s.skills.archery} · Carvings: ${s.skills.craft}`);txt('intention',s.current_intention||'Crow has not expressed an intention yet.');
+async function refresh(){try{const r=await apiFetch('/api/state');if(!r.ok)throw Error(r.status===401?'Open the full phone link printed by Crow’s terminal to connect.':'Server unavailable');s=await r.json();
+if(clientVersion&&s.runtime.version&&clientVersion!==s.runtime.version){globalThis.location?.reload?.();return;}
+const maintenance=s.runtime.maintenance||{status:'idle'};if(updateRequested&&maintenance.status==='complete'){globalThis.location?.reload?.();return;}const updating=['checking','backing_up','pulling','restarting'].includes(maintenance.status);
+if($('updateCrow')){ $('updateCrow').disabled=updating||!s.maintenance_enabled; $('updateCrow').textContent=updating?'Updating…':'Back up and update';txt('updateStatus',maintenance.message||(s.maintenance_enabled?'Ready. Your private life data stays on the PC.':'Start Crow with --lan from its Git checkout to enable authenticated updates.'));}
+if(['complete','up_to_date','failed','interrupted'].includes(maintenance.status))updateRequested=false;
+txt('toggle',s.paused?'Begin life':'Pause');txt('clock',`${s.clock.date} · ${s.clock.time} · UK time`);txt('status',s.runtime.status+(s.last_seconds!==null?' · Last choice '+s.last_seconds+'s':''));txt('error',s.last_error);$('toggle').disabled=updating;txt('activity',({rest:'Resting',practise:'Practising archery',explore:'Exploring',craft:'Making a carving',read:'Reading Wikipedia',sleep:'Sleeping',observe:'Watching the woodland',reflect:'Reflecting',gather:'Gathering materials',plan:'Preparing a construction plan',construct:'Constructing',move_object:'Carrying and placing an object',inspect:'Inspecting an object',fell_tree:'Felling a tree'})[s.action]);txt('reason',s.reason);$('energy').value=s.energy;txt('resources',`Wood: ${s.materials} kg · Stone: ${s.stone||0} kg · Archery sessions: ${s.skills.archery} · Carvings: ${s.skills.craft}`);txt('intention',s.current_intention||'Crow has not expressed an intention yet.');
 setActivity(s);
 $('feed').replaceChildren();for(const m of s.memories.slice(-8).reverse())entry($('feed'),m.event,m.at?new Date(m.at).toLocaleString('en-GB',{timeZone:'Europe/London'}):`Earlier prototype · Day ${m.day} · ${m.time}`);
 $('wishes').replaceChildren();for(const w of s.wishes.slice(-10).reverse())entry($('wishes'),w.text,`${w.reason} · First expressed day ${w.day} · ${w.mentions} mention(s)`);if(!s.wishes.length)entry($('wishes'),'No wishes expressed yet.');
@@ -204,7 +220,7 @@ const pending=s.pending;txt('remaining',pending?`${s.paused?'Paused · ':''}${Ma
 $('creations').replaceChildren();for(const c of s.creations.slice(-8).reverse())entry($('creations'),c.name,`${c.shape} · Day ${c.day}`);if(s.built_world){syncBuiltWorld(s.built_world)}else{creations(s.creations)}lamp.intensity=s.action==='read'&&s.pending?15:(s.daylight<.2?8:1.5);
 const celestial=sky.update(new Date(s.clock.iso));if($('skyInfo'))txt('skyInfo',`Sun ${celestial.sun.altitude.toFixed(0)}° · Moon ${celestial.moon.altitude.toFixed(0)}° above horizon · Wickford`);
 if($('worldPlans')&&s.built_world){$('worldPlans').replaceChildren();for(const p of s.built_world.plans.slice(-5).reverse())entry($('worldPlans'),`${p.name} · ${p.status}`,`Plan ${p.id} · ${Object.entries(p.bill).map(([m,q])=>q+' kg '+m).join(', ')||'No new materials'} · ${p.work_done_minutes||0}/${p.minutes} min work`);$('worldObjects').replaceChildren();for(const o of Object.values(s.built_world.objects))entry($('worldObjects'),o.name,`${o.id} · (${o.x.toFixed(1)}, ${o.z.toFixed(1)}) · ${o.parts.length} parts`);txt('sourceStocks',Object.entries(s.built_world.sources).map(([m,v])=>`${m}: ${v.stock} kg remains`).join(' · '));}
-}catch(e){txt('status','Connection lost — keep the Python terminal open.');txt('error',e.message)}}
+}catch(e){if(updateRequested){txt('status','Reconnecting after the update…');txt('error','');}else{txt('status','Connection lost — keep the Python terminal open.');txt('error',e.message)}}}
 function resize(){renderer.setSize(holder.clientWidth,holder.clientHeight);camera.aspect=holder.clientWidth/holder.clientHeight;camera.updateProjectionMatrix()}addEventListener('resize',resize);resize();
 function frame(now){const dt=Math.min(.08,(now-last)/1000);last=now;if(keys.has('ArrowLeft'))yaw+=dt*1.5;if(keys.has('ArrowRight'))yaw-=dt*1.5;let f=(keys.has('KeyW')||keys.has('ArrowUp')?1:0)-(keys.has('KeyS')||keys.has('ArrowDown')?1:0),r=(keys.has('KeyD')?1:0)-(keys.has('KeyA')?1:0);f+=touchInput.forward;r+=touchInput.right;const norm=Math.max(1,Math.hypot(f,r)),speed=4*dt/norm;const dx=(-Math.sin(yaw)*f+Math.cos(yaw)*r)*speed,dz=(-Math.cos(yaw)*f-Math.sin(yaw)*r)*speed;if(fits(camera.position.x+dx,camera.position.z))camera.position.x+=dx;if(fits(camera.position.x,camera.position.z+dz))camera.position.z+=dz;camera.rotation.set(pitch,yaw,0,'YXZ');
 const simdt=s?.paused?0:dt;let moving=false;

@@ -3,6 +3,8 @@
 import argparse
 import secrets
 import socket
+import maintenance
+import sys
 import world_state
 import copy
 import json
@@ -21,6 +23,10 @@ from zoneinfo import ZoneInfo
 ROOT = Path(__file__).resolve().parent
 SAVE = ROOT / 'crow-save.json'
 ACCESS_TOKEN = None
+RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
+RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
+UPDATE_LOCK = threading.Lock()
+APP_VERSION = '0.4.1'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 TZ = ZoneInfo('Europe/London')
 LOCK = threading.RLock()
@@ -65,7 +71,7 @@ if state['pending']:
 world_state.ensure(state)
 state['version']=4
 state['paused'] = True
-runtime = {'thinking': False, 'status': 'Ready — UK clock is live; press Begin life', 'generation': 0}
+runtime = {'thinking': False, 'status': 'Ready — UK clock is live; press Begin life', 'generation': 0, 'maintenance':maintenance.load_status(ROOT), 'version':APP_VERSION}
 
 
 def clamp(x, lo=0, hi=100):
@@ -457,6 +463,46 @@ def loop():
             last=time.monotonic()
 
 
+def update_report(**fields):
+    with LOCK:
+        status=dict(runtime.get('maintenance',{}));status.update(fields)
+        status['at']=datetime.now(TZ).isoformat()
+        runtime['maintenance']=status
+        maintenance.save_status(ROOT,status)
+
+
+def restart_updated_process(was_paused):
+    # Python sockets are non-inheritable. exec closes the old listener and
+    # replaces the whole process; a second Crow is never intentionally spawned.
+    env=os.environ.copy()
+    env['CROW_RESTART_TOKEN']=ACCESS_TOKEN or ''
+    env['CROW_UPDATE_RESUME']='0' if was_paused else '1'
+    os.execve(sys.executable,[sys.executable,str(ROOT/'crow.py'),*sys.argv[1:]],env)
+
+
+def perform_update(was_paused):
+    try:
+        result=maintenance.update_checkout(ROOT,update_report)
+        if result['changed']:
+            update_report(status='restarting',message='Update installed; restarting Crow…',**result)
+            with LOCK:persist()
+            restart_updated_process(was_paused)
+        else:
+            with LOCK:
+                state['paused']=was_paused
+                if state['pending']:state['pending']['ends_at']=None if was_paused else time.time()+state['pending']['remaining']
+                runtime['status']='Paused' if was_paused else 'Living in the clearing'
+                persist()
+            update_report(status='up_to_date',message='Already up to date. A life backup was saved.',**result)
+    except Exception as exc:
+        with LOCK:
+            state['paused']=True;runtime['status']='Paused after an update problem';persist()
+        update_report(status='failed',message=str(exc)[:1800])
+    finally:
+        UPDATE_LOCK.release()
+
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self,*args):pass
     def send(self,code,body,kind):
@@ -475,12 +521,23 @@ class Handler(BaseHTTPRequestHandler):
             name,kind=static[self.path];return self.send(200,(ROOT/name).read_bytes(),kind)
         if self.path=='/api/state':
             with LOCK:
-                clock();body=json.dumps({**state,'runtime':runtime}).encode()
+                clock();body=json.dumps({**state,'runtime':runtime,'maintenance_enabled':ACCESS_TOKEN is not None and (ROOT/'.git').exists()}).encode()
             return self.send(200,body,'application/json')
         return self.send(404,b'Not found','text/plain')
     def do_POST(self):
         if not self.authorised():return self.send(401,b'Phone access token required','text/plain')
-        if self.path!='/api/toggle' or self.headers.get('X-Crow')!='local':return self.send(403,b'Forbidden','text/plain')
+        if self.headers.get('X-Crow')!='local':return self.send(403,b'Forbidden','text/plain')
+        if self.path=='/api/update':
+            if ACCESS_TOKEN is None:return self.send(403,b'Updates require authenticated phone-access mode.','text/plain')
+            if not UPDATE_LOCK.acquire(blocking=False):return self.send(409,b'An update is already running.','text/plain')
+            with LOCK:
+                was_paused=state['paused'];state['paused']=True;runtime['generation']+=1
+                runtime['status']='Paused for backup and update';runtime['maintenance']={'status':'checking','message':'Preparing the update…'}
+                persist()
+            threading.Thread(target=perform_update,args=(was_paused,),daemon=True).start()
+            return self.send(202,b'{"accepted":true}','application/json')
+        if self.path!='/api/toggle':return self.send(404,b'Not found','text/plain')
+        if UPDATE_LOCK.locked():return self.send(409,b'Crow is paused while an update runs.','text/plain')
         with LOCK:
             state['paused']=not state['paused'];runtime['generation']+=1
             if state['pending']:
@@ -494,10 +551,19 @@ if __name__=='__main__':
     parser=argparse.ArgumentParser(description='Crow local world')
     parser.add_argument('--lan',action='store_true',help='Allow authenticated phone access on your home Wi-Fi')
     args=parser.parse_args()
-    if args.lan:ACCESS_TOKEN=secrets.token_urlsafe(24)
+    if args.lan:ACCESS_TOKEN=RESTART_TOKEN or secrets.token_urlsafe(24)
     clock();server=ThreadingHTTPServer(('0.0.0.0' if args.lan else '127.0.0.1',8765),Handler)
+    if RESTART_RESUME=='1':
+        state['paused']=False
+        if state['pending']:state['pending']['ends_at']=time.time()+state['pending']['remaining']
+        runtime['status']='Resumed after update'
+    if runtime['maintenance'].get('status') in ['checking','backing_up','pulling']:
+        update_report(status='interrupted',message='A previous update was interrupted. The saved life is paused; inspect the PC before retrying.')
+    if runtime['maintenance'].get('status')=='restarting':
+        update_report(status='complete',message='Update complete. Crow’s life has been restored.',version=APP_VERSION)
+    server.socket.set_inheritable(False)
     threading.Thread(target=loop,daemon=True).start()
-    print('\nCrow v0.4: http://127.0.0.1:8765'+('/#token='+ACCESS_TOKEN if ACCESS_TOKEN else '')+'\nUK clock · real-time activities · Ctrl+C stops safely\n')
+    print('\nCrow v'+APP_VERSION+': http://127.0.0.1:8765'+('/#token='+ACCESS_TOKEN if ACCESS_TOKEN else '')+'\nUK clock · real-time activities · Ctrl+C stops safely\n')
     if args.lan:
         try:
             with socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as probe:
