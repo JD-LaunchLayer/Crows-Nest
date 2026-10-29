@@ -568,3 +568,28 @@ python3 tools/twin_viewer.py --lan     # also from your phone (prints a private 
 A read-only window onto the twin, using the same 3D world and journal. It
 re-reads the twin's save on every refresh, shows the twin's fast-forward clock,
 refuses every change (pause, update) and never touches the real Crow on 8765.
+
+## v0.10.0 — his journal, a clearer side panel, a new look
+
+- **Tab opens his journal** (Escape or Tab closes it; "His journal" button on
+  phones). It opens with a plain summary assembled by fixed rules from his
+  saved state: what he is doing, his mood and body in words, his aim and next
+  step, what he has mostly been choosing, and his latest wish. Then his recent
+  reflections (each linked to the event it followed), wishes, what draws or
+  puts him off, his self-observations, what he holds in mind, projects,
+  lessons, reading notebook, practical attempts, methods, things made and
+  world objects. Everything is read-only.
+- **The side panel now keeps only what is happening now**: activity, aim and
+  next step, body, feelings, recent events and maintenance.
+- **Activities happen where they are about**: observing goes to the chosen
+  area, inspecting and gathering go to the named tree, plant or object, with
+  simple inspect and gather poses. In the twin viewer he appears directly at
+  each activity instead of endlessly walking, since the twin's clock outruns
+  any walk.
+- **A new, original elf model**: slimmer proportions, face with eyes, brows and
+  nose, silver hair tied back, long ears, teal tunic, rust sash, slate cloak
+  and boots. Appearance stays cosmetic and assigns no hobby.
+
+```bash
+node tests/diary_view.mjs
+```

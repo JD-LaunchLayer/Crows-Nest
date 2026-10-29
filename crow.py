@@ -32,7 +32,7 @@ ACCESS_TOKEN = None
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.9.1'
+APP_VERSION = '0.10.0'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -1016,7 +1016,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path.startswith('/api/') and not self.authorised():
             return self.send(401,b'Open the full phone access link from the terminal.','text/plain')
-        static={'/':('index.html','text/html; charset=utf-8'),'/world.js':('world.js','application/javascript'),'/life_view.js':('life_view.js','application/javascript'),'/journal.js':('journal.js','application/javascript'),'/mobile_controls.js':('mobile_controls.js','application/javascript'),'/sky.js':('sky.js','application/javascript'),'/vendor/astronomy.browser.min.js':('vendor/astronomy.browser.min.js','application/javascript'),'/vendor/three.module.js':('vendor/three.module.js','application/javascript')}
+        static={'/':('index.html','text/html; charset=utf-8'),'/world.js':('world.js','application/javascript'),'/life_view.js':('life_view.js','application/javascript'),'/diary_view.js':('diary_view.js','application/javascript'),'/journal.js':('journal.js','application/javascript'),'/mobile_controls.js':('mobile_controls.js','application/javascript'),'/sky.js':('sky.js','application/javascript'),'/vendor/astronomy.browser.min.js':('vendor/astronomy.browser.min.js','application/javascript'),'/vendor/three.module.js':('vendor/three.module.js','application/javascript')}
         if self.path in static:
             name,kind=static[self.path];return self.send(200,(ROOT/name).read_bytes(),kind)
         if self.path=='/api/state':

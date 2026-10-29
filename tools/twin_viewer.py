@@ -60,7 +60,7 @@ def main():
         app.runtime.update(status=f'Time-lapse twin, read-only view · twin clock {virtual:%a %d %b %Y %H:%M}',
                            model_usage={})
 
-    static = {'/': 'index.html', '/world.js': 'world.js', '/life_view.js': 'life_view.js', '/journal.js': 'journal.js',
+    static = {'/': 'index.html', '/world.js': 'world.js', '/life_view.js': 'life_view.js', '/diary_view.js': 'diary_view.js', '/journal.js': 'journal.js',
               '/mobile_controls.js': 'mobile_controls.js', '/sky.js': 'sky.js',
               '/vendor/astronomy.browser.min.js': 'vendor/astronomy.browser.min.js',
               '/vendor/three.module.js': 'vendor/three.module.js'}
