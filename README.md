@@ -557,3 +557,14 @@ paused him. Requests no longer send a sampling temperature (newer Claude
 models reject it), the full reason for any cloud fallback is recorded in
 `model_spend.last_fallback`, and a cut-off local reply is retried once with
 more room instead of pausing his life.
+
+### Watching the twin
+
+```bash
+python3 tools/twin_viewer.py          # then open http://127.0.0.1:8766
+python3 tools/twin_viewer.py --lan     # also from your phone (prints a private link)
+```
+
+A read-only window onto the twin, using the same 3D world and journal. It
+re-reads the twin's save on every refresh, shows the twin's fast-forward clock,
+refuses every change (pause, update) and never touches the real Crow on 8765.
