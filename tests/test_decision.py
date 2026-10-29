@@ -60,7 +60,7 @@ with tempfile.TemporaryDirectory() as td:
     assert len(calls)==1 and d['object_id']==''
 
     # 6. Projects: continuing keeps the milestone he set; starting asks only then for its title.
-    calls=[];app.model_call=stub(calls,{**base,'action':'observe','project':'continue','project_id':1});d,_=app.choose()
+    calls=[];app.model_call=stub(calls,{**base,'action':'rest','project':'continue','project_id':1});d,_=app.choose()
     assert d['project_id']==1 and d['target_action']=='read' and d['target_sessions']==5 and len(calls)==1
     calls=[];app.model_call=stub(calls,{**base,'action':'observe','project':'start'},
         {'project_title':'Notice which birds visit','target_action':'observe','target_sessions':3});d,_=app.choose()

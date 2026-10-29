@@ -7,6 +7,7 @@ import maintenance
 import reading_journal
 import life
 import memory_recall
+import ecology
 import sys
 import world_state
 import copy
@@ -29,7 +30,7 @@ ACCESS_TOKEN = None
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.6.0'
+APP_VERSION = '0.7.0'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -94,6 +95,7 @@ if state['pending']:
 reading_journal.ensure(state, ROOT)
 world_state.ensure(state)
 life.ensure(state)
+ecology.ensure(state)
 state['version']=5
 state['paused'] = True
 runtime = {'thinking': False, 'status': 'Ready — UK clock is live; press Begin life', 'generation': 0, 'maintenance':maintenance.load_status(ROOT), 'version':APP_VERSION}
@@ -165,13 +167,14 @@ STRING = {'type': 'string'}
 DECISION_DEFAULTS={'wish':'','wish_reason':'','object_id':'','plan_id':0,'destination_x':0,'destination_z':0,
     'material':'wood','plan_operation':'new','part_id':'','reading_spot':'standing','library_query':'',
     'reading_mode':'lookup','research_question':'','next_step':'','creation_name':'','creation_shape':'orb',
-    'project_id':-1,'project_title':'','project_status':'active','target_action':'rest','target_sessions':1}
+    'project_id':-1,'project_title':'','project_status':'active','target_action':'rest','target_sessions':1,
+    'observe_area':'woodland_edge','focus':''}
 # One neutral line per action. Details are requested only after an action is chosen.
 ACTION_MENU={'rest':'quiet rest in the cabin','sleep':'sleep (until 07:00 at night, 90 minutes by day)',
     'eat':'eat from an available food source','drink':'drink from the spring',
-    'observe':'watch the woodland without collecting anything','reflect':'think quietly in the cabin',
+    'observe':'look closely at one part of the woodland or clearing and notice what is actually there','reflect':'think quietly in the cabin',
     'explore':'walk the woodland; may pick up a little loose wood','practise':'archery practice (no measured accuracy yet)',
-    'read':'look something up on Wikipedia, or read at leisure','inspect':'examine one world object closely',
+    'read':'look something up on Wikipedia, or read at leisure','inspect':'examine one object, tree or plant closely',
     'gather':'carry 3 kg of wood or stone into inventory','fell_tree':'fell a standing tree with the axe; timber stays at the site',
     'craft':'carve a small piece from 1 kg wood with a measured outcome','plan':'draft a construction blueprint (builds nothing)',
     'construct':'work on an existing blueprint if materials allow','move_object':'carry a portable object somewhere',
@@ -286,8 +289,16 @@ def parameter_request(d):
                 {'loose_sources':world['sources'],'felled_trees':[{k:world['trees'][i][k] for k in ['id','stock']} for i in felled[:8]],
                  'inventory_kg':{'wood':state['materials'],'stone':state['stone']}})
     if a=='inspect':
-        return ('Choose an object to examine.',{'object_id':{'type':'string','enum':list(objects)}},
+        eco=ecology.ensure(state)
+        return ('Choose an object, tree or plant to examine. Trees and plants are named in your memories or observations.',
+                {'object_id':{'type':'string','enum':list(objects)+[p['id'] for p in eco['plants']]+list(world['trees'])}},
                 {'objects':[o['id']+' ('+o['name']+')' for o in world_state.nearby(state)['objects']]})
+    if a=='observe':
+        return ('Choose where to look. focus is what you are looking for, or empty for open attention. '
+                'You notice what is actually visible there now; things matching your focus are likelier to be noticed but not guaranteed. '
+                'In darkness little detail is visible.',
+                {'observe_area':{'type':'string','enum':list(ecology.AREAS)},'focus':STRING},
+                {'areas':ecology.area_summary(),'daylight':round(state.get('daylight',0),2)})
     if a=='move_object':
         portable=[i for i,o in objects.items() if o.get('portable')]
         return ('Choose a portable object and destination in metres (x east, z south; clearing -25..25).',
@@ -529,8 +540,11 @@ def finish_action(geometry=None):
         result=world_state.move(state,d.get('object_id',''),d.get('destination_x',0),d.get('destination_z',0));description=result['text']
     elif a=='inspect':
         obj=world_state.ensure(state)['objects'].get(d.get('object_id',''))
-        description=('Inspected '+json.dumps(obj,ensure_ascii=False)[:1500]) if obj else 'Inspection failed: that world object does not exist.'
-        result={'success':bool(obj),'text':description}
+        living=None if obj else ecology.inspect(state,d.get('object_id',''),datetime.now(TZ).timetuple().tm_yday,state.get('daylight',0))
+        if living:result=living;description=living['text']
+        else:
+            description=('Inspected '+json.dumps(obj,ensure_ascii=False)[:1500]) if obj else 'Inspection failed: that world object does not exist.'
+            result={'success':bool(obj),'text':description}
     elif a in ['rest','sleep']:
         description='Finished sleeping in his cabin.' if a=='sleep' else 'Finished a quiet rest in his cabin.'
     elif a=='explore':
@@ -554,7 +568,11 @@ def finish_action(geometry=None):
         reading=p.get('reading')
         if not reading:raise ValueError('No retrieved article; reading cannot finish')
         description='Retrieved a Wikipedia excerpt for processing: '+reading['title']+'.'
-    elif a=='observe':description='Spent time watching the woodland without collecting anything.'
+    elif a=='observe':
+        # Older saved observe decisions have no area; they are given open attention at the woodland edge.
+        result=ecology.observe(state,d.get('observe_area') or 'woodland_edge',d.get('focus',''),
+                               datetime.now(TZ).timetuple().tm_yday,state.get('daylight',0))
+        description=result['text']
     else:description='Spent quiet time reflecting in his cabin.'
     life.sync_energy(state);state['completed']+=1
     project=next((x for x in state['projects'] if x['id']==p['project_id']),None)
@@ -861,7 +879,7 @@ class Handler(BaseHTTPRequestHandler):
             name,kind=static[self.path];return self.send(200,(ROOT/name).read_bytes(),kind)
         if self.path=='/api/state':
             with LOCK:
-                clock();body=json.dumps({**state,'reading_log':reading_journal.page(state)['items'],
+                clock();body=json.dumps({**state,'ecology_view':ecology.view(state,datetime.now(TZ).timetuple().tm_yday),'reading_log':reading_journal.page(state)['items'],
                     'reading_count':len(state['reading_log']),'runtime':runtime,
                     'maintenance_enabled':ACCESS_TOKEN is not None and (ROOT/'.git').exists()}).encode()
             return self.send(200,body,'application/json')

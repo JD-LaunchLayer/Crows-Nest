@@ -152,3 +152,11 @@ actions the world cannot perform is a world rule. Recent-pattern counts make
 repetition observable without a rule forcing change. The evaluation script in
 tools/ measures real-model behaviour on a copy of the save; unit tests use stubs
 and do not show decision quality.
+
+
+## Observable woodland (0.7.0)
+
+Observation returns findings generated from world state (species, positions,
+real-date phenology, light from actual trees), never model-invented facts.
+Focus biases attention without closing it. The woodland is an authored world
+that Jordan can change; it supplies things to notice, not interests to adopt.

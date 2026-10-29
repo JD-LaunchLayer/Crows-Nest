@@ -407,3 +407,43 @@ samples are suggestive, not statistically conclusive.
 ```bash
 python3 tests/test_decision.py
 ```
+
+## v0.7.0 — a woodland that can actually be observed
+
+**Why.** Real-model evaluation on Jordan's PC (v0.6.0) showed Crow choosing to
+observe the woodland to find "visible plant interactions" for a sculpture. In
+0.6 that action only recorded "Spent time watching the woodland without
+collecting anything": there was nothing in the world to notice.
+
+**What changed.**
+
+- `ecology.py` gives the existing trees species (oak, hornbeam, silver birch,
+  hazel, ash, holly), assigned once from their IDs without changing IDs, stocks
+  or positions, and adds plants: ivy, bramble, bracken, bluebell, wood anemone,
+  male fern, moss, nettles, honeysuckle, holly seedlings, fly agaric and grass.
+  It is an authored south-east English mixed woodland, like the spring and fruit
+  bushes, not an ecological simulation.
+- What is visible follows the real UK date: leaf colour and fall, ivy flowering
+  with insects in autumn, bluebells only above ground from late winter to early
+  summer, toadstools in autumn, and so on. Dates are typical UK approximations.
+- Ground light is calculated from the actual standing trees and their seasonal
+  leaf cover. Felling a tree really opens the canopy there, and ivy on a felled
+  tree is reported lying on the stump.
+- `observe` now asks where to look (grove, woodland edge, spring side or
+  clearing) and an optional focus. Things matching his focus are likelier to be
+  noticed, but one incidental detail outside it is always included, and in the
+  dark little can be seen. Each finding is marked new or already seen.
+  Observations describe what is visible, not causes; interpreting is his job.
+- `inspect` also works on trees and plants by ID.
+- Each finding is separately recallable (`observed` memories). Recall now
+  merges reworded near-duplicates and limits how many items of one type appear.
+- The 3D view colours tree crowns by species and season, thins them as leaves
+  fall, and shows simple low-poly clumps for visible ground plants.
+
+**Not yet:** plants do not grow, spread or respond to his actions over time
+(apart from light), there are no animals beyond the insects on ivy flowers, and
+weather/temperature are not simulated.
+
+```bash
+python3 tests/test_ecology.py
+```

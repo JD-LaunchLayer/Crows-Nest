@@ -51,6 +51,11 @@ def candidates(state):
         items.append({'type': 'event', 'id': m.get('id'), 'order': m.get('id') or 0,
                       'text': _short(m.get('event'), 220), 'why': _short(m.get('reason'), 120),
                       'when': m.get('at', '')[:16], 'importance': 0})
+        found = (m.get('world_result') or {}).get('findings') or []
+        for f in found:  # each thing he actually noticed is recallable on its own
+            items.append({'type': 'observed', 'id': m.get('id'), 'order': m.get('id') or 0,
+                          'text': _short(f.get('text'), 200), 'why': _short(m.get('intention'), 100),
+                          'when': m.get('at', '')[:16], 'importance': .2})
     for x in state.get('long_term', []):
         items.append({'type': 'lesson', 'id': x.get('source_id'), 'order': x.get('source_id') or 0,
                       'text': _short(x.get('interpretation'), 220), 'why': _short(x.get('fact'), 120),
@@ -131,12 +136,21 @@ def recall(state, budget_chars=1700, exclude_ids=(), limit=8):
         scored.append((overlap + item['importance'] + recency, item))
     scored.sort(key=lambda pair: pair[0], reverse=True)
     chosen, seen, used, per_type = [], {}, 2, {}
+    out_terms = {}
+
+    def _near_duplicate(terms, seen):
+        # Reworded versions of the same note (e.g. repeated "did not answer my question") count once.
+        for k, other in out_terms.items():
+            if terms and other and len(terms & other) / len(terms | other) >= .5:
+                return seen[k]
+        return None
     for score, item in scored:
-        if per_type.get(item['type'], 0) >= max(2, limit // 2):
+        if per_type.get(item['type'], 0) >= max(2, limit // 3):
             continue  # keep several kinds of evidence visible rather than one flooded kind
         key = re.sub(r'\W+', ' ', item['text'].casefold()).strip()
-        if key in seen:
-            seen[key]['times_recorded'] = seen[key].get('times_recorded', 1) + 1
+        twin = seen.get(key) or _near_duplicate(words(item['text']), seen)
+        if twin:
+            twin['times_recorded'] = twin.get('times_recorded', 1) + 1
             continue
         out = {k: item[k] for k in ('type', 'id', 'when', 'text', 'why') if item[k] not in (None, '')}
         size = len(json.dumps(out, ensure_ascii=False)) + 25
@@ -144,6 +158,7 @@ def recall(state, budget_chars=1700, exclude_ids=(), limit=8):
             continue
         used += size
         seen[key] = out
+        out_terms[key] = words(item['text'])
         per_type[item['type']] = per_type.get(item['type'], 0) + 1
         chosen.append(out)
         if len(chosen) >= limit:
