@@ -39,7 +39,10 @@ view=ecology.view(s,15);assert view['trees']['tree-0']['cover']==0 and all(p['sp
 with tempfile.TemporaryDirectory() as td:
     shutil.copy(ROOT/'crow.py',Path(td)/'crow.py')
     spec=importlib.util.spec_from_file_location('crow_eco_test',Path(td)/'crow.py');app=importlib.util.module_from_spec(spec);spec.loader.exec_module(app)
-    app.state['paused']=False;app.state['daylight']=.7
+    from datetime import datetime
+    noon=datetime(2026,10,29,12,0,tzinfo=app.TZ);midnight=datetime(2026,10,29,23,30,tzinfo=app.TZ)
+    app.CLOCK_OVERRIDE=lambda:noon  # fixed time so the test does not depend on when it runs
+    app.state['paused']=False
     base={'action':'observe','reason':'I want to see what grows with what.','intention':'Find which plants grow on other plants',
           'wish':'','wish_reason':'','next_step':'','project_id':-1,'project_title':'','project_status':'active',
           'target_action':'observe','target_sessions':1}
@@ -51,5 +54,23 @@ with tempfile.TemporaryDirectory() as td:
     # A decision saved by an older version (no area) still completes honestly.
     app.start_action({**base},1);app.state['pending']['decision'].pop('observe_area',None);app.tick(600)
     assert app.finish_action()['world_result']['success']
-print('PASS: once-only seeding; calendar phenology; darkness; new vs seen details; focused but open attention; '
+
+    # Looking in the dark (nothing new) is recorded, but cannot mint new lessons, interests or self-observations.
+    app.CLOCK_OVERRIDE=lambda:midnight;lessons=len(app.state['long_term']);notes=len(app.state['personality_notes'])
+    app.start_action({**app.DECISION_DEFAULTS,**base,'observe_area':'grove','focus':''},1);app.tick(600);dark=app.finish_action()
+    assert dark['new_evidence'] is False
+    reflection={'feeling':'Calm.','lesson':'Darkness helps me focus on form.','topic':'darkness observation','enjoyment':2,
+        'personality_note':'Darkness suits my minimalism.','next_step':'','reading_summary':'','answer_status':'not_applicable',
+        'meaning':'Nothing new was visible.','adjustment':'','valence':.1,'arousal':.1,'importance':.2}
+    app.model_call=lambda *a,**k:(copy.deepcopy(reflection),1);assert app.reflect(dark)
+    assert len(app.state['long_term'])==lessons and len(app.state['personality_notes'])==notes
+    assert 'darkness observation' not in app.state['interests'] and app.state['appraisals'][-1]['source_id']==dark['id']
+    assert memory_recall.recent_pattern(app.state)['observations_with_nothing_new']>=1
+    # A reworded title for an existing project continues it rather than creating a duplicate.
+    app.CLOCK_OVERRIDE=lambda:noon
+    app.start_action({**app.DECISION_DEFAULTS,**base,'project_id':0,'project_title':'Woodland plant sculpture'},1)
+    count=len(app.state['projects'])
+    app.start_action({**app.DECISION_DEFAULTS,**base,'project_id':0,'project_title':'Woodland Plant Interaction Sculpture'},1)
+    assert len(app.state['projects'])==count
+print('PASS: no lessons from nothing new; reworded projects continue; once-only seeding; calendar phenology; darkness; new vs seen details; focused but open attention; '
       'light from actual trees and felling consequences; plant/tree inspection; seasonal view; recallable observation events; legacy observe.')

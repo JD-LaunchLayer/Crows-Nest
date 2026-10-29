@@ -22,6 +22,9 @@ model in this world. The twin's life diverges from his as soon as it starts.
 """
 import argparse
 import contextlib
+import http.client
+import socket
+import urllib.error
 import importlib.util
 import io
 import json
@@ -33,6 +36,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+OUTAGE = (urllib.error.URLError, ConnectionError, http.client.RemoteDisconnected, socket.timeout, TimeoutError)
 
 
 def create(twin, source):
@@ -111,6 +115,7 @@ def run(twin, source, days, max_errors=25, model=None):
     st['paused'] = False
     generation = app.runtime['generation']
     failures = 0
+    outage_started = None
     last_report_day = None
     run_started = time.monotonic()
     print(f'Twin clock {clock["now"]:%d %b %Y %H:%M}; running until {end:%d %b %Y %H:%M}. Ctrl+C stops safely.')
@@ -149,6 +154,17 @@ def run(twin, source, days, max_errors=25, model=None):
                     app.reflect(memory)
                 app.decide_and_start(generation)
                 failures = 0
+                outage_started = None
+            except OUTAGE as exc:
+                # Ollama or the network being down is not part of his life: wait in real time, keep the twin's clock still.
+                outage_started = outage_started or time.monotonic()
+                if time.monotonic() - outage_started > 1800:
+                    print(f'Stopping: the model server has been unreachable for 30 minutes ({exc}). Run the command again later.')
+                    break
+                print(f'  Waiting for Ollama / the network ({exc}); the twin is not ageing meanwhile…', flush=True)
+                time.sleep(30)
+                t0 = time.monotonic()  # the wait is not processing time for him
+                continue
             except Exception as exc:  # a failure is recorded as part of the run, not hidden
                 failures += 1
                 meta['errors'] = (meta['errors'] + [{'at': clock['now'].isoformat(), 'error': str(exc)[:300]}])[-60:]

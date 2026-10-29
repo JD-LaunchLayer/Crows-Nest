@@ -182,8 +182,19 @@ def recent_pattern(state, window=12):
             streak += 1
         else:
             break
+    looked = [m for m in state.get('memories', []) if m.get('kind') == 'experience' and m.get('action') == 'observe'][-window:]
     log = state.get('reading_log', [])[-window:]
     unanswered = sum(1 for r in log if r.get('answer_status') == 'not_answered')
     repeats = sum(1 for r in log if r.get('new_source_text') is False)
     return {'last_choices': actions, 'decisions_with_current_intention': streak,
-            'recent_readings': len(log), 'readings_not_answering': unanswered, 'repeated_excerpts': repeats}
+            'recent_readings': len(log), 'readings_not_answering': unanswered, 'repeated_excerpts': repeats,
+            'recent_observations': len(looked),
+            'observations_with_nothing_new': sum(1 for m in looked if m.get('new_evidence') is False)}
+
+
+def similar(a, b, threshold=.5):
+    """True when two short texts share most of their meaningful words (reworded duplicates)."""
+    x, y = words(a), words(b)
+    if not x or not y:
+        return str(a).casefold().strip() == str(b).casefold().strip()
+    return len(x & y) / len(x | y) >= threshold

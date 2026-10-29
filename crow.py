@@ -30,7 +30,7 @@ ACCESS_TOKEN = None
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.8.0'
+APP_VERSION = '0.8.1'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -232,7 +232,8 @@ def decision_context():
     memory=memory_recall.recall(state,MEMORY_BUDGET,exclude_ids=[m['id'] for m in recent])
     near=world_state.nearby(state)
     context={'clock':{k:state['clock'][k] for k in ['date','time','night']},'location':state['location'],
-        'body':life.perceive(state)['sensations'],'affect':{k:state['affect'][k] for k in ['valence','arousal']},
+        'body':life.perceive(state)['sensations'],
+        'outside_light':'dark' if state.get('daylight',0)<.12 else 'dim' if state.get('daylight',0)<.35 else 'daylight','affect':{k:state['affect'][k] for k in ['valence','arousal']},
         'intention':state['current_intention'],'next_step':state['next_step'],
         'recent_events':[{k:m.get(k) for k in ['id','time','event']} for m in recent],
         'relevant_memories':memory,'recent_pattern':memory_recall.recent_pattern(state),
@@ -459,7 +460,9 @@ def start_action(d, seconds, reading=None):
             project['milestone_done']=False;project['target_action']=d['target_action'];project['target']=clamp(d['target_sessions'],1,20);project['progress']=0
     elif not project and d['project_id']==0 and d['project_title'].strip():
         title = d['project_title'].strip()[:150]
-        project = next((p for p in state['projects'] if p['title'].casefold()==title.casefold() and p['status']!='completed'), None)
+        # A reworded title for a project he already has continues that project instead of silently duplicating it.
+        project = next((p for p in state['projects'] if p['status']!='completed' and memory_recall.similar(p['title'],title)), None)
+        if project and project['status']!='active':project['status']='active'
         if not project:
             project = {'id':state['next_project_id'],'title':title,'status':d['project_status'],'target_action':d['target_action'],'target':clamp(d['target_sessions'],1,20),'progress':0,'created':dt.isoformat()}
             state['next_project_id'] += 1; state['projects'].append(project)
@@ -588,6 +591,7 @@ def finish_action(geometry=None):
         result=ecology.observe(state,d.get('observe_area') or 'woodland_edge',d.get('focus',''),
                                now().timetuple().tm_yday,state.get('daylight',0))
         description=result['text']
+        new_evidence=bool(result.get('new_details'))
     else:description='Spent quiet time reflecting in his cabin.'
     life.sync_energy(state);state['completed']+=1
     project=next((x for x in state['projects'] if x['id']==p['project_id']),None)
@@ -606,6 +610,7 @@ def finish_action(geometry=None):
     if result:details['world_result']=result
     if a=='read':details.update(source=copy.deepcopy(p['reading']),research_question=d.get('research_question','')[:240])
     details['body_after']=life.perceive(state)['sensations']
+    if a=='observe':details['new_evidence']=new_evidence
     m=event(description,d['reason'],**details)
     if trial:life.bind_trial(state,trial,m)
     if a=='read':
@@ -665,8 +670,9 @@ def reflect(memory):
         appraisal={'at':now().isoformat(),'source_id':memory['id'],'feeling':result['feeling'][:350],'topic':result['topic'][:60],'enjoyment':clamp(result['enjoyment'],-2,2),'meaning':signal['meaning'],'concern':signal['concern'],'valence':signal['valence'],'importance':signal['importance']}
         state['appraisals'].append(appraisal);state['appraisals']=state['appraisals'][-400:]
         lesson=result['lesson'].strip()
-        repeated_lesson=any(re.sub(r'\W+',' ',x['interpretation'].casefold()).strip()==re.sub(r'\W+',' ',lesson.casefold()).strip() for x in state['long_term'][-30:])
-        fresh_evidence=memory.get('new_source_text',True)
+        repeated_lesson=any(memory_recall.similar(x['interpretation'],lesson) for x in state['long_term'][-30:])
+        # Unchanged sources, or looking without noticing anything new, are not fresh evidence for new lessons or interest.
+        fresh_evidence=memory.get('new_source_text',True) and memory.get('new_evidence',True)
         if lesson and not repeated_lesson and fresh_evidence:
             state['long_term'].append({'source_id':memory['id'],'fact':memory['event'],'source_url':memory.get('source',{}).get('url'),'interpretation':result['lesson'][:350],'at':appraisal['at']})
             state['long_term']=state['long_term'][-400:]
@@ -677,7 +683,7 @@ def reflect(memory):
             if len(state['interests'])>16:
                 victim=min(state['interests'],key=lambda k:abs(state['interests'][k]));del state['interests'][victim]
         note=result['personality_note'].strip()[:220]
-        if note and note not in [n['text'] for n in state['personality_notes']]:
+        if note and fresh_evidence and not any(memory_recall.similar(n['text'],note) for n in state['personality_notes']):
             state['personality_notes'].append({'text':note,'source_id':memory['id'],'at':appraisal['at']})
             state['personality_notes']=state['personality_notes'][-12:]
         state['diary'].append({'day':state['day'],'at':appraisal['at'],'text':result['feeling'][:350],'source_id':memory['id']})

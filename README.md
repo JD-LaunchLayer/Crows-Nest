@@ -482,3 +482,23 @@ one small model, not a prediction of the real Crow.
 ```bash
 python3 tests/test_timelapse.py
 ```
+
+## v0.8.1 — no lessons from nothing new
+
+The first twin pilot started at dusk. Crow observed eleven times in the dark,
+noticed nothing new each time, and still recorded six reworded lessons and
+self-observations praising darkness ("darkness enhances minimalist focus…").
+
+- An observation that produced no new detail is saved as an event and still
+  appraised, but, like a repeated reading excerpt, it cannot add long-term
+  lessons, interest score or self-observations.
+- Lessons, self-observations and project titles are compared by shared words,
+  so reworded duplicates are not stored again; a reworded project title
+  continues the existing project.
+- The decision context states whether it is dark, dim or daylight outside, and
+  `recent_pattern` counts recent observations that found nothing new.
+- The twin waits in real time when Ollama or the network is unreachable, without
+  ageing him or counting it as his failure; it gives up after 30 minutes.
+  The live Crow still pauses with an error in that case.
+
+Earlier entries are left as they were.

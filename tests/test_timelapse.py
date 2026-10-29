@@ -41,5 +41,18 @@ with tempfile.TemporaryDirectory() as td:
     again=json.loads((twin/'crow-save.json').read_text())['twin']
     assert again['started_virtual']==meta['started_virtual'] and datetime.fromisoformat(again['virtual_now'])>=start.replace()+(reached-start)
     assert digest()==before
-print('PASS: separate twin copy; refuses the real folder; virtual clock without real waiting; real life untouched; '
+
+    # An Ollama/network outage is waited out in real time; the twin neither ages nor records it as his failure.
+    import urllib.error
+    down={'n':3}
+    def flaky(*a,**k):
+        if down['n']>0:down['n']-=1;raise urllib.error.URLError('Connection refused')
+        return model(*a,**k)
+    real_sleep=timelapse.time.sleep;timelapse.time.sleep=lambda s:None
+    before_outage=json.loads((twin/'crow-save.json').read_text())['twin']
+    with contextlib.redirect_stdout(io.StringIO()):timelapse.run(twin,real/'crow-save.json',3.2,model=flaky)
+    timelapse.time.sleep=real_sleep
+    after=json.loads((twin/'crow-save.json').read_text())['twin']
+    assert down['n']==0 and len(after['errors'])==len(before_outage['errors'])
+print('PASS: outage waited out without ageing; separate twin copy; refuses the real folder; virtual clock without real waiting; real life untouched; '
       'body, sleep and observation continue through simulated days; resumable.')
