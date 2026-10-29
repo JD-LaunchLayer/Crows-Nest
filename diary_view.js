@@ -40,7 +40,7 @@ export function createDiary({document}){
   if(!$('diary'))return;
   const key=JSON.stringify([s.decisions,s.pending&&s.pending.start,(s.diary||[]).length,s.interests,(s.personality_notes||[]).length,s.affect,s.current_intention,s.clock&&s.clock.date]);
   if(key===last)return;last=key;
-  if(s.clock)$('diaryDate').textContent=`${s.clock.date} · ${s.clock.time}${s.twin?' · twin clock':' · UK time'}`;
+  if(s.clock)$('diaryDate').textContent=`${s.clock.date} · ${s.clock.time}${s.twin?' · twin clock':s.crow_clock?' · Crow\'s own time':' · UK time'}`;
   $('diaryBadge').textContent=s.twin?'CROW · TIME-LAPSE TWIN':'CROW\'S JOURNAL';
   $('diaryNow').textContent=summary(s);
   const events=new Map((s.memories||[]).map(m=>[m.id,m]));

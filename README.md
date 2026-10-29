@@ -593,3 +593,27 @@ refuses every change (pause, update) and never touches the real Crow on 8765.
 ```bash
 node tests/diary_view.mjs
 ```
+
+## v0.11.0 — a steady, faster life (optional), and keeping the twin
+
+```bash
+python3 tools/set_speed.py 24        # one real hour per Crow day, like Pino; restart Crow afterwards
+python3 tools/promote_twin.py        # with Crow stopped: make the twin's life his life (backup first)
+```
+
+At a speed above 1 Crow keeps his own calendar, starting from the present: his
+sun, seasons, plants, body, activities and memory fading all follow it while he
+runs. Nothing advances while he is paused or closed, and his calendar is never
+wound back (setting speed 1 later keeps his own date at normal pace). The
+header shows "Crow's time (24× speed)". Cloud spend rises with speed; raise the
+cap with `python3 tools/use_haiku.py --daily-budget 3` (answer "N" to replacing
+the key).
+
+`promote_twin.py` backs up the real save, events and reading archive to
+`backups/before-twin-<time>/`, copies the twin's life in, keeps the twin's date
+as his clock, keeps the real-world spending record, and adds an event stating
+that his life continued from the twin.
+
+```bash
+python3 tests/test_speed.py
+```
