@@ -227,3 +227,43 @@ python3 tests/test_maintenance.py
 Tests exercise a real local Git remote and backups, refusal paths, authenticated
 HTTP requests, update exclusivity and the restart token/resume contract. Full
 self-restart and reconnect still need verification on the running PC/phone.
+
+
+## v0.4.2 — quick research and a clearer journal
+
+Crow can choose quick research, which waits only for Wikipedia retrieval and
+local model processing, or leisurely reading, which uses the configured read
+session duration. The UK clock and physical work durations are unchanged. A
+saved older reading session without a mode becomes a quick lookup on upgrade;
+its retrieved source is preserved.
+
+The Journal now includes a **Reading notebook**: article links, the research
+question and purpose, Crow's source summary, his personal note, whether he
+thinks the question was answered, and a tentative next step. **View excerpt**
+shows the saved text; new processed entries identify the exact excerpt length
+supplied to the model. **Load earlier reading** opens older history. Old cached
+sources are recovered without fabricating summaries or future plans.
+
+The current activity shows its source/question or target object, construction
+plan, material bill, work progress, and start time when applicable. **Tentative
+next step** is Crow's own revisable intention, not a queued instruction. The
+activity feed also records his stated aim and reason. Processing a completed
+experience survives pause/restart and is not applied twice on retry. These are
+observer views, with no controls for choosing his interests or behaviour.
+
+Notes remain model-generated interpretations. Researching a topic does not
+grant practical skill or finish a physical project. Article selection still
+uses Wikipedia's first search result. Quick research need not prevent Crow
+from choosing further research; there is no forced activity schedule.
+
+The proposed [master prompt and life-system brief](docs/CROW_MASTER_PROMPT.md)
+are included for review and future implementation. That document is not loaded
+as the runtime prompt in this release; hunger, food, cooking and the richer
+emotion/learning architecture described there are not yet implemented.
+
+Additional checks:
+
+```bash
+python3 tests/test_research.py
+node tests/journal.mjs
+```

@@ -103,3 +103,20 @@ Future observer interfaces should show expressed wishes, actual actions and
 optional evidence/history. They should not offer controls for choosing his
 preferences or directing his life. Technical pause/backup controls are for
 maintenance, not behavioural coaching.
+
+
+## Research timing and observer notebook (0.4.2)
+
+Task research may use a quick lookup with no simulated reading timer. Retrieval
+and inference still take real execution time. Leisurely reading remains a
+Crow-selected timed option. Physical work and the real clock do not accelerate.
+
+Show the source and excerpt separately from Crow's interpretation, tentative
+lesson and possible next step. Recover older source records honestly: absent
+notes stay absent. The next step is his revisable intention, not an owner-set
+queue. A persistent pending-reflection reference lets processing resume after
+pause/restart; one source event receives one appraisal. None of these observer
+features prescribes an interest or makes a source summary proof of skill.
+
+See docs/CROW_MASTER_PROMPT.md for the proposed expanded brief. It is a design
+document, not an installed personality rewrite or a claim those systems exist.
