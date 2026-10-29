@@ -120,3 +120,21 @@ features prescribes an interest or makes a source summary proof of skill.
 
 See docs/CROW_MASTER_PROMPT.md for the proposed expanded brief. It is a design
 document, not an installed personality rewrite or a claim those systems exist.
+
+
+## First causal life loop (0.5.0)
+
+See docs/LIFE_LOOP.md for the authored body processes, resource rates, measurable
+carving domain, precommitted predictions, reusable parameterised methods and
+contextual appraisal. This is the first implementable slice of the expanded
+brief. Curiosity and kindness are intentional initial dispositions, not claims
+of an unbiased or blank mind. Do not assign a preferred technique as a hobby.
+
+No bodily threshold selects an action. Long physical work offers Crow a choice
+to continue or suspend with progress preserved. Generated predictions must be
+recorded before new work; older unpredicted work remains honestly unpredicted.
+A failed chosen tolerance still produces its material-paid rough workpiece.
+Learning evidence and affect carry actual executor event references. A source
+summary or reflection cannot grant practical skill, create an object or refill
+needs. The proposed full master prompt is not wholesale loaded into the small
+runtime context; a compact relevant policy and current evidence are supplied.

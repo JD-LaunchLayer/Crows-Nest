@@ -21,6 +21,7 @@ export function createJournal({document,apiFetch}){
    for(const record of items){
     const card=node('article','',parent,'entry reading-entry');link(card,record);
     node('em',date(record.at)+' · '+({lookup:'Quick research',leisure:'Reading at leisure',legacy:'Earlier reading'}[record.mode]||'Reading'),card);
+    if(record.new_source_text===false)node('p','Previously consulted excerpt · not fresh source evidence.',card,'muted');
     if(record.question)node('p','Question: '+record.question,card);
     if(record.intention)node('p','Working towards: '+record.intention,card);
     if(record.reason)node('p','Why: '+record.reason,card);

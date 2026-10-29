@@ -54,10 +54,14 @@ def ensure(state):
             # Existing carvings retain their previous placement. Migration spends
             # no more material; their historical one-unit cost is preserved.
             factor={'sphere':math.pi/6,'cone':math.pi/12,'cylinder':math.pi/4}.get(shape,1)
-            height=1/(500*.14*.14*factor)
-            p=part('body',0,height/2,0,.14,height,.14);p['shape']=shape
+            # A new practice result has a measurable width deviation. Preserve
+            # the paid kilogram by compensating height, rather than spawning mass.
+            width=c.get('actual_width_m',.14)
+            height=1/(500*width*.14*factor)
+            p=part('body',0,height/2,0,width,height,.14);p['shape']=shape
             world['objects'][ident]={'id':ident,'name':c['name'],'kind':'carving','x':3+(i%5)*.9,'z':9+(i//5),
                                      'portable':True,'parts':[p],'paid_materials':{'wood':1.0},'revision':0}
+            if 'actual_width_m' in c:world['objects'][ident]['work_measurement']={'target_width_m':c.get('target_width_m',.14),'actual_width_m':width}
     return world
 
 

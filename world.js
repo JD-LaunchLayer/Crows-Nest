@@ -2,6 +2,7 @@ import * as T from '/vendor/three.module.js';
 import {installTouchControls} from '/mobile_controls.js';
 import {createSky} from '/sky.js';
 import {createJournal} from '/journal.js';
+import {createLifeView} from '/life_view.js';
 const $=id=>document.getElementById(id),txt=(id,v)=>$(id).textContent=v;
 const clientVersion=document.querySelector?.('meta[name="crow-version"]')?.content||null;
 let updateRequested=false;
@@ -11,6 +12,7 @@ let accessToken=tokenParams.get('token')||globalThis.sessionStorage?.getItem('cr
 if(tokenParams.has('token')){globalThis.sessionStorage?.setItem('crow-access-token',accessToken);globalThis.history?.replaceState(null,'',globalThis.location.pathname);}
 async function apiFetch(url,options={}){return fetch(url,{...options,headers:{...(options.headers||{}),...(accessToken?{'Authorization':'Bearer '+accessToken}:{})}})}
 const journal=createJournal({document,apiFetch});
+const lifeView=createLifeView({document});
 const holder=$('view'),scene=new T.Scene();scene.background=new T.Color('#b7c6b0');scene.fog=new T.Fog('#b7c6b0',24,65);
 let renderer;try{renderer=new T.WebGLRenderer({antialias:true,powerPreference:'low-power'});}catch(e){txt('loading','3D graphics could not start. Check Firefox hardware acceleration. '+e.message);throw e;}
 renderer.setPixelRatio(Math.min(devicePixelRatio,globalThis.matchMedia?.('(pointer:coarse)').matches?1:1.5));renderer.shadowMap.enabled=true;renderer.shadowMap.type=T.PCFSoftShadowMap;holder.prepend(renderer.domElement);
@@ -144,6 +146,7 @@ function beginDesired(){
  if(d.pending&&d.action==='read'){readingPlan();return}
  anim.activeAction=d.pending?d.action:'idle';
  let place=stations[d.location]||stations.cabin;
+ if(d.pending&&['eat','drink'].includes(d.action)){const target=s.built_world?.objects[d.objectId||(d.action==='eat'?'food_store':'spring')];if(target)place=new T.Vector3(target.x,0,target.z-1);}
  if(d.pending&&d.action==='fell_tree'){const tree=s.built_world?.trees[d.objectId];if(tree)place=new T.Vector3(tree.x-.9,0,tree.z);}
  anim.steps=[walk(new T.Vector3(0,0,0)),walk(place),wait(d.pending?d.action:'idle',Infinity)];
 }
@@ -209,17 +212,18 @@ if(clientVersion&&s.runtime.version&&clientVersion!==s.runtime.version){globalTh
 const maintenance=s.runtime.maintenance||{status:'idle'};if(updateRequested&&maintenance.status==='complete'){globalThis.location?.reload?.();return;}const updating=['checking','backing_up','pulling','restarting'].includes(maintenance.status);
 if($('updateCrow')){ $('updateCrow').disabled=updating||!s.maintenance_enabled; $('updateCrow').textContent=updating?'Updating…':'Back up and update';txt('updateStatus',maintenance.message||(s.maintenance_enabled?'Ready. Your private life data stays on the PC.':'Start Crow with --lan from its Git checkout to enable authenticated updates.'));}
 if(['complete','up_to_date','failed','interrupted'].includes(maintenance.status))updateRequested=false;
-txt('toggle',s.paused?'Begin life':'Pause');txt('clock',`${s.clock.date} · ${s.clock.time} · UK time`);txt('status',s.runtime.status+(s.last_seconds!==null?' · Last choice '+s.last_seconds+'s':''));txt('error',s.last_error);$('toggle').disabled=updating;txt('activity',({rest:'Resting',practise:'Practising archery',explore:'Exploring',craft:'Making a carving',read:'Reading Wikipedia',sleep:'Sleeping',observe:'Watching the woodland',reflect:'Reflecting',gather:'Gathering materials',plan:'Preparing a construction plan',construct:'Constructing',move_object:'Carrying and placing an object',inspect:'Inspecting an object',fell_tree:'Felling a tree'})[s.action]);txt('reason',s.reason);$('energy').value=s.energy;txt('resources',`Wood: ${s.materials} kg · Stone: ${s.stone||0} kg · Archery sessions: ${s.skills.archery} · Carvings: ${s.skills.craft}`);txt('intention',s.current_intention||'Crow has not expressed an intention yet.');
+txt('toggle',s.paused?'Begin life':'Pause');txt('clock',`${s.clock.date} · ${s.clock.time} · UK time`);txt('status',s.runtime.status+(s.last_seconds!==null?' · Last choice '+s.last_seconds+'s':''));txt('error',s.last_error);$('toggle').disabled=updating;txt('activity',({eat:'Eating',drink:'Drinking',rest:'Resting',practise:'Practising archery',explore:'Exploring',craft:'Making a carving',read:'Reading Wikipedia',sleep:'Sleeping',observe:'Watching the woodland',reflect:'Reflecting',gather:'Gathering materials',plan:'Preparing a construction plan',construct:'Constructing',move_object:'Carrying and placing an object',inspect:'Inspecting an object',fell_tree:'Felling a tree'})[s.action]);txt('reason',s.reason);$('energy').value=s.energy;txt('resources',`Wood: ${s.materials} kg · Stone: ${s.stone||0} kg · Archery sessions: ${s.skills.archery} · Carvings: ${s.skills.craft}`);txt('intention',s.current_intention||'Crow has not expressed an intention yet.');
 setActivity(s);
 $('feed').replaceChildren();for(const m of s.memories.slice(-16).reverse())entry($('feed'),m.event,[m.at?new Date(m.at).toLocaleString('en-GB',{timeZone:'Europe/London'}):`Earlier prototype · Day ${m.day} · ${m.time}`,m.intention?'Aim: '+m.intention:'',m.reason?'Why: '+m.reason:'',m.next_step?'Tentative next step: '+m.next_step:''].filter(Boolean).join(' · '));
 $('wishes').replaceChildren();for(const w of s.wishes.slice(-10).reverse())entry($('wishes'),w.text,`${w.reason} · First expressed day ${w.day} · ${w.mentions} mention(s)`);if(!s.wishes.length)entry($('wishes'),'No wishes expressed yet.');
 $('projects').replaceChildren();for(const p of s.projects.slice(-8).reverse())entry($('projects'),p.title,`${p.status} · ${p.progress}/${p.target} ${p.target_action} sessions`);if(!s.projects.length)entry($('projects'),'No projects chosen yet.');
-$('emotions').replaceChildren();for(const [name,value]of Object.entries(s.emotions)){const label=document.createElement('div');label.textContent=name.charAt(0).toUpperCase()+name.slice(1);const bar=document.createElement('progress');bar.max=100;bar.value=value;$('emotions').append(label,bar)}
+$('emotions').replaceChildren();if(!s.affect)for(const [name,value]of Object.entries(s.emotions)){const label=document.createElement('div');label.textContent=name.charAt(0).toUpperCase()+name.slice(1);const bar=document.createElement('progress');bar.max=100;bar.value=value;$('emotions').append(label,bar)}
 txt('feeling',s.appraisals.length?s.appraisals.at(-1).feeling:'He has not reflected on a completed experience yet.');
 $('longterm').replaceChildren();for(const m of s.long_term.slice(-6).reverse())entry($('longterm'),m.interpretation,'Based on: '+m.fact);
 $('reading').replaceChildren();const source=s.pending?.reading;if(source){const a=document.createElement('a');a.textContent=source.title;a.href=source.url;a.target='_blank';a.rel='noopener noreferrer';$('reading').append(a)}
 const pending=s.pending;txt('remaining',pending?(pending.decision?.action==='read'&&pending.duration===0?`${s.paused?'Paused · ':''}Quick research · finishes after processing the excerpt`:`${s.paused?'Paused · ':''}${Math.ceil(pending.remaining/60)} min remaining · ${Math.round(pending.duration/60)} min session`):s.reflection_pending?'Processing this experience.':'Choosing the next activity.');
 journal.update(s);
+lifeView.update(s);
 $('creations').replaceChildren();for(const c of s.creations.slice(-8).reverse())entry($('creations'),c.name,`${c.shape} · Day ${c.day}`);if(s.built_world){syncBuiltWorld(s.built_world)}else{creations(s.creations)}lamp.intensity=s.action==='read'&&s.pending?15:(s.daylight<.2?8:1.5);
 const celestial=sky.update(new Date(s.clock.iso));if($('skyInfo'))txt('skyInfo',`Sun ${celestial.sun.altitude.toFixed(0)}° · Moon ${celestial.moon.altitude.toFixed(0)}° above horizon · Wickford`);
 if($('worldPlans')&&s.built_world){$('worldPlans').replaceChildren();for(const p of s.built_world.plans.slice(-5).reverse())entry($('worldPlans'),`${p.name} · ${p.status}`,`Plan ${p.id} · ${Object.entries(p.bill).map(([m,q])=>q+' kg '+m).join(', ')||'No new materials'} · ${p.work_done_minutes||0}/${p.minutes} min work`);$('worldObjects').replaceChildren();for(const o of Object.values(s.built_world.objects))entry($('worldObjects'),o.name,`${o.id} · (${o.x.toFixed(1)}, ${o.z.toFixed(1)}) · ${o.parts.length} parts`);txt('sourceStocks',Object.entries(s.built_world.sources).map(([m,v])=>`${m}: ${v.stock} kg remains`).join(' · '));}
@@ -259,10 +263,11 @@ if(anim.pose==='take'||anim.pose==='putback'){arms[1].rotation.x=-1.4*Math.sin(M
 headPivot.rotation.x=anim.book?.22+Math.sin(anim.elapsed*.5)*.015:0;
 crow.position.y=-.28*seated-.36*anim.floor+(moving?Math.abs(walking)*.025:0);
 torso.scale.y=1+Math.sin(anim.elapsed*1.8)*.008;
-heldBook.visible=anim.book;if(shelfBook)shelfBook.visible=!anim.book;heldAxe.visible=anim.pose==='fell_tree'&&!moving;bow.visible=!anim.book&&!seated&&!heldAxe.visible;
+heldBook.visible=anim.book;if(shelfBook)shelfBook.visible=!anim.book;heldAxe.visible=anim.pose==='fell_tree'&&!moving;bow.visible=anim.pose==='practise'&&!anim.book&&!seated&&!heldAxe.visible;
 const turn=anim.elapsed%24;pagePivot.rotation.z=anim.pose.startsWith('reading')&&turn<1.8?Math.PI*T.MathUtils.smoothstep(turn,0,1.8):0;
 if(anim.pose==='practise'&&!moving){arms[0].rotation.x=-1.25;arms[1].rotation.x=-1.1;elbows[1].rotation.x=-.8;}
 if(heldAxe.visible){arms[1].rotation.x=-.75+Math.sin(anim.elapsed*2)*.55;elbows[1].rotation.x=-.4;}
+if(['eat','drink'].includes(anim.pose)&&!moving){arms[1].rotation.x=-1.25;elbows[1].rotation.x=-1.2+Math.sin(anim.elapsed*1.2)*.12;headPivot.rotation.x=.08;}
 if(anim.pose==='craft'&&!moving){arms[1].rotation.x=-.8+Math.sin(anim.elapsed*4)*.12;elbows[1].rotation.x=-.5;headPivot.rotation.x=.18;}
 if(anim.pose==='observe'&&!moving)headPivot.rotation.y=Math.sin(anim.elapsed*.2)*.35;else headPivot.rotation.y=0;
 crow.visible=!(anim.pose==='sleep');

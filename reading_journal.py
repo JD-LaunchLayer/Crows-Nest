@@ -2,6 +2,24 @@
 import copy
 import json
 import re
+import hashlib
+
+
+def fingerprint(source):
+    return hashlib.sha256(source.get('text','')[:CONTEXT_CHARS].strip().encode()).hexdigest()
+
+
+def research_context(state):
+    records=state.get('reading_log',[])
+    groups={}
+    for record in records:
+        key=record.get('url') or record.get('title')
+        if key not in groups:groups[key]={'title':record.get('title'),'times_consulted':0}
+        groups[key].update({k:record.get(k) for k in ['question','summary','answer_status']})
+        groups[key]['last_id']=record['id']
+        groups[key]['times_consulted']+=1
+    return {'sources':sorted(groups.values(),key=lambda g:g['last_id'])[-4:],
+            'recent_search_feedback':state.get('research_feedback',[])[-2:]}
 
 CONTEXT_CHARS = 2500
 
@@ -17,11 +35,14 @@ def ensure(state, root):
     sources = {key: memory['source'] for key, memory in memories.items()}
     for path in (root / 'crow-reading').glob('article-*.json'):
         match = re.fullmatch(r'article-(\d+)\.json', path.name)
-        if not match or int(match[1]) in records:
+        if not match:
             continue
+        existing=records.get(int(match[1]))
+        if existing and existing.get('fingerprint'):continue
         try:
             source = json.loads(path.read_text())
             if isinstance(source, dict) and isinstance(source.get('title'), str):
+                if existing:existing['fingerprint']=fingerprint(source)
                 sources.setdefault(int(match[1]), source)
         except (OSError, ValueError):
             continue  # Leave a damaged archive untouched; it is not a new experience.
@@ -31,6 +52,7 @@ def ensure(state, root):
         saved = source.get('journal')
         if isinstance(saved, dict) and saved.get('id') == memory_id:
             records[memory_id] = copy.deepcopy(saved)
+            records[memory_id].setdefault('fingerprint',fingerprint(source))
             continue
         memory = memories.get(memory_id, {})
         lesson = next((item.get('interpretation', '') for item in state.get('long_term', [])
@@ -42,6 +64,7 @@ def ensure(state, root):
             'reason': memory.get('reason', ''), 'mode': 'legacy', 'status': 'legacy',
             'summary': '', 'lesson': lesson, 'answer_status': 'unknown',
             'next_step': '', 'processed_chars': 0,
+            'fingerprint':fingerprint(source),
         }
     state['reading_log'] = sorted(records.values(), key=lambda record: record['id'])
 
@@ -58,6 +81,8 @@ def save_article(root, source, record):
 def record_reading(state, memory, pending, root):
     source = pending['reading']
     decision = pending['decision']
+    digest=fingerprint(source)
+    earlier=next((r for r in reversed(state.get('reading_log',[])) if r.get('fingerprint')==digest),None)
     record = {
         'id': memory['id'], 'at': memory['at'], 'title': source['title'], 'url': source['url'],
         'query': source.get('query', ''), 'question': decision.get('research_question', '')[:240],
@@ -65,7 +90,9 @@ def record_reading(state, memory, pending, root):
         'mode': decision.get('reading_mode', 'lookup'), 'status': 'awaiting_note',
         'summary': '', 'lesson': '', 'answer_status': 'unknown',
         'next_step': decision.get('next_step', '')[:300], 'processed_chars': 0,
+        'fingerprint':digest,'new_source_text':earlier is None,'repeat_of':earlier['id'] if earlier else None,
     }
+    memory['new_source_text']=record['new_source_text']
     state.setdefault('reading_log', []).append(record)
     save_article(root, source, record)
 

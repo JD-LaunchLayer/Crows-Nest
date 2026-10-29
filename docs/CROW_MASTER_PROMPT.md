@@ -1,6 +1,6 @@
 # Crow: master prompt and life systems
 
-Draft for Jordan — 29 October 2026. This is a proposed specification, not an installed update. The baseline reviewed was Crow v0.4.1. The accompanying v0.4.2 implements faster research and observer logging; the broader life systems below remain proposed.
+Draft for Jordan — 29 October 2026. This is a proposed specification, not an installed update. The baseline reviewed was Crow v0.4.1. The accompanying v0.4.2 introduced faster research and observer logging. Version 0.5.0 implements a first bounded body/learning/appraisal loop; see LIFE_LOOP.md for exact capabilities. The broader architecture below remains the target.
 
 The aim is a persistent simulated individual whose choices reflect his circumstances and accumulated experience. Curiosity and kindness are intentionally chosen starting dispositions. His appearance does not prescribe his identity, and his hobbies and projects are not assigned. These are simulated emotions and agency within an authored world; neither this prompt nor a believable journal establishes human subjective experience.
 
@@ -92,7 +92,7 @@ Use structured outputs that separate an attempted action from a reported result.
 
 The v0.4.1 baseline has local decisions, some reflective memory and interest tracking, energy, real clock/day/night, Wikipedia excerpts, finite wood/stone/tree accounting, persistent primitive construction, a walkable desktop/mobile world, and authenticated phone maintenance.
 
-Its emotional values still start from fixed baselines and drift back towards fixed values. Its action vocabulary and practical skill model remain narrow. Hunger, thirst, food supply, cooking, cleaning, broad object interaction, and the fuller learning/appraisal/memory design above are not implemented by supplying this prompt. Many furnishings remain props. Existing objects and memories must be preserved while those systems are added.
+In the v0.4.1 baseline its emotional values started from fixed baselines and drifted back towards fixed values. Its action vocabulary and practical skill model remain narrow. Supplying this prompt alone cannot implement hunger, thirst, food supply, cooking, cleaning, broad object interaction or the fuller learning/appraisal/memory design above. Version 0.5.0 adds a first body, provisions, measured carving and contextual appraisal implementation, documented separately in LIFE_LOOP.md; cooking, cleaning and general physical learning remain future work. Many furnishings remain props. Existing objects and memories must be preserved while those systems are added.
 
 ## Research timing and observer detail: v0.4.2
 
@@ -100,7 +100,7 @@ Jordan specifically wants useful research to complete without a human reading ti
 
 The observer journal shows the actual source and excerpt, Crow's research question and stated purpose, his source summary, his personal note, and his own assessment of whether the question was answered. These generated notes are interpretations, not verified facts or proof of practical skill. The next step is explicitly tentative and chosen by Crow; it is not queued as an owner instruction. Earlier cached sources appear with missing notes honestly left missing.
 
-Unprocessed experiences survive pause and restart so processing can resume before another decision. The history can load earlier readings and show the excerpt supplied to the model. Source retrieval still uses Wikipedia's first search result, and broader article selection remains future work.
+Unprocessed experiences survive pause and restart so processing can resume before another decision. The history can load earlier readings and show the excerpt supplied to the model. Version 0.5.0 adds candidate relevance selection, repeat-source evidence and research-progress feedback; see LIFE_LOOP.md. The earlier v0.4.2 implementation used the first result.
 
 ## Suggested implementation order
 

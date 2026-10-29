@@ -267,3 +267,78 @@ Additional checks:
 python3 tests/test_research.py
 node tests/journal.mjs
 ```
+
+
+## v0.5.0 — a first causal learning and bodily-needs loop
+
+This milestone connects actual attempts, predictions, fatigue and future choices.
+It is deliberately limited to a measurable carving domain, not general human
+learning, consciousness or unrestricted physical simulation. The compact runtime
+policy now starts Crow curious and kind, without assigning a hobby or occupation.
+
+- Food, hydration, digestion, sleep pressure and exertion advance from active
+  elapsed time and effort. A finite provisions chest, slowly renewing fruit
+  bushes and a replenishing spring basin are present before needs are enabled.
+  Their objects appear in the 3D world. Crow chooses whether and when to eat,
+  drink, rest or sleep; no needs threshold assigns an activity.
+- Long physical activities get a model-selected continuation review every 15
+  minutes. Crow can pause with progress saved and choose `resume_work` later.
+  Pausing for maintenance or closing the program advances no bodily needs,
+  supplies, learning or emotional decay.
+- Before a new carving attempt Crow can choose a hypothesis, predicted success,
+  expected width error, tolerance and working method. If the main choice omits
+  that prediction, a short local model call supplies it before work starts.
+- Working support, pass type, direction, accumulated motor practice and current
+  fatigue determine a bounded width deviation. The actual saved workpiece has
+  that width; its height compensates to preserve the paid kilogram. A missed
+  tolerance still leaves a real rough workpiece and spends its material.
+- Tested parameterised carving methods retain outcomes, source event IDs and
+  shapes tested. Crow can choose to reuse them on another supported shape.
+  Practical control improves through performed work; reading never increments
+  it. Legacy session counters are retained as history, not certified expertise.
+- Reflections appraise the particular outcome against Crow's own concern.
+  Valence/arousal signals retain their event references and fade over active
+  time. The old fixed happiness baselines and activity-specific emotional
+  bonuses are not used by the new process. Generated interpretations remain
+  subjective model reports, not proof of human feelings.
+- The Journal adds body signals, available provisions, current predictions,
+  measured results, possible corrections, paused work and tested-method evidence.
+  These views offer no owner controls for his decisions or personality.
+
+Existing saves migrate in place with `crow-save-before-v0.5.json` saved first.
+Old objects, resources, memories, wishes and partial work are retained. No past
+prediction or measured skill is invented for older activities.
+
+See [the mechanics and limits](docs/LIFE_LOOP.md). The expanded master-prompt
+brief remains a target; this implements only a first portion of it. Cooking,
+cleaning, injury/illness, structural physics, arbitrary tool invention and
+self-written general action programs are not implemented. AI inference stays
+on local Ollama; no new pip packages or paid APIs are needed.
+
+New checks:
+
+```bash
+python3 tests/test_life.py
+node tests/life_view.mjs
+```
+
+
+### Repeated research and irrelevant search results
+
+Wikipedia now returns up to five search candidates for Crow to assess against
+his actual question. He can reject them all; a no-match records honest feedback
+instead of pretending reading succeeded or completing a milestone. Task questions
+use quick lookup even if the model also selected leisure timing. Genuine leisurely
+reading with no task question remains available.
+
+The decision context shows source consultation counts, latest answers and failed
+search feedback. Repeated excerpts have content fingerprints and are labelled
+in the notebook. Their interpretations remain visible, but the same source text
+cannot repeatedly boost interest scores or add fresh long-term lessons. Existing
+history is retained. Older completed read/plan projects are annotated as research
+milestones, not claimed physical completion. These changes address a feedback
+loop; they do not assign a different hobby or force a particular next activity.
+
+```bash
+python3 tests/test_research_loop.py
+```
