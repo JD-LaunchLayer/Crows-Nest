@@ -138,3 +138,17 @@ Learning evidence and affect carry actual executor event references. A source
 summary or reflection cannot grant practical skill, create an object or refill
 needs. The proposed full master prompt is not wholesale loaded into the small
 runtime context; a compact relevant policy and current evidence are supplied.
+
+
+## Decision and memory continuity (0.6.0)
+
+Choosing is split into what/why and then details for that one action, so
+irrelevant tool fields no longer occupy every decision or keep foregrounding
+particular activities. Recall ranks the whole saved history by relevance to his
+own current intention and keeps evidence types distinct. Memory and recent
+events are protected in the context budget; world listings are trimmed first.
+Retrieval changes what evidence he sees, never which action he takes. Removing
+actions the world cannot perform is a world rule. Recent-pattern counts make
+repetition observable without a rule forcing change. The evaluation script in
+tools/ measures real-model behaviour on a copy of the save; unit tests use stubs
+and do not show decision quality.

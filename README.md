@@ -111,10 +111,8 @@ preferences, not model-weight training or evidence of consciousness.
 ## Checks
 
 ```bash
-python3 tests/test_simulation.py
-node tests/animation.mjs
-python3 tests/test_mobile.py
-node tests/touch.mjs
+for t in tests/test_*.py; do python3 "$t"; done
+for t in tests/*.mjs; do node "$t"; done
 ```
 
 Tests cover backend state/timing and Three.js animation logic with a stub
@@ -341,4 +339,71 @@ loop; they do not assign a different hobby or force a particular next activity.
 
 ```bash
 python3 tests/test_research_loop.py
+```
+
+## v0.6.0 — two-step decisions and protected memory
+
+**Why.** On a long-running life the 0.5 decision prompt trimmed recalled
+memories, lessons, recent events, personality notes and projects *first*
+whenever it grew past its character limit. Measured on a synthetic save with
+500 events, 120 lessons and 40 readings (`tests/lived_fixture.py`, not Crow's
+real save), all five were cut to zero while the world description was kept.
+Every decision also had to fill 27 fields (carving shape, reading posture,
+build coordinates…) even when he chose to sleep.
+
+**What changed.**
+
+- Deciding happens in two steps. First Crow chooses his action, intention,
+  reason, optional wish, project choice and next step (9 fields, 320 output
+  tokens). Only then is he asked for details of that one action, with only the
+  context it needs: carving method and prediction for `craft`, search terms
+  and posture for `read`, a tree for `fell_tree`, and so on. Rest, sleep,
+  observe, reflect, explore and practice need no second call. The details step
+  cannot change the chosen action.
+- `memory_recall.py` ranks his whole saved history — outcome events, lessons,
+  appraisals, processed readings, measured trials and failed searches — by
+  shared rare words with his current intention, next step and active project,
+  plus small importance and recency bonuses. Each item keeps its source ID and
+  a type label (event, reading, lesson, appraisal, trial, search_miss).
+  Identical texts are recalled once. This is keyword relevance, not semantic
+  search: a paraphrase with no shared words can still be missed.
+- The decision context has a priority order. Body, intention, recent events
+  and recalled memories are trimmed last; nearby-object lists, interests and
+  wishes are trimmed first. On the same synthetic save the first-step prompt is
+  about 6,700 characters (roughly 2,100 tokens by estimate) and keeps every
+  protected section.
+- `recent_pattern` reports counts of recent choices, how many decisions share
+  the current intention, and how many recent readings did not answer or
+  repeated an excerpt. These are observations only; no threshold triggers
+  anything.
+- Actions the world cannot currently carry out are not offered: `construct`
+  with no open blueprint, `resume_work` with no paused job, `move_object` with
+  nothing portable (and, as before, `craft` without wood).
+- Crow may list `memory_ids_used`. Only IDs that were actually shown are kept,
+  and they are saved on the "started" event together with `recalled_ids`. This
+  is a self-report of citation, not proof that memory caused the choice.
+- Reflections receive related memories from the same recall rather than the
+  three most recent lessons.
+- Every model call records Ollama's real `prompt_eval_count`/`eval_count` in
+  `runtime.model_usage`, with a flag if prompt plus output limit approaches
+  `num_ctx`. `CROW_NUM_CTX`, `CROW_CONTEXT_CHARS` and `CROW_MEMORY_CHARS` can
+  be set in the environment.
+
+Saved history is not rewritten. Older pending decisions keep working, because
+the two steps are merged into the same decision format as before.
+
+### Measuring it with the real model (read-only)
+
+```bash
+python3 tools/evaluate_decisions.py --context-only        # sizes and what recall surfaces
+python3 tools/evaluate_decisions.py --samples 6           # Qwen decisions with vs without recall
+python3 tools/evaluate_decisions.py --samples 6 --perturb empty_pantry
+```
+
+The script copies the save to a temporary folder. It never writes to the live
+save or event log, starts no actions and fetches nothing from Wikipedia. A few
+samples are suggestive, not statistically conclusive.
+
+```bash
+python3 tests/test_decision.py
 ```
