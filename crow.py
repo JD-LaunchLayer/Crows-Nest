@@ -85,6 +85,7 @@ if state['pending']:
     if state['pending']['decision'].get('action') == 'read':
         decision = state['pending']['decision']
         decision.setdefault('reading_mode', 'lookup')
+        if decision.get('research_question','').strip():decision['reading_mode']='lookup'
         if decision['reading_mode'] == 'lookup':
             state['pending']['remaining'] = 0
             state['pending']['duration'] = 0

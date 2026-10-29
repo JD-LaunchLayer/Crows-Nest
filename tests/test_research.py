@@ -34,6 +34,8 @@ with tempfile.TemporaryDirectory() as temporary:
                          'reason': 'An old question.', 'source': source}],
            'pending': {'decision': decision, 'remaining': 800, 'duration': 900,
                        'start': source['retrieved'], 'reading': source, 'project_id': None}}
+    old['pending']['decision']['reading_mode']='leisure'
+    old['pending']['decision']['research_question']='How is grain arranged?'
     (root / 'crow-save.json').write_text(json.dumps(old))
     spec = importlib.util.spec_from_file_location('crow_research_test', root / 'crow.py')
     app = importlib.util.module_from_spec(spec);spec.loader.exec_module(app)
