@@ -38,6 +38,13 @@ with tempfile.TemporaryDirectory() as td:
     app.model_call('Fourth.',schema,100,'test');assert app.state['model_spend']['usd']>0 and app.state['model_spend']['total_usd']>total
     # The key is never part of his saved life or the observer API.
     app.persist();assert KEY not in (folder/'crow-save.json').read_text() and KEY not in json.dumps(app.runtime)
+    # The cloud model's slips are fitted to the form; unfixable answers fall back to the local model.
+    form=app.fields_schema({'action':{'type':'string','enum':['rest','observe']},'wish_reason':app.STRING,
+        'project':{'type':'string','enum':['none','continue']},'project_id':{'type':'integer','enum':[0,3]},
+        'memory_ids_used':{'type':'array','items':{'type':'integer'},'maxItems':4}})
+    fitted=app.conform({'action':'observe','project':'maybe','project_id':None,'memory_ids_used':[1,'x',2],'extra':1},form)
+    assert fitted=={'action':'observe','wish_reason':'','project':'none','project_id':0,'memory_ids_used':[1,2]}
+    assert app.conform({'action':'dance'},form) is app.MISSING and app.conform({'n':'4'},app.fields_schema({'n':{'type':'integer','minimum':1,'maximum':3}}))=={'n':3}
     # A local reply cut off mid-JSON is retried once with more room instead of stopping his life.
     replies=iter(['{"answer": "unfinish','{"answer":"complete"}'])
     def cut(req,timeout):
@@ -46,4 +53,4 @@ with tempfile.TemporaryDirectory() as td:
     app.urllib.request.urlopen=cut;app.PROVIDER='ollama'
     data,_=app.model_call('Answer.',schema,100,'test')
     assert data=={'answer':'complete'} and sent[-1][1]['options']['num_predict']==200 and app.runtime['model_usage']['test']['retried']
-print('PASS: cut-off local replies retried; Haiku via forced structured tool call; real token cost ledger; outage and over-budget fall back to local; daily reset; key never saved in his life.')
+print('PASS: cloud slips fitted or fallen back; cut-off local replies retried; Haiku via forced structured tool call; real token cost ledger; outage and over-budget fall back to local; daily reset; key never saved in his life.')

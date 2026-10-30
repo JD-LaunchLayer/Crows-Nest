@@ -34,7 +34,7 @@ ACCESS_TOKEN = None
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.12.0'
+APP_VERSION = '0.12.1'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -214,6 +214,67 @@ def ollama_call(prompt, schema, limit, purpose):
     return data, seconds, usage
 
 
+MISSING = object()
+
+
+def conform(value, schema):
+    """Fit a cloud answer to the requested structure, or return MISSING.
+
+    The local model is grammar-constrained; the cloud model's tool input is not, so it can
+    return a null number or an out-of-list choice. Small slips get neutral values (empty
+    text, no project, an empty list); anything that cannot be fitted makes the call fall back."""
+    kind = schema.get('type')
+    if kind == 'object':
+        if not isinstance(value, dict):
+            return MISSING
+        out = {}
+        for key, sub in schema.get('properties', {}).items():
+            fitted = conform(value[key], sub) if key in value else MISSING
+            if fitted is MISSING and key in schema.get('required', []):
+                options = sub.get('enum', [])
+                if sub.get('type') == 'string' and not options:
+                    fitted = ''
+                elif sub.get('type') == 'array':
+                    fitted = []
+                elif 'none' in options:
+                    fitted = 'none'
+                elif 0 in options and sub.get('type') == 'integer':
+                    fitted = 0
+                else:
+                    return MISSING
+            if fitted is not MISSING:
+                out[key] = fitted
+        return out
+    if kind == 'array':
+        if not isinstance(value, list):
+            return MISSING
+        items = [conform(v, schema.get('items', {})) for v in value]
+        return [v for v in items if v is not MISSING][:schema.get('maxItems', 10**6)]
+    if kind == 'boolean':
+        if isinstance(value, str) and value.lower() in ('true', 'false'):
+            value = value.lower() == 'true'
+        return value if isinstance(value, bool) else MISSING
+    if kind in ('integer', 'number'):
+        if isinstance(value, str):
+            try:
+                value = float(value)
+            except ValueError:
+                return MISSING
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+            return MISSING
+        if kind == 'integer':
+            if value != int(value):
+                return MISSING
+            value = int(value)
+        value = max(schema.get('minimum', value), min(schema.get('maximum', value), value))
+    elif kind == 'string':
+        if not isinstance(value, str):
+            return MISSING
+    if 'enum' in schema and value not in schema['enum']:
+        return MISSING
+    return value
+
+
 def anthropic_call(prompt, schema, limit, purpose):
     """Claude via the Messages API, forced to answer through one tool whose input schema is the requested JSON."""
     key = os.environ.get('ANTHROPIC_API_KEY') or SETTINGS.get('anthropic_api_key', '')
@@ -238,6 +299,10 @@ def anthropic_call(prompt, schema, limit, purpose):
     block = next((b for b in result.get('content', []) if b.get('type') == 'tool_use'), None)
     if block is None or not isinstance(block.get('input'), dict):
         raise ValueError('The cloud model returned no structured answer')
+    fitted = conform(block['input'], schema)
+    if fitted is MISSING:
+        raise ValueError('The cloud answer did not fit the requested structure')
+    block['input'] = fitted
     used = result.get('usage', {})
     tokens_in, tokens_out = int(used.get('input_tokens', 0)), int(used.get('output_tokens', 0))
     cost = tokens_in / 1e6 * PRICE['input'] + tokens_out / 1e6 * PRICE['output']
@@ -820,6 +885,8 @@ def reflect(memory):
         topic=result['topic'].strip().lower()[:60]
         if topic and fresh_evidence:
             # Repeated experiential appraisals accumulate slowly; unknown topics never become orders.
+            # A reworded topic ("new woodland edge ground" / "...in daylight") strengthens the interest he already has.
+            topic=next((k for k in state['interests'] if memory_recall.similar(k,topic)),topic)
             state['interests'][topic]=round(clamp(state['interests'].get(topic,0)*.95+appraisal['enjoyment'],-10,10),2)
             if len(state['interests'])>16:
                 victim=min(state['interests'],key=lambda k:abs(state['interests'][k]));del state['interests'][victim]
@@ -1037,11 +1104,17 @@ def loop():
             with LOCK:
                 if state['paused']:continue
                 generation=runtime['generation'];runtime.update(thinking=True,status='Choosing what matters next…')
-            decide_and_start(generation)
+            if decide_and_start(generation) is not None:
+                with LOCK:runtime['failures']=0
         except Exception as exc:
+            # A bad answer or brief outage is retried rather than stopping his life; repeated failure still pauses.
             with LOCK:
-                state.update(paused=True,last_error=str(exc));runtime.update(status='Paused — see the error below',generation=runtime['generation']+1)
+                runtime['failures']=runtime.get('failures',0)+1;state['last_error']=str(exc)[:300]
+                if runtime['failures']>=8:
+                    state['paused']=True;runtime.update(status='Paused after repeated problems — see the error below',generation=runtime['generation']+1,failures=0)
+                else:runtime['status']=f"Had trouble deciding ({runtime['failures']}); trying again…"
                 persist()
+            time.sleep(min(30,2*runtime.get('failures',1)))
         finally:
             with LOCK:
                 runtime['thinking']=False
