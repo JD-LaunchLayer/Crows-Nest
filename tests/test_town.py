@@ -33,11 +33,18 @@ with tempfile.TemporaryDirectory() as td:
     (Path(td)/town.ORDERS).write_text(json.dumps([{'id':'sketchbook','name':'Sketchbook','price':5,'qty':2,'effect':'possession:sketchbook'},
                                                   {'id':'magic','name':'Wand','price':1,'qty':1,'effect':'grant:everything'}]))
     done=town.apply_stock_orders(s,Path(td),'t');assert len(done)==1 and s['trading']['stock']['sketchbook']['qty']==2 and not (Path(td)/town.ORDERS).exists()
-# Owned tools have real, bounded effects: a whetstone narrows carving error; a lantern allows a little detail at night.
+# Blades dull with use and work suffers; owning a whetstone changes nothing until he uses it on a blade.
 def attempt(st):
     d={'attempt':{'support':'bench','passes':'light','direction':'along','target_error_mm':10},'creation_shape':'orb','intention':''}
     return life.practical_attempt(copy.deepcopy(st),d,600)['actual_error_mm']
-plain=attempt(s);s['possessions']['whetstone']=1;assert attempt(s)<plain
+s['daylight']=.9;keen=attempt(s);fell=life.work_rate(s,'fell_tree')
+life.advance(s,10*3600,'craft');life.advance(s,10*3600,'fell_tree')
+assert attempt(s)>keen and life.work_rate(s,'fell_tree')<fell and 'dull' in life.tool_feel(s,'carving_knife')+life.tool_feel(s,'axe')
+s['possessions']['whetstone']=1;dull=attempt(s);assert attempt(s)==dull, 'owning it does nothing'
+assert 'Nothing else happened' in town.use_item(s,'whetstone','','rub it')['text'] and attempt(s)==dull
+town.use_item(s,'whetstone','carving_knife','draw the blade along it');assert attempt(s)<dull and 'keen' in life.tool_feel(s,'carving_knife')
+assert 'whetstone' not in town.POSSESSION_LOOKS['whetstone'].lower() and 'sharpen' not in town.POSSESSION_LOOKS['whetstone'].lower()
+assert 'sharpen' in town.ITEM_KNOWLEDGE['whetstone']
 dark=ecology.observe(s,'grove','',302,0);assert dark['dark']
 lit=ecology.observe(s,'grove','',302,0,lamp=True);assert lit['findings'] and len(lit['findings'])<=2
 
@@ -79,5 +86,5 @@ with tempfile.TemporaryDirectory() as td:
     model.action='trade';app.decide_and_start(app.runtime['generation'])
     assert app.state['pending']['remaining']==30*60
     app.tick(1800);m=app.finish_action();assert app.state['trading']['credit']==1 and 'posted job' in m['event']
-print('PASS: café, post and decorations added once; details without explanations; dial shadow follows time; posted-rate buying, selling, jobs '
+print('PASS: blades dull with use and slow or roughen work; a whetstone only helps when used on a blade; café, post and decorations added once; details without explanations; dial shadow follows time; posted-rate buying, selling, jobs '
       'and requests; Jordan restocking; real tool effects; lantern light; web address safety; search and page parsing; browse and trade in his life.')

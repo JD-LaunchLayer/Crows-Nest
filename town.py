@@ -23,7 +23,7 @@ JOBS = {
 # Effects are the only ways goods can change his world: 'pantry:N' adds ready food,
 # 'possession:NAME' gives him an item he keeps. Known possessions with mechanics:
 #   lantern  - lets him make out nearby detail when observing or inspecting in the dark
-#   whetstone - keeps his carving blade keen (narrower carving error)
+#   whetstone - does nothing by itself; used on a blade it restores the edge
 # Any other possession is simply owned: it exists, with no invented ability.
 STARTING_STOCK = {
     'provisions_bundle': {'name': 'Bundle of bread, cheese and dried fruit (4 servings)', 'price': 3, 'qty': 6, 'effect': 'pantry:4'},
@@ -455,3 +455,34 @@ def apply_stock_orders(state, root, at):
     if done:
         _record(post, 'New stock arrived: ' + '; '.join(done) + '.', at)
     return done
+
+
+# How owned things look when he examines them. No uses are stated.
+POSSESSION_LOOKS = {
+    'lantern': 'A brass and glass oil lantern with a wick, a small oil reservoir and a wire handle.',
+    'whetstone': 'A flat grey stone about the length of a hand, fine-grained and smooth, slightly hollowed in the middle.',
+}
+# What Edda knows about her goods (only she is told this).
+ITEM_KNOWLEDGE = {
+    'provisions_bundle': 'ready food that keeps well: bread, cheese and dried fruit, about four meals',
+    'lantern': 'gives light after dark: you can see what you are doing and work outdoors at night nearly as well as by day',
+    'whetstone': 'for sharpening blades: drawn along an axe or carving knife it restores a dulled edge; dull blades make chopping slow and carving rough',
+}
+TOOLS = {'axe', 'carving_knife'}
+
+
+def use_item(state, item, target, how):
+    """Crow tries something he owns. Only real mechanics change anything; everything else is honestly nothing."""
+    owned = state.get('possessions', {})
+    if not owned.get(item):
+        return {'success': False, 'text': 'He does not have that.'}
+    target = target if target in TOOLS else ''
+    if item == 'whetstone' and target:
+        name = target.replace('_', ' ')
+        state['tool_condition'][target] = 1.
+        return {'success': True, 'text': f'Drew the {name} along the whetstone for a while. The edge now looks bright and even.'}
+    if item == 'whetstone':
+        return {'success': True, 'text': 'Turned the stone over and rubbed it with his thumb. Nothing else happened.'}
+    if item == 'lantern':
+        return {'success': True, 'text': 'Lit the lantern: a small warm pool of light. He keeps it with him after dark.'}
+    return {'success': True, 'text': f'Handled the {item.replace("_", " ")} ({" ".join(str(how).split())[:80] or "idly"}). Nothing in particular happened.'}
