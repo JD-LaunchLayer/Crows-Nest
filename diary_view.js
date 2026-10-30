@@ -38,7 +38,7 @@ export function createDiary({document}){
  }
  function update(s){
   if(!$('diary'))return;
-  const key=JSON.stringify([s.trading,s.possessions,s.decisions,s.pending&&s.pending.start,(s.diary||[]).length,s.interests,(s.personality_notes||[]).length,s.affect,s.current_intention,s.clock&&s.clock.date]);
+  const key=JSON.stringify([s.keeper,s.trading,s.possessions,s.decisions,s.pending&&s.pending.start,(s.diary||[]).length,s.interests,(s.personality_notes||[]).length,s.affect,s.current_intention,s.clock&&s.clock.date]);
   if(key===last)return;last=key;
   if(s.clock)$('diaryDate').textContent=`${s.clock.date} · ${s.clock.time}${s.twin?' · twin clock':s.crow_clock?' · Crow\'s own time':' · UK time'}`;
   $('diaryBadge').textContent=s.twin?'CROW · TIME-LAPSE TWIN':'CROW\'S JOURNAL';
@@ -63,6 +63,16 @@ export function createDiary({document}){
     if((t.requests||[]).length){trade.append(el('p','Things he has asked the post to stock:'));for(const r of [...t.requests].reverse().slice(0,8))trade.append(el('p',`“${r.item}”${r.times>1?` (asked ${r.times} times)`:''}`,'thought'));}
     else trade.append(el('p','He has not asked for anything to be stocked.','muted'));
     const last=(t.ledger||[]).at(-1);if(last)trade.append(el('p','Last at the post: '+last.text,'muted'));}}
+  const people=$('diaryPeople');if(people){people.replaceChildren();const k=s.keeper;
+   const talk=[...(s.memories||[])].reverse().find(m=>m.world_result&&m.world_result.conversation);
+   if(talk){people.append(el('p',`Last talked: ${(talk.at||'').slice(0,16).replace('T',' ')}`,'muted'));
+    for(const c of talk.world_result.conversation)people.append(el('p',`${c.who}: “${c.text}”`,'thought'));
+    if(talk.world_result.text)people.append(el('p',talk.world_result.text,'muted'));}
+   else people.append(el('p','They have not spoken yet.','muted'));
+   if(k){const feel=k.warmth>.3?'fond of him':k.warmth>.05?'warming to him':k.warmth<-.3?'wary of him':k.warmth<-.05?'a little cool towards him':'undecided about him';
+    people.append(el('p',`Edda seems ${feel}. They have talked ${k.talks} time${k.talks===1?'':'s'}.`));
+    for(const n of (k.notes||[]).slice(-5).reverse())people.append(el('p','Edda: “'+n.text+'”','thought'));
+    for(const f of k.favours||[])people.append(el('p',`Open favour (${f.id}): ${f.task} · ${f.minutes} min · ${f.credit} credit`,'muted'));}}
   const self=$('diarySelf');self.replaceChildren();
   for(const n of (s.personality_notes||[]).slice(-6).reverse())self.append(el('p','“'+n.text+'”','thought'));
   if(!(s.personality_notes||[]).length)self.append(el('p','He has not described himself yet.','muted'));

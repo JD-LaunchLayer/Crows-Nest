@@ -66,6 +66,22 @@ def advance(state, seconds, action):
     sync_energy(state)
 
 
+OUTDOOR_WORK = {'fell_tree', 'gather', 'construct', 'explore', 'practise', 'move_object', 'craft'}
+INDOOR_WORK = {'trade'}
+
+
+def work_rate(state, action):
+    """How fast physical work progresses (1 = normal). An authored consequence, not a score:
+    marked tiredness, hunger or thirst slow work, and outdoor work in the dark without a lantern
+    goes at half speed. Rest, reading, eating and other non-physical activities are unaffected."""
+    if action not in OUTDOOR_WORK and action not in INDOOR_WORK:
+        return 1.
+    rate = 1 / (1 + .6 * max(0., fatigue(state) - .2))
+    if action in OUTDOOR_WORK and state.get('daylight', 1) < .12 and not state.get('possessions', {}).get('lantern'):
+        rate *= .5
+    return rate
+
+
 def sync_energy(state):
     b=state['body']
     state['energy']=round(clamp(b['reserve']-b['sleep_debt']*2-b['exertion']*25),2)
@@ -155,6 +171,7 @@ def practical_attempt(state, decision, seconds):
     error*=1 if method['passes']=='light' else 1.7
     error*=1 if method['direction']=='along' else 1.5
     if state.get('possessions',{}).get('whetstone'):error*=.85  # a keen blade: an owned tool, not practice
+    if state.get('daylight',1)<.12 and not state.get('possessions',{}).get('lantern'):error*=1.4  # carving by starlight
     error=round(error,2);met=error<=target
     # Motor practice transfers across shapes, but reading and idle time cannot add it.
     p['control_hours']+=max(0,seconds)/3600*.12/(1+fatigue(state))

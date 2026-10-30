@@ -17,6 +17,7 @@ with tempfile.TemporaryDirectory() as temp:
  m.clock(datetime(2026,10,28,23,15,0,tzinfo=tz));assert m.state['clock']['night'] and m.state['daylight']==0
  m.clock(datetime(2026,6,15,13,15,0,tzinfo=tz));assert m.state['daylight']>.9
  def decision(action):return {'action':action,'reason':'I want to try this.','intention':'Make a collection.','wish':'','wish_reason':'','library_query':'Wood carving','creation_name':'A small bowl','creation_shape':'bowl','project_id':0,'project_title':'Make two carvings','project_status':'active','target_action':'craft','target_sessions':2}
+ m.CLOCK_OVERRIDE=lambda:datetime(2026,10,28,12,0,0,tzinfo=tz)  # daylight, so outdoor work runs at normal pace
  m.state['paused']=False
  m.start_action(decision('craft'),1.2)
  assert m.state['materials']==6 and m.state['pending']['remaining']==2700

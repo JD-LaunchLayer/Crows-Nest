@@ -68,6 +68,8 @@ with tempfile.TemporaryDirectory() as temp:
     d={'action':'craft','reason':'I want to test this.','intention':'Test a width.','wish':'','wish_reason':'',
        'library_query':'','creation_name':'First trial','creation_shape':'orb','project_id':0,'project_title':'',
        'project_status':'active','target_action':'craft','target_sessions':1,'attempt':bad['attempt']}
+    from datetime import datetime
+    app.CLOCK_OVERRIDE=lambda:datetime(2026,10,28,12,0,tzinfo=app.TZ)  # daylight, independent of when the test runs
     app.state['paused']=False;app.start_action(d,1);app.tick(900)
     remaining=app.state['pending']['remaining'];body=copy.deepcopy(app.state['body'])
     app.state['paused']=True;app.tick(3600);assert app.state['body']==body
