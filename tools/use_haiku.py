@@ -38,6 +38,8 @@ def test(key):
 
 
 def main():
+    if not (CONFIG.parent / 'crow-save.json').exists():
+        sys.exit(f'No Crow save in {CONFIG.parent}. Run this from the folder where Crow lives: cd ~/Crows-Nest')
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--off', action='store_true', help='Use the local Qwen model again.')
     parser.add_argument('--daily-budget', type=float, default=None, help='Daily cloud spend cap in US dollars (default 1.00).')

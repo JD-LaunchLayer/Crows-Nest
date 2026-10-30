@@ -90,5 +90,13 @@ with tempfile.TemporaryDirectory() as td:
     assert 'text' not in m['source'] and m['source']['text_archived'] and app.reading_journal.article(app.ROOT,m['id'])['text']=='Excerpt text.'
     assert app.MEMORY_LIMIT>=3000
 
+    # Reworded interest topics strengthen one interest instead of splitting into near-duplicates.
+    app.state['interests']={'observing new woodland edge ground':5.0}
+    m=app.event('Observed the woodland edge.',kind='experience',new_evidence=True)
+    res={'feeling':'Calm.','lesson':'','topic':'observing new woodland edge ground in daylight','enjoyment':1,'personality_note':'','next_step':'',
+         'reading_summary':'','answer_status':'not_applicable','meaning':'Fine.','adjustment':'','valence':.1,'arousal':.1,'importance':.2}
+    app.model_call=lambda *a,**k:(dict(res),1);app.state['paused']=False;app.reflect(m)
+    assert list(app.state['interests'])==['observing new woodland edge ground'] and app.state['interests']['observing new woodland edge ground']>5
+
 print('PASS: small choice schema; details only for the chosen action; memory protected and relevance-ranked on a long life; '
       'unchanged save; uncited IDs rejected; single targets; project milestones; unavailable mechanics hidden; repetition observable.')

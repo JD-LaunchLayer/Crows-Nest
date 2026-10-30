@@ -19,6 +19,8 @@ CONFIG = Path(__file__).resolve().parents[1] / 'crow-config.json'
 
 
 def main():
+    if not (CONFIG.parent / 'crow-save.json').exists():
+        sys.exit(f'No Crow save in {CONFIG.parent}. Run this from the folder where Crow lives: cd ~/Crows-Nest')
     if len(sys.argv) != 2:
         sys.exit(__doc__)
     try:

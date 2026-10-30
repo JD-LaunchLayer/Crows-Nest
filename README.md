@@ -654,3 +654,17 @@ python3 tests/test_speed.py
 ```bash
 python3 tests/test_town.py
 ```
+
+## v0.12.1 — steadier with the cloud model
+
+From the first Haiku twin run (5 simulated days, 60 form errors):
+
+- Haiku's structured answers are fitted to the requested form: small slips
+  (a missing note, a null project number, an unknown project choice) get
+  neutral values; answers that cannot be fitted fall back to local Qwen.
+- The live Crow retries after a bad answer or brief outage instead of pausing;
+  only eight failures in a row pause him, with the error shown.
+- Reworded interest topics strengthen the existing interest instead of
+  splitting into near-duplicates.
+- `promote_twin.py`, `set_speed.py` and `use_haiku.py` refuse to run outside
+  the folder where Crow's save lives.

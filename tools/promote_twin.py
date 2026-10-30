@@ -67,6 +67,8 @@ def promote(real, twin, at=None, confirm=True):
 
 def main():
     twin = Path(sys.argv[1]).expanduser() if len(sys.argv) > 1 else Path('~/crow-twin').expanduser()
+    if not (ROOT / 'crow-save.json').exists():
+        sys.exit(f'No Crow save in {ROOT}. Run this from the folder where Crow lives: cd ~/Crows-Nest')
     if crow_running():
         sys.exit('Crow is still running. Stop him with Ctrl+C in his window first.')
     backup = promote(ROOT, twin)
