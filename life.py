@@ -238,3 +238,72 @@ def learning_context(state):
                        for m in sorted(p['methods'],key=lambda m:m['evidence'][-1] if m['evidence'] else 0)[-3:]],
             'recent_trials':[{k:t[k] for k in ['id','hypothesis','method_id','actual_error_mm','target_error_mm','goal_met','adjustment']}
                              for t in p['trials'][-2:]]}
+
+
+# Building craft. Every shape can be attempted from the start; how true it comes out depends on
+# practice with that kind of shape (with some carry-over from handiwork in general), on fatigue
+# and on light. These difficulty figures are authored world properties, not shown to Crow.
+SHAPE_FAMILY = {'box': 'straight', 'cylinder': 'turned', 'cone': 'turned', 'sphere': 'turned', 'wedge': 'angled', 'arch': 'curved'}
+SHAPE_DIFFICULTY = {'box': 1., 'cylinder': 1.5, 'cone': 1.8, 'sphere': 2.2, 'wedge': 2., 'arch': 3.5}
+SHAPE_FAILS_AT_CM = {'box': 30., 'cylinder': 25., 'cone': 22., 'sphere': 20., 'wedge': 16., 'arch': 11.}
+
+
+def building(state):
+    return ensure(state) and state['practical'].setdefault('building', {'hours': {}, 'parts': []})
+
+
+def build_practice(state, parts, minutes):
+    """Time actually spent building adds practice to the kinds of shape being worked."""
+    record = building(state)
+    if not parts or minutes <= 0:
+        return
+    share = minutes / 60 * .5 / (1 + fatigue(state)) / len(parts)
+    for p in parts:
+        fam = SHAPE_FAMILY.get(p['shape'], 'straight')
+        record['hours'][fam] = round(record['hours'].get(fam, 0.) + share, 4)
+
+
+def build_parts(state, plan_id, parts):
+    """Execute a finished plan's parts: returns (placed, failed, report). Deterministic per plan."""
+    import hashlib
+    record = building(state)
+    hours = record['hours']
+    general = sum(hours.values())
+    dark = state.get('daylight', 1) < .12 and not state.get('possessions', {}).get('lantern')
+    placed, failed, notes = [], [], []
+    for i, p in enumerate(parts):
+        fam = SHAPE_FAMILY.get(p['shape'], 'straight')
+        practice = hours.get(fam, 0.) + .3 * (general - hours.get(fam, 0.))
+        jitter = .6 + int(hashlib.sha1(f'{plan_id}:{i}'.encode()).hexdigest()[:6], 16) / 0xffffff * .8
+        err = 5 * SHAPE_DIFFICULTY.get(p['shape'], 1.) / (1 + math.sqrt(practice / 3)) * (1 + .7 * fatigue(state)) * (1.5 if dark else 1) * jitter
+        err = round(err, 1)
+        outcome = {'shape': p['shape'], 'error_cm': err, 'plan': plan_id}
+        if err >= SHAPE_FAILS_AT_CM.get(p['shape'], 30.):
+            failed.append(p)
+            outcome['held'] = False
+            notes.append(f'the {p["shape"]} ({p.get("id", "part")}) did not hold and came apart')
+        else:
+            angle = int(hashlib.sha1(f'{plan_id}:{i}:a'.encode()).hexdigest()[:4], 16) / 0xffff * 2 * math.pi
+            p['x'] = round(p['x'] + math.cos(angle) * err / 200, 3)
+            p['z'] = round(p['z'] + math.sin(angle) * err / 200, 3)
+            p['rotation_z'] = round(p.get('rotation_z', 0) + (err / 250) * (1 if i % 2 else -1), 3)
+            p['finish'] = 'fine' if err < 2 else 'fair' if err < 6 else 'rough'
+            placed.append(p)
+            outcome['held'] = True
+            notes.append(f'{p["shape"]} {p.get("id", "part")} {p["finish"]}, about {err:g} cm off true')
+        record['parts'] = (record['parts'] + [outcome])[-80:]
+    report = f'{len(placed)} of {len(parts)} parts held: ' + '; '.join(notes) + '.'
+    if failed:
+        report += ' Half the material of what fell apart was recoverable as offcuts.'
+    return placed, failed, report
+
+
+def building_record(state):
+    """His own evidence about building, by shape: attempts, how many held, typical accuracy."""
+    out = {}
+    for o in building(state)['parts']:
+        s = out.setdefault(o['shape'], {'attempts': 0, 'held': 0, 'cm_off': []})
+        s['attempts'] += 1
+        s['held'] += int(o['held'])
+        s['cm_off'].append(o['error_cm'])
+    return {k: {'attempts': v['attempts'], 'held': v['held'], 'recent_cm_off_true': v['cm_off'][-3:]} for k, v in out.items()}

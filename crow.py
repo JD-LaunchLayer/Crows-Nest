@@ -34,7 +34,7 @@ ACCESS_TOKEN = None
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.13.0'
+APP_VERSION = '0.14.0'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -510,7 +510,8 @@ def parameter_request(d):
         open_plans=[p for p in world['plans'] if p['status'] in ['proposed','in_progress']]
         return ('Choose which blueprint to work on. Work only proceeds if inventory covers its bill; it may take several sessions.',
                 {'plan_id':{'type':'integer','enum':[p['id'] for p in open_plans]}},
-                {'plans':[{k:p.get(k) for k in ['id','name','bill','minutes','work_done_minutes','status']} for p in open_plans[-6:]],
+                {'your_building_so_far':life.building_record(state),
+                 'plans':[{k:p.get(k) for k in ['id','name','bill','minutes','work_done_minutes','status']} for p in open_plans[-6:]],
                  'inventory_kg':{'wood':state['materials'],'stone':state['stone']}})
     if a=='resume_work':
         return ('Choose which paused job to resume with its original progress.',
@@ -541,7 +542,8 @@ def parameter_request(d):
                 {'creation_name':STRING,'plan_operation':{'type':'string','enum':['new','add','remove']},
                  'object_id':{'type':'string','enum':['']+list(objects)},'part_id':STRING,
                  'destination_x':{'type':'number'},'destination_z':{'type':'number'}},
-                {'nearby':world_state.nearby(state)['objects'],'inventory_kg':{'wood':state['materials'],'stone':state['stone']}})
+                {'nearby':world_state.nearby(state)['objects'],'inventory_kg':{'wood':state['materials'],'stone':state['stone']},
+                 'your_building_so_far':life.building_record(state)})
     if a=='craft':
         methods=[m['id'] for m in state['practical']['methods']]
         return ('Carve one small piece from 1 kg wood; target width 140 mm, error is measured from the result. '
@@ -761,7 +763,11 @@ def finish_action(geometry=None):
         except ValueError as exc:
             result={'success':False,'text':'Construction planning failed: '+str(exc)};description=result['text']
     elif a=='construct':
-        result=world_state.construct(state,d.get('plan_id'),p['duration']/60);description=result['text']
+        plan=world_state.plan_by_id(state,d.get('plan_id'))
+        before=plan.get('work_done_minutes',0) if plan else 0
+        result=world_state.construct(state,d.get('plan_id'),p['duration']/60,
+                                     execute=lambda parts:life.build_parts(state,d.get('plan_id'),parts));description=result['text']
+        if plan:life.build_practice(state,plan['parts'],plan.get('work_done_minutes',0)-before)
     elif a=='move_object':
         result=world_state.move(state,d.get('object_id',''),d.get('destination_x',0),d.get('destination_z',0));description=result['text']
     elif a=='inspect':
@@ -984,7 +990,7 @@ def review_work(pending):
 def draft_geometry(pending):
     d=pending['decision']
     if d.get('plan_operation')=='remove':return None
-    props={'shape':{'type':'string','enum':['box','sphere','cone','cylinder']},'material':{'type':'string','enum':['wood','stone']},'color':STRING}
+    props={'shape':{'type':'string','enum':world_state.SHAPES},'material':{'type':'string','enum':['wood','stone']},'color':STRING}
     props.update({k:{'type':'number'} for k in ['x','y','z','width','height','depth']})
     schema=fields_schema({'parts':{'type':'array','minItems':1,'maxItems':8,'items':fields_schema(props)}})
     with LOCK:
@@ -993,6 +999,7 @@ def draft_geometry(pending):
         if target and len(target['parts'])>16:
             target['parts_omitted']=len(target['parts'])-16;target['parts']=target['parts'][:16]
     prompt=('Design geometry for the construction idea YOU chose: '+d['intention']+' Name: '+d['creation_name']+'. '+
+            'Shapes: box, cylinder, cone, sphere, wedge (a sloped triangular block, e.g. for a roof or ramp) and arch (a half ring). '+
             'Use 1–8 solid parts. Coordinates are local metres around the target origin, with y up. Part x/z -12..12, y 0..8, dimensions width/depth .03..8 and height .03..6. Bottom of each part must be at or above ground. Materials wood or stone; hex colour. '+
             'This produces a quoted blueprint only, not a finished object. Density is wood 500 kg/m3, stone 2200 kg/m3. You may plan more than you can afford. Existing target: '+json.dumps(target))
     try:

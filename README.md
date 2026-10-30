@@ -696,3 +696,27 @@ From the first Haiku twin run (5 simulated days, 60 form errors):
 ```bash
 python3 tests/test_keeper.py
 ```
+
+## v0.14.0 — building skill that grows with practice
+
+Nothing unlocks. Every shape can be attempted from the start — box, cylinder,
+cone, sphere, and now **wedge** (a sloped triangular block) and **arch** (a half
+ring) — but how true a finished part comes out depends on:
+
+- practice with that kind of shape (straight, turned, angled, curved), with some
+  carry-over from building in general; practice accrues only from real time
+  spent constructing, more slowly when tired;
+- fatigue at the moment of finishing, and darkness without a lantern.
+
+Each part comes out fine, fair or rough, slightly off true in position and
+tilt, and a part that is too far off does not hold: half its material is
+recoverable as offcuts, half is lost. Typical results from the authored
+model: a beginner's arch almost always falls (~19 cm off); after many hours of
+curved building most hold (~7 cm); boxes hold from the start (~5 cm, improving
+to ~2 cm). Crow sees only his own record — attempts, how many held and how far
+off they were, by shape — never the difficulty figures. Construction reports
+what held and what came apart.
+
+```bash
+python3 tests/test_building.py
+```

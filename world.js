@@ -231,6 +231,8 @@ function syncBuiltWorld(world){
     if(p.shape==='sphere')geo=new T.SphereGeometry(.5,8,6);
     else if(p.shape==='cone')geo=new T.ConeGeometry(.5,1,6);
     else if(p.shape==='cylinder')geo=new T.CylinderGeometry(.5,.5,1,8);
+    else if(p.shape==='wedge'){const tri=new T.Shape();tri.moveTo(-.5,-.5);tri.lineTo(.5,-.5);tri.lineTo(0,.5);tri.closePath();geo=new T.ExtrudeGeometry(tri,{depth:1,bevelEnabled:false});geo.translate(0,0,-.5);}
+    else if(p.shape==='arch'){geo=new T.TorusGeometry(.42,.08,6,14,Math.PI);geo.translate(0,-.42,0);}
     else geo=new T.BoxGeometry(1,1,1);
     const m=mesh(geo,p.color,p.x,p.y,p.z,group);m.scale.set(p.width,p.height,p.depth);m.rotation.z=p.rotation_z||0;
    }
