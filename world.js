@@ -31,7 +31,7 @@ for(const p of Object.values(stations)){const mid=p.clone().multiplyScalar(.5),p
 box(6,.15,5,'#806c4b',-10,.05,-10);box(6,3,.2,'#76644b',-10,1.5,-12.5);box(.2,3,5,'#806c4b',-13,1.5,-10);box(.2,3,5,'#806c4b',-7,1.5,-10);
 block(-10,-12.5,6,.2);block(-13,-10,.2,5);block(-7,-10,.2,5);
 const roof=mesh(new T.ConeGeometry(4.5,2.5,4),'#4e5540',-10,4,-10);roof.rotation.y=Math.PI/4;
-box(1.5,.4,2.6,'#a3a782',-11.5,.35,-10.3);box(1.3,.18,.55,'#d5ccb1',-11.5,.65,-11.1);box(.7,1,.6,'#8c704e',-8.2,.5,-11.5);
+box(1.5,.4,2.6,'#a3a782',-11.5,.35,-10.3);const blanket=box(1.3,.1,1.6,'#6f7f63',-11.5,.95,-9.7);blanket.visible=false;box(1.3,.18,.55,'#d5ccb1',-11.5,.65,-11.1);box(.7,1,.6,'#8c704e',-8.2,.5,-11.5);
 // Range target with concentric faces pointing into the clearing.
 box(.18,2.5,.18,'#6e593e',10,1.25,-10);for(const [r,col,z] of [[1,'#dfd6b4',-9.9],[.7,'#877249',-9.86],[.45,'#d6c99e',-9.82],[.17,'#935d3e',-9.78]]){mesh(new T.CylinderGeometry(r,r,.07,16),'#'+col.replace('#',''),10,2,z).rotation.x=Math.PI/2;}block(10,-10,2,.5);
 // Workbench, reading cabin and a small quiet pond.
@@ -142,6 +142,10 @@ for(const x of [-.12,.12]){
  const elbow=new T.Group();elbow.position.y=-.3;shoulder.add(elbow);elbows.push(elbow);
  cyl(.06,.055,.26,'#5b4635',0,-.13,0,elbow);mesh(new T.IcosahedronGeometry(.055,0),SKIN,0,-.29,0,elbow);
 }
+// His lantern: carried and lit after dark once he owns one. The light is real in the scene.
+const heldLantern=new T.Group();elbows[0].add(heldLantern);heldLantern.position.set(0,-.38,.06);heldLantern.visible=false;
+mesh(new T.CylinderGeometry(.06,.07,.14,6),'#b08a3c',0,-.07,0,heldLantern);mesh(new T.SphereGeometry(.045,8,6),'#ffd27a',0,-.07,0,heldLantern);
+const lanternLight=new T.PointLight(0xffc56b,0,9,1.6);lanternLight.position.set(0,-.07,0);heldLantern.add(lanternLight);
 const heldAxe=new T.Group();box(.055,.55,.055,'#937449',0,0,0,heldAxe);box(.30,.14,.07,'#a8afaa',.10,.21,0,heldAxe);elbows[1].add(heldAxe);heldAxe.position.set(0,-.29,.08);heldAxe.visible=false;
 const bow=mesh(new T.TorusGeometry(.47,.025,4,12,Math.PI),'#b09a68',.48,1.14,-.2,crow);bow.rotation.z=-Math.PI/2;
 const heldBook=new T.Group();heldBook.position.set(0,1.05,.44);heldBook.rotation.x=.28;crow.add(heldBook);heldBook.visible=false;
@@ -170,6 +174,8 @@ function readingPlan(){
  anim.steps=[walk(new T.Vector3(0,0,0)),walk(LIB.door),walk(LIB.aisle),walk(LIB.shelf,0),
  wait('take',1.4,()=>{anim.book=true}),walk(LIB.aisle),...after];
 }
+// His bed in the cabin: sleeping lies him down under a blanket; resting sits him on its edge.
+const BEDSIDE=new T.Vector3(-10.2,0,-10.1);
 // Where an activity actually happens: the chosen area, tree, plant or object, when the decision names one.
 const AREA_SPOTS={grove:[15.5,8.5],spring_side:[-15.6,-1.5],clearing:[1.5,2.5]};
 // Inside the buildings: at the trading post counter, or on the café terminal stool.
@@ -196,14 +202,17 @@ function beginDesired(){
  if(d.pending&&['eat','drink'].includes(d.action)){const target=s.built_world?.objects[d.objectId||(d.action==='eat'?'food_store':'spring')];if(target)place=new T.Vector3(target.x,0,target.z-1);}
  if(d.pending&&d.action==='fell_tree'){const tree=s.built_world?.trees[d.objectId];if(tree)place=new T.Vector3(tree.x-.9,0,tree.z);}
  place=targetFor(d)||place;
+ const toBed=d.pending&&['sleep','rest'].includes(d.action);if(toBed)place=BEDSIDE.clone();
  // The twin's clock outruns any walk, so its view shows him where he is rather than on the way there.
- if(d.twin){crow.position.copy(place);anim.steps=[wait(d.pending?d.action:'idle',Infinity)];return}
- anim.steps=[walk(new T.Vector3(0,0,0)),walk(place),wait(d.pending?d.action:'idle',Infinity)];
+ // Opening the page mid-activity shows him where he already is; the twin's clock outruns any walk.
+ if(d.twin||anim.snap){anim.snap=false;crow.position.copy(place);anim.steps=[wait(d.pending?d.action:'idle',Infinity)];return}
+ anim.steps=toBed?[walk(new T.Vector3(0,0,0)),walk(stations.cabin),walk(place),wait(d.action,Infinity)]
+  :[walk(new T.Vector3(0,0,0)),walk(place),wait(d.pending?d.action:'idle',Infinity)];
 }
 function setActivity(data){
  const key=`${data.decisions}:${Boolean(data.pending)}`;if(key===anim.key)return;
  anim.key=key;anim.desired={action:data.action,location:data.location,pending:Boolean(data.pending),spot:data.pending?.decision?.reading_spot||'standing',objectId:data.pending?.decision?.object_id||'',area:data.pending?.decision?.observe_area||'',twin:Boolean(data.twin)};
- if(!initialized){initialized=true;crow.position.copy(stations[data.location]||stations.cabin);}
+ if(!initialized){initialized=true;crow.position.copy(stations[data.location]||stations.cabin);anim.snap=true;}
  if(anim.returning)return;
  if(data.twin){anim.book=false;anim.seated=0;anim.floor=0;anim.activeAction='idle';beginDesired();return}
  if(anim.book){
@@ -279,7 +288,7 @@ $('longterm').replaceChildren();for(const m of s.long_term.slice(-6).reverse())e
 $('reading').replaceChildren();const source=s.pending?.reading;if(source){const a=document.createElement('a');a.textContent=source.title;a.href=source.url;a.target='_blank';a.rel='noopener noreferrer';$('reading').append(a)}
 const pending=s.pending;txt('remaining',pending?(pending.decision?.action==='read'&&pending.duration===0?`${s.paused?'Paused · ':''}Quick research · finishes after processing the excerpt`:`${s.paused?'Paused · ':''}${Math.ceil(pending.remaining/60)} min remaining · ${Math.round(pending.duration/60)} min session`):s.reflection_pending?'Processing this experience.':'Choosing the next activity.');
 journal.update(s);
-lifeView.update(s);diary.update(s);edda.visible=Boolean(s.keeper&&s.built_world?.objects?.trading_post);
+lifeView.update(s);diary.update(s);edda.visible=Boolean(s.keeper&&s.built_world?.objects?.trading_post);const lit=Boolean(s.possessions?.lantern)&&s.daylight<.12;heldLantern.visible=lit;lanternLight.intensity=lit?6:0;
 $('creations').replaceChildren();for(const c of s.creations.slice(-8).reverse())entry($('creations'),c.name,`${c.shape} · Day ${c.day}`);if(s.built_world){syncBuiltWorld(s.built_world)}else{creations(s.creations)}syncEcology(s.ecology_view);lamp.intensity=s.action==='read'&&s.pending?15:(s.daylight<.2?8:1.5);
 const celestial=sky.update(new Date(s.clock.iso));if($('skyInfo'))txt('skyInfo',`Sun ${celestial.sun.altitude.toFixed(0)}° · Moon ${celestial.moon.altitude.toFixed(0)}° above horizon · Wickford`);
 if($('worldPlans')&&s.built_world){$('worldPlans').replaceChildren();for(const p of s.built_world.plans.slice(-5).reverse())entry($('worldPlans'),`${p.name} · ${p.status}`,`Plan ${p.id} · ${Object.entries(p.bill).map(([m,q])=>q+' kg '+m).join(', ')||'No new materials'} · ${p.work_done_minutes||0}/${p.minutes} min work`);$('worldObjects').replaceChildren();for(const o of Object.values(s.built_world.objects))entry($('worldObjects'),o.name,`${o.id} · (${o.x.toFixed(1)}, ${o.z.toFixed(1)}) · ${o.parts.length} parts`);txt('sourceStocks',Object.entries(s.built_world.sources).map(([m,v])=>`${m}: ${v.stock} kg remains`).join(' · '));}
@@ -303,6 +312,7 @@ if(step){
    const t=T.MathUtils.smoothstep(step.elapsed,0,step.duration);anim.seated=1-t;anim.floor=1-t;
   }else if(step.pose==='stand'){
    const t=T.MathUtils.smoothstep(step.elapsed,0,step.duration);crow.position.lerpVectors(LIB.seat,LIB.approach,t);anim.seated=1-t;
+  }else if(step.pose==='rest'&&crow.position.distanceTo(BEDSIDE)<.6){anim.seated=1;crow.rotation.y=Math.PI/2;crow.position.x=-10.95;crow.position.z=-10.0;
   }else if(step.pose==='reading'){anim.seated=1;crow.rotation.y=Math.PI;}else if(step.pose==='readingFloor'){anim.seated=1;anim.floor=1;crow.rotation.y=Math.PI;}
   if(step.elapsed>=step.duration){anim.steps.shift();if(step.done)step.done();}
  }
@@ -318,6 +328,11 @@ for(let i=0;i<2;i++){
 if(anim.pose==='take'||anim.pose==='putback'){arms[1].rotation.x=-1.4*Math.sin(Math.min(1,step.elapsed/step.duration)*Math.PI);elbows[1].rotation.x=-.15;}
 headPivot.rotation.x=anim.book?.22+Math.sin(anim.elapsed*.5)*.015:0;
 crow.position.y=-.28*seated-.36*anim.floor+(moving?Math.abs(walking)*.025:0);
+const inBed=anim.pose==='sleep'&&!moving&&(anim.inBed||crow.position.distanceTo(BEDSIDE)<.6);
+if(inBed){anim.inBed=true;crow.position.set(-11.5,.82,-9.25);crow.rotation.set(-Math.PI/2,0,0);
+ for(let i=0;i<2;i++){legs[i].rotation.x=0;knees[i].rotation.x=0;arms[i].rotation.x=0;elbows[i].rotation.x=0}}
+else if(anim.inBed){anim.inBed=false;crow.rotation.x=0;crow.position.set(BEDSIDE.x,0,BEDSIDE.z);}
+blanket.visible=inBed;
 torso.scale.y=1+Math.sin(anim.elapsed*1.8)*.008;edda.rotation.y=Math.sin(anim.elapsed*.3)*.25;
 heldBook.visible=anim.book;if(shelfBook)shelfBook.visible=!anim.book;heldAxe.visible=anim.pose==='fell_tree'&&!moving;bow.visible=anim.pose==='practise'&&!anim.book&&!seated&&!heldAxe.visible;
 const turn=anim.elapsed%24;pagePivot.rotation.z=anim.pose.startsWith('reading')&&turn<1.8?Math.PI*T.MathUtils.smoothstep(turn,0,1.8):0;
@@ -328,6 +343,6 @@ if(anim.pose==='inspect'&&!moving){headPivot.rotation.x=.38;arms[1].rotation.x=-
 if(anim.pose==='gather'&&!moving){const bend=.5+Math.sin(anim.elapsed*1.4)*.25;arms[0].rotation.x=-bend;arms[1].rotation.x=-bend;headPivot.rotation.x=.3;}
 if(anim.pose==='craft'&&!moving){arms[1].rotation.x=-.8+Math.sin(anim.elapsed*4)*.12;elbows[1].rotation.x=-.5;headPivot.rotation.x=.18;}
 if(anim.pose==='observe'&&!moving)headPivot.rotation.y=Math.sin(anim.elapsed*.2)*.35;else headPivot.rotation.y=0;
-crow.visible=!(anim.pose==='sleep');
+crow.visible=true;if(inBed){headPivot.rotation.set(0,0,0);torso.scale.y=1+Math.sin(anim.elapsed*.9)*.02;}
 sky.frame();renderer.render(scene,camera);requestAnimationFrame(frame)}
 $('loading').remove();refresh();setInterval(refresh,2500);requestAnimationFrame(frame);

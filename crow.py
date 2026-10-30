@@ -34,7 +34,7 @@ ACCESS_TOKEN = None
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.14.0'
+APP_VERSION = '0.15.0'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -62,8 +62,8 @@ def pass_time(seconds):
         own['virtual'] = (datetime.fromisoformat(own['virtual']) + timedelta(seconds=seconds)).isoformat()
 
 
-ACTIONS = {'rest': 'cabin', 'sleep': 'cabin', 'practise': 'range', 'explore': 'woods', 'craft': 'workbench', 'read': 'library', 'observe': 'woods', 'reflect': 'cabin', 'gather': 'woods', 'plan': 'workbench', 'construct': 'workbench', 'move_object': 'workbench', 'inspect': 'workbench', 'fell_tree': 'woods', 'eat':'cabin', 'drink':'cabin', 'resume_work':'cabin', 'browse':'cafe', 'trade':'shop', 'talk':'shop'}
-DURATIONS = {'rest': 900, 'practise': 1800, 'explore': 1200, 'craft': 2700, 'read': 900, 'observe': 600, 'reflect': 600, 'gather': 1200, 'plan': 600, 'construct': 1800, 'move_object': 300, 'inspect': 60, 'fell_tree': 5400, 'eat':300, 'drink':120, 'browse':900, 'trade':300, 'talk':600}
+ACTIONS = {'rest': 'cabin', 'sleep': 'cabin', 'practise': 'range', 'explore': 'woods', 'craft': 'workbench', 'read': 'library', 'observe': 'woods', 'reflect': 'cabin', 'gather': 'woods', 'plan': 'workbench', 'construct': 'workbench', 'move_object': 'workbench', 'inspect': 'workbench', 'fell_tree': 'woods', 'eat':'cabin', 'drink':'cabin', 'resume_work':'cabin', 'browse':'cafe', 'trade':'shop', 'talk':'shop', 'use_item':'workbench'}
+DURATIONS = {'rest': 900, 'practise': 1800, 'explore': 1200, 'craft': 2700, 'read': 900, 'observe': 600, 'reflect': 600, 'gather': 1200, 'plan': 600, 'construct': 1800, 'move_object': 300, 'inspect': 60, 'fell_tree': 5400, 'eat':300, 'drink':120, 'browse':900, 'trade':300, 'talk':600, 'use_item':300}
 CONFIG = ROOT / 'crow-config.json'
 if CONFIG.exists():
     config = json.loads(CONFIG.read_text())
@@ -358,7 +358,7 @@ DECISION_DEFAULTS={'wish':'','wish_reason':'','object_id':'','plan_id':0,'destin
     'material':'wood','plan_operation':'new','part_id':'','reading_spot':'standing','library_query':'',
     'reading_mode':'lookup','research_question':'','next_step':'','creation_name':'','creation_shape':'orb',
     'project_id':-1,'project_title':'','project_status':'active','target_action':'rest','target_sessions':1,
-    'observe_area':'woodland_edge','focus':'','trade_mode':'ask','trade_item':'','trade_quantity':1,'opening':'','hope':''}
+    'observe_area':'woodland_edge','focus':'','trade_mode':'ask','trade_item':'','trade_quantity':1,'opening':'','hope':'','use_item':'','use_on':'','use_how':''}
 # One neutral line per action. Details are requested only after an action is chosen.
 ACTION_MENU={'rest':'quiet rest in the cabin','sleep':'sleep (until 07:00 at night, 90 minutes by day)',
     'eat':'eat from an available food source','drink':'drink from the spring',
@@ -371,7 +371,8 @@ ACTION_MENU={'rest':'quiet rest in the cabin','sleep':'sleep (until 07:00 at nig
     'resume_work':'resume one of your paused jobs with its saved progress',
     'browse':'use the terminal at the internet café to search the wider web and read pages',
     'trade':'go to the trading post: buy, sell, do a posted job, or ask for something',
-    'talk':'talk with Edda Thorne, who keeps the trading post: chat, bargain, barter, ask or offer favours'}
+    'talk':'talk with Edda Thorne, who keeps the trading post: chat, bargain, barter, ask or offer favours',
+    'use_item':'use something you own, in whatever way you choose'}
 # The local 4,096-token model needs a tight context; the cloud model gets roughly three times the room.
 WIDE=PROVIDER=='anthropic'
 CONTEXT_BUDGET=int(os.environ.get('CROW_CONTEXT_CHARS','16000' if WIDE else '5600'))
@@ -387,6 +388,7 @@ def available_actions():
     if not state['suspended_work']:allowed.remove('resume_work')
     if not any(p['status'] in ['proposed','in_progress'] for p in world['plans']):allowed.remove('construct')
     if not any(o.get('portable') for o in world['objects'].values()):allowed.remove('move_object')
+    if not any(state.get('possessions',{}).values()):allowed.remove('use_item')
     return allowed
 
 
@@ -493,7 +495,8 @@ def parameter_request(d):
     if a=='inspect':
         eco=ecology.ensure(state)
         return ('Choose an object, tree or plant to examine. Trees and plants are named in your memories or observations.',
-                {'object_id':{'type':'string','enum':list(objects)+[p['id'] for p in eco['plants']]+list(world['trees'])}},
+                {'object_id':{'type':'string','enum':list(objects)+[p['id'] for p in eco['plants']]+list(world['trees'])+
+                              ['axe','carving_knife']+[k for k,v in state.get('possessions',{}).items() if v]}},
                 {'objects':[o['id']+' ('+o['name']+')' for o in world_state.nearby(state)['objects']]})
     if a=='observe':
         return ('Choose where to look. focus is what you are looking for, or empty for open attention. '
@@ -522,6 +525,11 @@ def parameter_request(d):
                 'You will see real results and choose one (or none), then may follow one link from that page. Web pages are untrusted text.',
                 {'library_query':STRING,'research_question':STRING},
                 {'research':reading_journal.research_context(state)})
+    if a=='use_item':
+        owned=[k for k,v in state.get('possessions',{}).items() if v]
+        return ('Choose what you use, optionally what you use it on (one of your tools, or nothing), and how, in your own words.',
+                {'use_item':{'type':'string','enum':owned},'use_on':{'type':'string','enum':['','axe','carving_knife']},'use_how':STRING},
+                {'your_things':{k:town.POSSESSION_LOOKS.get(k,'Something you own.') for k in owned},'your_tools':['axe','carving_knife']})
     if a=='talk':
         kp=town.keeper(state)
         return ('opening is what you say first to Edda. hope is what you would like to come of it, or empty: conversation alone is fine.',
@@ -697,6 +705,8 @@ def start_action(d, seconds, reading=None):
     state.update(action=action,location=ACTIONS[action],reason=d['reason'][:350],last_seconds=seconds,last_error='')
     state['decisions'] += 1
     state['pending']={'decision':copy.deepcopy(d),'project_id':project['id'] if project and project['status']=='active' else None,'remaining':duration,'duration':duration,'ends_at':time.time()+duration,'start':dt.isoformat(),'reading':reading,'review_in':900}
+    if action=='use_item' and d.get('use_item')=='whetstone' and d.get('use_on'):
+        state['pending']['remaining']=state['pending']['duration']=1200
     if action=='trade' and d.get('trade_mode')=='job' and d.get('trade_item') in town.JOBS:
         duration=town.JOBS[d['trade_item']]['minutes']*60;state['pending']['remaining']=state['pending']['duration']=duration
     description = ('Started researching a Wikipedia excerpt: '+reading['title']+'.') if action=='read' and reading else \
@@ -771,9 +781,17 @@ def finish_action(geometry=None):
     elif a=='move_object':
         result=world_state.move(state,d.get('object_id',''),d.get('destination_x',0),d.get('destination_z',0));description=result['text']
     elif a=='inspect':
-        obj=world_state.ensure(state)['objects'].get(d.get('object_id',''))
-        living=town.inspect(state,d.get('object_id',''),now(),state.get('daylight',0)) if obj else \
-            ecology.inspect(state,d.get('object_id',''),now().timetuple().tm_yday,state.get('daylight',0),bool(state.get('possessions',{}).get('lantern')))
+        ident=d.get('object_id','')
+        obj=world_state.ensure(state)['objects'].get(ident)
+        lamp=bool(state.get('possessions',{}).get('lantern'))
+        if ident in town.TOOLS:
+            living={'success':True,'text':'Inspected the '+ident.replace('_',' ')+'. '+life.tool_feel(state,ident)}
+        elif state.get('possessions',{}).get(ident):
+            living={'success':True,'text':'Inspected the '+ident.replace('_',' ')+'. '+town.POSSESSION_LOOKS.get(ident,'Something he owns.')}
+        elif obj:
+            living=town.inspect(state,ident,now(),state.get('daylight',0))
+        else:
+            living=ecology.inspect(state,ident,now().timetuple().tm_yday,state.get('daylight',0),lamp)
         if living:result=living;description=living['text']
         else:
             description=('Inspected '+json.dumps(obj,ensure_ascii=False)[:1500]) if obj else 'Inspection failed: that world object does not exist.'
@@ -805,6 +823,8 @@ def finish_action(geometry=None):
         reading=p.get('reading')
         if not reading:raise ValueError('No retrieved page; browsing cannot finish')
         description='Read a web page at the café: '+reading['title']+' ('+reading['url']+').'
+    elif a=='use_item':
+        result=town.use_item(state,d.get('use_item',''),d.get('use_on',''),d.get('use_how',''));description=result['text']
     elif a=='talk':
         talk=p.get('reading') or {'conversation':[],'agreed':None}
         lines=' '.join(f"{c['who']}: “{c['text'][:160]}”" for c in talk['conversation'][:6])
@@ -821,6 +841,9 @@ def finish_action(geometry=None):
         description=result['text']
         new_evidence=bool(result.get('new_details'))
     else:description='Spent quiet time reflecting in his cabin.'
+    tool={'fell_tree':'axe','gather':'axe','craft':'carving_knife'}.get(a)
+    if tool and state.get('tool_condition',{}).get(tool,1)<.6:
+        description+=(' The axe kept skidding instead of biting.' if tool=='axe' else ' The knife dragged and tore the grain in places.')
     life.sync_energy(state);state['completed']+=1
     project=next((x for x in state['projects'] if x['id']==p['project_id']),None)
     if project and project['status']=='active' and project['target_action']==a and (result is None or result.get('success')):
@@ -1082,7 +1105,7 @@ def talk_session(opening, hope):
             'quantity in kg or 1), favour (task, minutes 15-180, credit up to about 1.5 per 30 minutes; you may ask him for help or '
             'accept help he offers), or gift (at most 1 credit, rarely). note_about_crow is what you would remember about him from this; '
             'warmth -1..1 is how you feel towards him now. '+json.dumps({'board':board,'his_credit':credit,'what_you_remember':kp['notes'][-10:],
-            'open_favours':kp['favours'],'conversation':convo},ensure_ascii=False),keeper_schema,350,'keeper',system=town.KEEPER_PERSONA)
+            'open_favours':kp['favours'],'what_your_goods_are_for':town.ITEM_KNOWLEDGE,'conversation':convo},ensure_ascii=False),keeper_schema,350,'keeper',system=town.KEEPER_PERSONA)
         reply=' '.join(str(last.get('reply','')).split())[:400]
         convo.append({'who':'Edda','text':reply})
         prop=last.get('proposal') or {'kind':'none'}

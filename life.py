@@ -18,6 +18,7 @@ def ensure(state):
         'water_litres': 40., 'water_capacity': 40.})
     state.setdefault('practical', {'control_hours': 0., 'methods': [], 'trials': [], 'next_trial_id': 1})
     state.setdefault('affect', {'valence': 0., 'arousal': 0., 'signals': []})
+    state.setdefault('tool_condition', {'axe': 1., 'carving_knife': 1.})
     world=state['built_world']
     if not world.get('life_sites_added'):
         from world_state import part
@@ -62,6 +63,7 @@ def advance(state, seconds, action):
         supplies['berries']=min(supplies['berry_capacity'],supplies['berries']+.25*dt)
         supplies['water_litres']=min(supplies['water_capacity'],supplies['water_litres']+2*dt)
         for signal in state['affect']['signals']:signal['age_hours']+=dt
+        wear(state,action,dt)
     refresh_affect(state)
     sync_energy(state)
 
@@ -79,7 +81,38 @@ def work_rate(state, action):
     rate = 1 / (1 + .6 * max(0., fatigue(state) - .2))
     if action in OUTDOOR_WORK and state.get('daylight', 1) < .12 and not state.get('possessions', {}).get('lantern'):
         rate *= .5
+    edge = state.get('tool_condition', {})
+    if action == 'fell_tree':
+        rate *= .4 + .6 * edge.get('axe', 1.)
+    elif action == 'gather':
+        rate *= .7 + .3 * edge.get('axe', 1.)
+    elif action == 'construct':
+        rate *= .85 + .15 * edge.get('axe', 1.)
     return rate
+
+
+# Blades dull with use (per active hour of that work) and stay dull until something restores the edge.
+WEAR = {'fell_tree': ('axe', .05), 'gather': ('axe', .02), 'construct': ('axe', .01), 'craft': ('carving_knife', .06)}
+
+
+def wear(state, action, hours):
+    tool, rate = WEAR.get(action, (None, 0))
+    if tool:
+        cond = state.setdefault('tool_condition', {'axe': 1., 'carving_knife': 1.})
+        cond[tool] = round(max(.2, cond.get(tool, 1.) - rate * hours), 4)
+
+
+def tool_feel(state, tool):
+    """What the edge looks and feels like: observation, not explanation."""
+    c = state.get('tool_condition', {}).get(tool, 1.)
+    name = {'axe': 'axe', 'carving_knife': 'carving knife'}.get(tool, tool)
+    if c > .85:
+        return f'The {name} edge is bright and keen.'
+    if c > .6:
+        return f'The {name} edge has lost a little of its shine.'
+    if c > .4:
+        return f'The {name} edge is dull; it catches the light along its length.'
+    return f'The {name} edge is rounded and nicked.'
 
 
 def sync_energy(state):
@@ -170,7 +203,7 @@ def practical_attempt(state, decision, seconds):
     error*=1 if method['support']=='bench' else 1.8
     error*=1 if method['passes']=='light' else 1.7
     error*=1 if method['direction']=='along' else 1.5
-    if state.get('possessions',{}).get('whetstone'):error*=.85  # a keen blade: an owned tool, not practice
+    error*=1+(1-state.get('tool_condition',{}).get('carving_knife',1.))  # a dull knife tears instead of cutting
     if state.get('daylight',1)<.12 and not state.get('possessions',{}).get('lantern'):error*=1.4  # carving by starlight
     error=round(error,2);met=error<=target
     # Motor practice transfers across shapes, but reading and idle time cannot add it.

@@ -720,3 +720,29 @@ what held and what came apart.
 ```bash
 python3 tests/test_building.py
 ```
+
+## v0.15.0 — blades that dull, a whetstone to discover, a lantern you can see
+
+- **Tools wear.** His axe dulls with felling (and a little with gathering and
+  building) and his carving knife with carving. A dull axe makes felling and
+  chopping slower; a dull knife makes carving rougher. Work results mention
+  what he would notice ("the axe kept skidding instead of biting"), and
+  inspecting a tool describes its edge, but nothing explains the cause.
+- **`use_item`** lets him use anything he owns, on one of his tools or on
+  nothing, in his own words. Only real mechanics change anything: a whetstone
+  used on a blade restores its edge after 20 minutes of work; used on nothing,
+  nothing happens. Owning a whetstone no longer helps by itself. Inspecting it
+  shows only a flat, fine-grained grey stone.
+- **Edda knows what her goods are for** (light after dark; sharpening dulled
+  blades; food that keeps). Crow is never told; he can ask her.
+- **The lantern** lights automatically when it is dark and he owns one: he
+  carries it, and it casts real light in the 3D scene. Its effect on outdoor
+  work and on seeing detail is unchanged and still unexplained to him.
+- **Sleeping and resting in the cabin.** He walks into the cabin and lies down
+  in his bed under a blanket, breathing slowly, instead of vanishing; resting
+  sits him on the edge of the bed. Opening the page mid-activity now shows him
+  where he already is rather than walking there.
+
+```bash
+python3 tests/test_tools.py
+```
