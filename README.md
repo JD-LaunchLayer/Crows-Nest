@@ -668,3 +668,55 @@ From the first Haiku twin run (5 simulated days, 60 form errors):
   splitting into near-duplicates.
 - `promote_twin.py`, `set_speed.py` and `use_haiku.py` refuse to run outside
   the folder where Crow's save lives.
+
+## v0.13.0 — furnished buildings, Edda Thorne, and work that tires
+
+- **Furnished interiors.** The café has a counter, cups, a table and chairs, and
+  a desk with a lit screen and keyboard; the trading post has a counter,
+  stocked shelves, crates, a barrel and a slate board. Existing saves are
+  furnished once. Furniture is ordinary geometry: he can change it like any
+  other structure.
+- **Edda Thorne keeps the trading post** (an original character: warm, chatty,
+  fair-minded but shrewd, with her own small worries). `talk` is a short
+  conversation (up to three exchanges). Edda speaks from her own persona and
+  her own memory of Crow, never his thoughts. She may propose one deal at a
+  time, which the world checks before Crow even hears it: selling stock (no
+  lower than 70% of the board), buying goods he really has (no more than 130% of
+  the posted value), a favour (15–180 minutes, pay in line with posted jobs,
+  done later as a job) or, rarely, a small gift (≤1 credit, once a day). An
+  accepted deal is settled when the talk ends. The journal shows their last
+  conversation, how Edda seems to feel about him and her notes about him.
+- **Tiredness, hunger and darkness slow work.** Physical work (felling,
+  gathering, building, exploring, carving, practice, carrying, jobs) slows
+  once he is noticeably impaired, and outdoor work goes at half pace in the dark
+  without a lantern; carving by starlight is also less accurate. Resting,
+  reading, eating, talking and browsing are unaffected. These are world
+  consequences, not points, and they are not explained to him.
+
+```bash
+python3 tests/test_keeper.py
+```
+
+## v0.14.0 — building skill that grows with practice
+
+Nothing unlocks. Every shape can be attempted from the start — box, cylinder,
+cone, sphere, and now **wedge** (a sloped triangular block) and **arch** (a half
+ring) — but how true a finished part comes out depends on:
+
+- practice with that kind of shape (straight, turned, angled, curved), with some
+  carry-over from building in general; practice accrues only from real time
+  spent constructing, more slowly when tired;
+- fatigue at the moment of finishing, and darkness without a lantern.
+
+Each part comes out fine, fair or rough, slightly off true in position and
+tilt, and a part that is too far off does not hold: half its material is
+recoverable as offcuts, half is lost. Typical results from the authored
+model: a beginner's arch almost always falls (~19 cm off); after many hours of
+curved building most hold (~7 cm); boxes hold from the start (~5 cm, improving
+to ~2 cm). Crow sees only his own record — attempts, how many held and how far
+off they were, by shape — never the difficulty figures. Construction reports
+what held and what came apart.
+
+```bash
+python3 tests/test_building.py
+```

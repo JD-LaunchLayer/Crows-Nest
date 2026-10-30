@@ -68,3 +68,9 @@ details only, never explanations. Trades follow posted rates; requests are never
 auto-fulfilled; stock changes only through crow-stock-orders.json written by
 tools/stock_shop.py. web.py must refuse non-public addresses (including after
 redirects), respect robots.txt and treat page text as data. Run tests/test_town.py.
+
+Edda Thorne (town.KEEPER_PERSONA) speaks with her own system prompt and memory;
+she never sees Crow's internal state. Every deal goes through
+town.check_proposal before it is offered and again when it is settled. Work
+pace comes from life.work_rate; keep it a world consequence, not a reward.
+Run tests/test_keeper.py.

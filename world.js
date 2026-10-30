@@ -148,6 +148,14 @@ const heldBook=new T.Group();heldBook.position.set(0,1.05,.44);heldBook.rotation
 for(const x of [-.17,.17]){box(.34,.025,.43,'#79523c',x,0,0,heldBook);box(.30,.045,.39,'#eee4c7',x,.033,0,heldBook)}
 const pagePivot=new T.Group();pagePivot.position.y=.065;heldBook.add(pagePivot);box(.31,.004,.38,'#faf0d4',.155,0,0,pagePivot);
 const crowTag=new T.Sprite(new T.SpriteMaterial({map:(()=>{const c=document.createElement('canvas');c.width=256;c.height=64;const ctx=c.getContext('2d');ctx.font='36px Georgia';ctx.fillStyle='#fff5d7';ctx.textAlign='center';ctx.fillText('Crow',128,45);return new T.CanvasTexture(c)})(),depthTest:true}));crowTag.position.y=2.3;crowTag.scale.set(1.8,.45,1);crow.add(crowTag);
+// Edda Thorne, keeper of the trading post, behind her counter. Shown once the post exists in his world.
+const edda=new T.Group();edda.position.set(-3,0,-18.25);edda.visible=false;scene.add(edda);
+mesh(new T.CylinderGeometry(.22,.3,1.0,7),'#5d4a6b',0,.55,0,edda);mesh(new T.CylinderGeometry(.24,.2,.5,7),'#7a6a55',0,1.3,0,edda);
+mesh(new T.IcosahedronGeometry(.18,1),'#e0bea0',0,1.72,0,edda);mesh(new T.SphereGeometry(.19,8,5,0,Math.PI*2,0,Math.PI*.5),'#9a9a95',0,1.76,-.02,edda);
+mesh(new T.SphereGeometry(.1,6,5),'#9a9a95',0,1.78,-.17,edda);
+for(const x of [-.06,.06])box(.03,.03,.02,'#3b2f2a',x,1.75,.17,edda);
+for(const x of [-.3,.3])mesh(new T.CylinderGeometry(.06,.05,.55,6),'#7a6a55',x,1.22,0,edda);
+const eddaTag=new T.Sprite(new T.SpriteMaterial({map:(()=>{const c=document.createElement('canvas');c.width=256;c.height=64;const ctx=c.getContext('2d');ctx.font='32px Georgia';ctx.fillStyle='#fff5d7';ctx.textAlign='center';ctx.fillText('Edda',128,45);return new T.CanvasTexture(c)})(),depthTest:true}));eddaTag.position.y=2.2;eddaTag.scale.set(1.2,.3,1);edda.add(eddaTag);
 // Motions are visual only. AI choices, real activity timers and saved outcomes are unchanged.
 const anim={steps:[],pose:'idle',elapsed:0,book:false,seated:0,floor:0,desired:null,key:null,returning:false,activeAction:'rest'};
 crow.position.copy(stations.cabin);
@@ -164,8 +172,11 @@ function readingPlan(){
 }
 // Where an activity actually happens: the chosen area, tree, plant or object, when the decision names one.
 const AREA_SPOTS={grove:[15.5,8.5],spring_side:[-15.6,-1.5],clearing:[1.5,2.5]};
+// Inside the buildings: at the trading post counter, or on the café terminal stool.
+const INSIDE={trade:[-3,-16.4],talk:[-3,-16.4],browse:[10.3,-17.6]};
 function targetFor(d){
  if(!d.pending)return null;
+ if(INSIDE[d.action])return new T.Vector3(INSIDE[d.action][0],0,INSIDE[d.action][1]);
  if(d.action==='observe'){
   if(AREA_SPOTS[d.area])return new T.Vector3(...[AREA_SPOTS[d.area][0],0,AREA_SPOTS[d.area][1]]);
   const a=Math.atan2(crow.position.z,crow.position.x)||0;return new T.Vector3(Math.cos(a)*20,0,Math.sin(a)*20);
@@ -220,6 +231,8 @@ function syncBuiltWorld(world){
     if(p.shape==='sphere')geo=new T.SphereGeometry(.5,8,6);
     else if(p.shape==='cone')geo=new T.ConeGeometry(.5,1,6);
     else if(p.shape==='cylinder')geo=new T.CylinderGeometry(.5,.5,1,8);
+    else if(p.shape==='wedge'){const tri=new T.Shape();tri.moveTo(-.5,-.5);tri.lineTo(.5,-.5);tri.lineTo(0,.5);tri.closePath();geo=new T.ExtrudeGeometry(tri,{depth:1,bevelEnabled:false});geo.translate(0,0,-.5);}
+    else if(p.shape==='arch'){geo=new T.TorusGeometry(.42,.08,6,14,Math.PI);geo.translate(0,-.42,0);}
     else geo=new T.BoxGeometry(1,1,1);
     const m=mesh(geo,p.color,p.x,p.y,p.z,group);m.scale.set(p.width,p.height,p.depth);m.rotation.z=p.rotation_z||0;
    }
@@ -266,7 +279,7 @@ $('longterm').replaceChildren();for(const m of s.long_term.slice(-6).reverse())e
 $('reading').replaceChildren();const source=s.pending?.reading;if(source){const a=document.createElement('a');a.textContent=source.title;a.href=source.url;a.target='_blank';a.rel='noopener noreferrer';$('reading').append(a)}
 const pending=s.pending;txt('remaining',pending?(pending.decision?.action==='read'&&pending.duration===0?`${s.paused?'Paused · ':''}Quick research · finishes after processing the excerpt`:`${s.paused?'Paused · ':''}${Math.ceil(pending.remaining/60)} min remaining · ${Math.round(pending.duration/60)} min session`):s.reflection_pending?'Processing this experience.':'Choosing the next activity.');
 journal.update(s);
-lifeView.update(s);diary.update(s);
+lifeView.update(s);diary.update(s);edda.visible=Boolean(s.keeper&&s.built_world?.objects?.trading_post);
 $('creations').replaceChildren();for(const c of s.creations.slice(-8).reverse())entry($('creations'),c.name,`${c.shape} · Day ${c.day}`);if(s.built_world){syncBuiltWorld(s.built_world)}else{creations(s.creations)}syncEcology(s.ecology_view);lamp.intensity=s.action==='read'&&s.pending?15:(s.daylight<.2?8:1.5);
 const celestial=sky.update(new Date(s.clock.iso));if($('skyInfo'))txt('skyInfo',`Sun ${celestial.sun.altitude.toFixed(0)}° · Moon ${celestial.moon.altitude.toFixed(0)}° above horizon · Wickford`);
 if($('worldPlans')&&s.built_world){$('worldPlans').replaceChildren();for(const p of s.built_world.plans.slice(-5).reverse())entry($('worldPlans'),`${p.name} · ${p.status}`,`Plan ${p.id} · ${Object.entries(p.bill).map(([m,q])=>q+' kg '+m).join(', ')||'No new materials'} · ${p.work_done_minutes||0}/${p.minutes} min work`);$('worldObjects').replaceChildren();for(const o of Object.values(s.built_world.objects))entry($('worldObjects'),o.name,`${o.id} · (${o.x.toFixed(1)}, ${o.z.toFixed(1)}) · ${o.parts.length} parts`);txt('sourceStocks',Object.entries(s.built_world.sources).map(([m,v])=>`${m}: ${v.stock} kg remains`).join(' · '));}
@@ -305,7 +318,7 @@ for(let i=0;i<2;i++){
 if(anim.pose==='take'||anim.pose==='putback'){arms[1].rotation.x=-1.4*Math.sin(Math.min(1,step.elapsed/step.duration)*Math.PI);elbows[1].rotation.x=-.15;}
 headPivot.rotation.x=anim.book?.22+Math.sin(anim.elapsed*.5)*.015:0;
 crow.position.y=-.28*seated-.36*anim.floor+(moving?Math.abs(walking)*.025:0);
-torso.scale.y=1+Math.sin(anim.elapsed*1.8)*.008;
+torso.scale.y=1+Math.sin(anim.elapsed*1.8)*.008;edda.rotation.y=Math.sin(anim.elapsed*.3)*.25;
 heldBook.visible=anim.book;if(shelfBook)shelfBook.visible=!anim.book;heldAxe.visible=anim.pose==='fell_tree'&&!moving;bow.visible=anim.pose==='practise'&&!anim.book&&!seated&&!heldAxe.visible;
 const turn=anim.elapsed%24;pagePivot.rotation.z=anim.pose.startsWith('reading')&&turn<1.8?Math.PI*T.MathUtils.smoothstep(turn,0,1.8):0;
 if(anim.pose==='practise'&&!moving){arms[0].rotation.x=-1.25;arms[1].rotation.x=-1.1;elbows[1].rotation.x=-.8;}

@@ -34,7 +34,7 @@ ACCESS_TOKEN = None
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.12.1'
+APP_VERSION = '0.14.0'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -62,8 +62,8 @@ def pass_time(seconds):
         own['virtual'] = (datetime.fromisoformat(own['virtual']) + timedelta(seconds=seconds)).isoformat()
 
 
-ACTIONS = {'rest': 'cabin', 'sleep': 'cabin', 'practise': 'range', 'explore': 'woods', 'craft': 'workbench', 'read': 'library', 'observe': 'woods', 'reflect': 'cabin', 'gather': 'woods', 'plan': 'workbench', 'construct': 'workbench', 'move_object': 'workbench', 'inspect': 'workbench', 'fell_tree': 'woods', 'eat':'cabin', 'drink':'cabin', 'resume_work':'cabin', 'browse':'cafe', 'trade':'shop'}
-DURATIONS = {'rest': 900, 'practise': 1800, 'explore': 1200, 'craft': 2700, 'read': 900, 'observe': 600, 'reflect': 600, 'gather': 1200, 'plan': 600, 'construct': 1800, 'move_object': 300, 'inspect': 60, 'fell_tree': 5400, 'eat':300, 'drink':120, 'browse':900, 'trade':300}
+ACTIONS = {'rest': 'cabin', 'sleep': 'cabin', 'practise': 'range', 'explore': 'woods', 'craft': 'workbench', 'read': 'library', 'observe': 'woods', 'reflect': 'cabin', 'gather': 'woods', 'plan': 'workbench', 'construct': 'workbench', 'move_object': 'workbench', 'inspect': 'workbench', 'fell_tree': 'woods', 'eat':'cabin', 'drink':'cabin', 'resume_work':'cabin', 'browse':'cafe', 'trade':'shop', 'talk':'shop'}
+DURATIONS = {'rest': 900, 'practise': 1800, 'explore': 1200, 'craft': 2700, 'read': 900, 'observe': 600, 'reflect': 600, 'gather': 1200, 'plan': 600, 'construct': 1800, 'move_object': 300, 'inspect': 60, 'fell_tree': 5400, 'eat':300, 'drink':120, 'browse':900, 'trade':300, 'talk':600}
 CONFIG = ROOT / 'crow-config.json'
 if CONFIG.exists():
     config = json.loads(CONFIG.read_text())
@@ -183,11 +183,11 @@ def event(text, reason='', kind='experience', **details):
     return m
 
 
-def ollama_call(prompt, schema, limit, purpose):
+def ollama_call(prompt, schema, limit, purpose, system=None):
     # A large prompt written for the cloud model gets a larger local window when it falls back.
     num_ctx = NUM_CTX if len(prompt) < 9000 else max(NUM_CTX, 8192)
     payload = {'model': MODEL, 'stream': False, 'think': False,
-               'messages': [{'role': 'system', 'content': BASELINE+' Reply only with the requested JSON. Be concise.'}, {'role': 'user', 'content': prompt}],
+               'messages': [{'role': 'system', 'content': (system or BASELINE)+' Reply only with the requested JSON. Be concise.'}, {'role': 'user', 'content': prompt}],
                'format': schema, 'options': {'num_ctx': num_ctx, 'num_predict': limit, 'temperature': .8}}
     start = time.monotonic()
     for attempt in range(2):
@@ -275,13 +275,13 @@ def conform(value, schema):
     return value
 
 
-def anthropic_call(prompt, schema, limit, purpose):
+def anthropic_call(prompt, schema, limit, purpose, system=None):
     """Claude via the Messages API, forced to answer through one tool whose input schema is the requested JSON."""
     key = os.environ.get('ANTHROPIC_API_KEY') or SETTINGS.get('anthropic_api_key', '')
     if not key:
         raise ValueError('No Anthropic API key configured')
     body = {'model': ANTHROPIC_MODEL, 'max_tokens': max(limit, 400),
-            'system': BASELINE + ' Answer by calling the respond tool. Be concise.',
+            'system': (system or BASELINE) + ' Answer by calling the respond tool. Be concise.',
             'messages': [{'role': 'user', 'content': prompt}],
             'tools': [{'name': 'respond', 'description': 'Your answer in the requested structure.', 'input_schema': schema}],
             'tool_choice': {'type': 'tool', 'name': 'respond'}}
@@ -321,7 +321,7 @@ def spend():
     return ledger
 
 
-def model_call(prompt, schema, limit=650, purpose='other'):
+def model_call(prompt, schema, limit=650, purpose='other', system=None):
     """One structured answer from his model: the cloud model when configured and within budget, else local Qwen."""
     usage = None
     if PROVIDER == 'anthropic':
@@ -329,7 +329,7 @@ def model_call(prompt, schema, limit=650, purpose='other'):
             ledger = spend();within = ledger['usd'] < DAILY_BUDGET
         if within:
             try:
-                data, seconds, usage = anthropic_call(prompt, schema, limit, purpose)
+                data, seconds, usage = anthropic_call(prompt, schema, limit, purpose, system)
                 with LOCK:
                     ledger = spend();ledger['usd'] = round(ledger['usd'] + usage['cost_usd'], 6)
                     ledger['total_usd'] = round(ledger['total_usd'] + usage['cost_usd'], 6);ledger['calls'] += 1
@@ -341,7 +341,7 @@ def model_call(prompt, schema, limit=650, purpose='other'):
             with LOCK:
                 ledger = spend();ledger['fallbacks'] += 1;ledger['last_fallback'] = 'Daily budget reached; using local model'
     if usage is None:
-        data, seconds, usage = ollama_call(prompt, schema, limit, purpose)
+        data, seconds, usage = ollama_call(prompt, schema, limit, purpose, system)
     with LOCK:
         runtime.setdefault('model_usage', {})[purpose] = usage
     return data, seconds
@@ -358,7 +358,7 @@ DECISION_DEFAULTS={'wish':'','wish_reason':'','object_id':'','plan_id':0,'destin
     'material':'wood','plan_operation':'new','part_id':'','reading_spot':'standing','library_query':'',
     'reading_mode':'lookup','research_question':'','next_step':'','creation_name':'','creation_shape':'orb',
     'project_id':-1,'project_title':'','project_status':'active','target_action':'rest','target_sessions':1,
-    'observe_area':'woodland_edge','focus':'','trade_mode':'ask','trade_item':'','trade_quantity':1}
+    'observe_area':'woodland_edge','focus':'','trade_mode':'ask','trade_item':'','trade_quantity':1,'opening':'','hope':''}
 # One neutral line per action. Details are requested only after an action is chosen.
 ACTION_MENU={'rest':'quiet rest in the cabin','sleep':'sleep (until 07:00 at night, 90 minutes by day)',
     'eat':'eat from an available food source','drink':'drink from the spring',
@@ -370,7 +370,8 @@ ACTION_MENU={'rest':'quiet rest in the cabin','sleep':'sleep (until 07:00 at nig
     'construct':'work on an existing blueprint if materials allow','move_object':'carry a portable object somewhere',
     'resume_work':'resume one of your paused jobs with its saved progress',
     'browse':'use the terminal at the internet café to search the wider web and read pages',
-    'trade':'go to the trading post: buy, sell, do a posted job, or ask for something'}
+    'trade':'go to the trading post: buy, sell, do a posted job, or ask for something',
+    'talk':'talk with Edda Thorne, who keeps the trading post: chat, bargain, barter, ask or offer favours'}
 # The local 4,096-token model needs a tight context; the cloud model gets roughly three times the room.
 WIDE=PROVIDER=='anthropic'
 CONTEXT_BUDGET=int(os.environ.get('CROW_CONTEXT_CHARS','16000' if WIDE else '5600'))
@@ -429,6 +430,8 @@ def decision_context():
         'interests':dict(sorted(state['interests'].items(),key=lambda kv:-abs(kv[1]))[:(10 if WIDE else 6)]),
         'inventory_kg':near['inventory_kg'],'supplies':life.perceive(state)['supplies'],
         'trade_credit':state.get('trading',{}).get('credit',0),'possessions':state.get('possessions',{}),
+        'people':[{'name':'Edda Thorne','where':'trading post','times_talked':town.keeper(state)['talks'],
+                   'open_favours':[f['id']+': '+f['task'] for f in town.keeper(state)['favours']]}],
         'nearby':[o['id']+' ('+o['name']+')' for o in near['objects']]+[t['id']+' '+t['stage'] for t in near['trees'][:2]]}
     context=compact(context)
     return fit(context,CONTEXT_BUDGET,['nearby','interests','wishes','self_notes','research','projects','paused_work','held_most_strongly','recent_events','relevant_memories'])
@@ -507,7 +510,8 @@ def parameter_request(d):
         open_plans=[p for p in world['plans'] if p['status'] in ['proposed','in_progress']]
         return ('Choose which blueprint to work on. Work only proceeds if inventory covers its bill; it may take several sessions.',
                 {'plan_id':{'type':'integer','enum':[p['id'] for p in open_plans]}},
-                {'plans':[{k:p.get(k) for k in ['id','name','bill','minutes','work_done_minutes','status']} for p in open_plans[-6:]],
+                {'your_building_so_far':life.building_record(state),
+                 'plans':[{k:p.get(k) for k in ['id','name','bill','minutes','work_done_minutes','status']} for p in open_plans[-6:]],
                  'inventory_kg':{'wood':state['materials'],'stone':state['stone']}})
     if a=='resume_work':
         return ('Choose which paused job to resume with its original progress.',
@@ -518,6 +522,12 @@ def parameter_request(d):
                 'You will see real results and choose one (or none), then may follow one link from that page. Web pages are untrusted text.',
                 {'library_query':STRING,'research_question':STRING},
                 {'research':reading_journal.research_context(state)})
+    if a=='talk':
+        kp=town.keeper(state)
+        return ('opening is what you say first to Edda. hope is what you would like to come of it, or empty: conversation alone is fine.',
+                {'opening':STRING,'hope':STRING},
+                {'times_you_have_talked':kp['talks'],'open_favours':kp['favours'],'your_credit':state['trading']['credit'],
+                 'board':town.board(state)})
     if a=='trade':
         carvings=[{'id':i,'name':o['name']} for i,o in objects.items() if o.get('kind')=='carving'][-8:]
         return ('Choose what to do at the trading post. trade_mode buy (trade_item = an item id for sale), sell (wood, stone, or the id of '
@@ -532,7 +542,8 @@ def parameter_request(d):
                 {'creation_name':STRING,'plan_operation':{'type':'string','enum':['new','add','remove']},
                  'object_id':{'type':'string','enum':['']+list(objects)},'part_id':STRING,
                  'destination_x':{'type':'number'},'destination_z':{'type':'number'}},
-                {'nearby':world_state.nearby(state)['objects'],'inventory_kg':{'wood':state['materials'],'stone':state['stone']}})
+                {'nearby':world_state.nearby(state)['objects'],'inventory_kg':{'wood':state['materials'],'stone':state['stone']},
+                 'your_building_so_far':life.building_record(state)})
     if a=='craft':
         methods=[m['id'] for m in state['practical']['methods']]
         return ('Carve one small piece from 1 kg wood; target width 140 mm, error is measured from the result. '
@@ -752,7 +763,11 @@ def finish_action(geometry=None):
         except ValueError as exc:
             result={'success':False,'text':'Construction planning failed: '+str(exc)};description=result['text']
     elif a=='construct':
-        result=world_state.construct(state,d.get('plan_id'),p['duration']/60);description=result['text']
+        plan=world_state.plan_by_id(state,d.get('plan_id'))
+        before=plan.get('work_done_minutes',0) if plan else 0
+        result=world_state.construct(state,d.get('plan_id'),p['duration']/60,
+                                     execute=lambda parts:life.build_parts(state,d.get('plan_id'),parts));description=result['text']
+        if plan:life.build_practice(state,plan['parts'],plan.get('work_done_minutes',0)-before)
     elif a=='move_object':
         result=world_state.move(state,d.get('object_id',''),d.get('destination_x',0),d.get('destination_z',0));description=result['text']
     elif a=='inspect':
@@ -790,6 +805,13 @@ def finish_action(geometry=None):
         reading=p.get('reading')
         if not reading:raise ValueError('No retrieved page; browsing cannot finish')
         description='Read a web page at the café: '+reading['title']+' ('+reading['url']+').'
+    elif a=='talk':
+        talk=p.get('reading') or {'conversation':[],'agreed':None}
+        lines=' '.join(f"{c['who']}: “{c['text'][:160]}”" for c in talk['conversation'][:6])
+        deal=town.apply_proposal(state,talk['agreed'],now().isoformat(),now().date().isoformat()) if talk.get('agreed') else {'success':True,'text':'No deal was made.'}
+        town.remember(state,talk.get('note',''),talk.get('warmth',0),now().isoformat())
+        result={'success':deal['success'],'text':deal['text'],'conversation':talk['conversation']}
+        description='Talked with Edda Thorne at the trading post. '+lines+' '+deal['text']
     elif a=='trade':
         result=town.trade(state,d.get('trade_mode','ask'),d.get('trade_item',''),d.get('trade_quantity',1),now().isoformat());description=result['text']
     elif a=='observe':
@@ -913,7 +935,9 @@ def tick(elapsed):
     p=state['pending']
     life.advance(state,elapsed,p['decision']['action'] if p else 'reflect')
     if p:
-        p['remaining']=max(0,p['remaining']-elapsed)
+        # Tired, hungry or working outdoors in the dark: the same job takes longer (see life.work_rate).
+        p['remaining']=max(0,p['remaining']-elapsed*life.work_rate(state,p['decision']['action']))
+        if p['remaining']<.5:p['remaining']=0
         p['review_in']=max(0,p.get('review_in',900)-elapsed)
         p['ends_at']=time.time()+p['remaining']
 
@@ -966,7 +990,7 @@ def review_work(pending):
 def draft_geometry(pending):
     d=pending['decision']
     if d.get('plan_operation')=='remove':return None
-    props={'shape':{'type':'string','enum':['box','sphere','cone','cylinder']},'material':{'type':'string','enum':['wood','stone']},'color':STRING}
+    props={'shape':{'type':'string','enum':world_state.SHAPES},'material':{'type':'string','enum':['wood','stone']},'color':STRING}
     props.update({k:{'type':'number'} for k in ['x','y','z','width','height','depth']})
     schema=fields_schema({'parts':{'type':'array','minItems':1,'maxItems':8,'items':fields_schema(props)}})
     with LOCK:
@@ -975,6 +999,7 @@ def draft_geometry(pending):
         if target and len(target['parts'])>16:
             target['parts_omitted']=len(target['parts'])-16;target['parts']=target['parts'][:16]
     prompt=('Design geometry for the construction idea YOU chose: '+d['intention']+' Name: '+d['creation_name']+'. '+
+            'Shapes: box, cylinder, cone, sphere, wedge (a sloped triangular block, e.g. for a roof or ramp) and arch (a half ring). '+
             'Use 1–8 solid parts. Coordinates are local metres around the target origin, with y up. Part x/z -12..12, y 0..8, dimensions width/depth .03..8 and height .03..6. Bottom of each part must be at or above ground. Materials wood or stone; hex colour. '+
             'This produces a quoted blueprint only, not a finished object. Density is wood 500 kg/m3, stone 2200 kg/m3. You may plan more than you can afford. Existing target: '+json.dumps(target))
     try:
@@ -1032,6 +1057,50 @@ def web_session(query, question):
             'kind':'web','trail':trail,'results_seen':[r['title'] for r in results]}
 
 
+def describe_offer(p):
+    return {'sell_item':f"Edda would sell you {p['quantity']} × {p['item']} for {p['credit']:g} credit",
+            'buy_goods':f"Edda would take {p['quantity']} of your {p['item']} for {p['credit']:g} credit",
+            'favour':f"Edda asks/accepts a favour: {p['task']} ({p['minutes']} minutes) for {p['credit']:g} credit",
+            'gift':f"Edda offers you {p['credit']:g} credit as a gift"}.get(p.get('kind'),'')
+
+
+def talk_session(opening, hope):
+    """A short conversation at the trading post. Edda speaks from her own persona and memory of him;
+    any deal must pass the world's limits before it is offered, and is settled when the talk ends."""
+    with LOCK:
+        kp=copy.deepcopy(town.keeper(state));credit=state['trading']['credit'];day=now().date().isoformat()
+        goods={'wood_kg':state['materials'],'stone_kg':state['stone'],
+               'carvings':[{'id':i,'name':o['name']} for i,o in state['built_world']['objects'].items() if o.get('kind')=='carving'][-6:]}
+        board=town.board(state);clock_now=now().strftime('%a %H:%M')
+    convo=[{'who':'Crow','text':' '.join(opening.split())[:400] or '…'}];agreed=None;last={}
+    keeper_schema=fields_schema({'reply':STRING,'proposal':town.proposal_schema(),'note_about_crow':STRING,
+                                 'warmth':{'type':'number','minimum':-1,'maximum':1}})
+    for turn in range(3):
+        last,_=model_call('It is '+clock_now+'. Crow, the elf who lives in the clearing, is at your counter. Reply to him in character. '
+            'proposal is ONE optional deal (kind none if you are just talking): sell_item (item = a stock id, credit = total price; you '
+            'may haggle but not below 70% of the board), buy_goods (item = wood, stone or one of his carving ids he has mentioned; '
+            'quantity in kg or 1), favour (task, minutes 15-180, credit up to about 1.5 per 30 minutes; you may ask him for help or '
+            'accept help he offers), or gift (at most 1 credit, rarely). note_about_crow is what you would remember about him from this; '
+            'warmth -1..1 is how you feel towards him now. '+json.dumps({'board':board,'his_credit':credit,'what_you_remember':kp['notes'][-10:],
+            'open_favours':kp['favours'],'conversation':convo},ensure_ascii=False),keeper_schema,350,'keeper',system=town.KEEPER_PERSONA)
+        reply=' '.join(str(last.get('reply','')).split())[:400]
+        convo.append({'who':'Edda','text':reply})
+        prop=last.get('proposal') or {'kind':'none'}
+        with LOCK:ok,why=town.check_proposal(state,prop,day)
+        offer=prop if ok and prop.get('kind')!='none' else None
+        answer,_=model_call('You are talking with Edda Thorne at the trading post. Say your next line naturally (or a brief goodbye). '
+            'accept_offer agrees to the offer on the table, if any; leave ends the conversation. Deals are settled when you leave. '
+            +json.dumps({'your_hope':hope[:200],'your_credit':credit,'your_goods':goods,'offer_on_the_table':describe_offer(offer) if offer else 'none',
+                         'conversation':convo},ensure_ascii=False),
+            fields_schema({'say':STRING,'accept_offer':{'type':'boolean'},'leave':{'type':'boolean'}}),250,'talk')
+        convo.append({'who':'Crow','text':' '.join(str(answer.get('say','')).split())[:400]})
+        if offer and answer.get('accept_offer') is True:
+            agreed=offer;break
+        if answer.get('leave') is True:break
+    return {'kind':'conversation','with':'Edda Thorne','conversation':convo,'agreed':agreed,
+            'note':str(last.get('note_about_crow',''))[:200],'warmth':last.get('warmth',0)}
+
+
 REVIEWABLE=['craft','construct','fell_tree','practise','gather','explore','move_object']
 
 
@@ -1059,6 +1128,9 @@ def decide_and_start(generation):
                 event(where+' did not provide something he chose to read. '+reading['reason'],d['reason'],'research_feedback',intention=d['intention'])
                 persist()
             return None
+    if d['action']=='talk':
+        with LOCK:runtime['status']='Talking with Edda at the trading post…'
+        reading=talk_session(d.get('opening',''),d.get('hope',''))  # stored with the session; settled when it ends
     with LOCK:
         if not state['paused'] and generation==runtime['generation']:
             start_action(d,seconds,reading);return d

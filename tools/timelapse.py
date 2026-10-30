@@ -141,7 +141,8 @@ def run(twin, source, days, max_errors=25, model=None, max_spend=40.):
         while clock['now'] < end:
             pending = st['pending']
             if pending and pending['remaining'] > 0:
-                step = pending['remaining']
+                # Work may go slower than the clock (tiredness, darkness); step by clock time, not work left.
+                step = pending['remaining'] / max(.05, app.life.work_rate(st, pending['decision']['action']))
                 reviewable = pending['decision']['action'] in app.REVIEWABLE
                 if reviewable:
                     step = min(step, max(1, pending.get('review_in', 900)))

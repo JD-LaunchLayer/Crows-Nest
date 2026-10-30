@@ -8,6 +8,8 @@ import copy
 import math
 
 DENSITY = {'wood': 500, 'stone': 2200}
+# Any shape can be attempted at any time; how well it turns out is a matter of practice (life.build_parts).
+SHAPES = ['box', 'cylinder', 'cone', 'sphere', 'wedge', 'arch']
 COLORS = {'wood': '#a48859', 'stone': '#8b9187'}
 
 
@@ -20,6 +22,8 @@ def mass(parts):
     for p in parts:
         volume=p['width']*p['height']*p['depth']
         if p['shape']=='sphere': volume*=math.pi/6
+        elif p['shape']=='wedge': volume*=.5
+        elif p['shape']=='arch': volume*=.35
         elif p['shape']=='cylinder': volume*=math.pi/4
         elif p['shape']=='cone': volume*=math.pi/12
         bill[p['material']]+=volume*DENSITY[p['material']]
@@ -116,7 +120,7 @@ def validate_parts(parts):
     if not isinstance(parts,list) or not 1<=len(parts)<=16:raise ValueError('A plan needs 1–16 solid parts')
     clean=[]
     for i,p in enumerate(parts):
-        if not isinstance(p,dict) or p.get('shape') not in ['box','sphere','cylinder','cone']:raise ValueError('Unsupported part shape')
+        if not isinstance(p,dict) or p.get('shape') not in SHAPES:raise ValueError('Unsupported part shape')
         if p.get('material') not in DENSITY:raise ValueError('Unsupported material')
         if not isinstance(p.get('color'),str) or not re.fullmatch(r'#[0-9a-fA-F]{6}',p['color']):raise ValueError('Invalid colour')
         c={'id':'part-'+str(i+1),'shape':p['shape'],'material':p['material'],'color':p['color'],'rotation_z':0}
@@ -161,7 +165,9 @@ def affordable(state, plan):
     return all(inventory(state,k)+.001>=v for k,v in plan['bill'].items())
 
 
-def construct(state, plan_id, work_minutes=None):
+def construct(state, plan_id, work_minutes=None, execute=None):
+    """Work on a plan. On completion, `execute(parts)` (if given) returns (placed_parts, failed_parts, report)
+    so that skill, fatigue and light shape what is actually built."""
     world=ensure(state);p=plan_by_id(state,plan_id)
     if not p or p['status'] not in ['proposed','in_progress']:return {'success':False,'text':'No unbuilt plan with that ID is available.'}
     target=world['objects'].get(p['target_id'])
@@ -176,22 +182,31 @@ def construct(state, plan_id, work_minutes=None):
             return {'success':True,'built':False,'text':f'Worked {work_minutes:g} minutes on plan {p["id"]}. {p["minutes"]-p["work_done_minutes"]:g} minutes of construction remains; no completed object exists yet.'}
     if p['operation']=='new' and intersects_world(world,{'parts':p['parts']},p['x'],p['z']):
         return {'success':False,'text':'The planned site intersects another solid object. No building occurred.'}
+    placed,failed,report=(execute(copy.deepcopy(p['parts'])) if execute and p['operation']!='remove'
+                          else (copy.deepcopy(p['parts']),[],''))
+    if p['operation']!='remove' and not placed:
+        for k,v in p['bill'].items():add_inventory(state,k,-v)
+        for k,v in mass(failed).items():add_inventory(state,k,round(v*.5,2))
+        p['status']='failed';p['outcome']=report;world['revision']+=1
+        return {'success':False,'built':False,'text':'Construction of '+p['name']+' was finished but nothing held. '+report}
     if p['operation']=='new':
         ident='built-'+str(world['next_object_id']);world['next_object_id']+=1
-        target={'id':ident,'name':p['name'],'kind':'built','x':p['x'],'z':p['z'],'parts':copy.deepcopy(p['parts']),
+        target={'id':ident,'name':p['name'],'kind':'built','x':p['x'],'z':p['z'],'parts':placed,
                 'portable':sum(p['bill'].values())<=20,'paid_materials':copy.deepcopy(p['bill']),'revision':0}
         world['objects'][ident]=target
     elif p['operation']=='add':
-        for part in p['parts']:
+        for part in placed:
             piece=copy.deepcopy(part);piece['id']='plan-'+str(p['id'])+'-'+piece['id'];target['parts'].append(piece)
         target['revision']+=1
     else:
         target['parts']=[part for part in target['parts'] if part['id']!=p['remove_part']];target['revision']+=1
     for k,v in p['bill'].items():add_inventory(state,k,-v)
     for k,v in p['salvage'].items():add_inventory(state,k,v)
-    p['status']='built';world['revision']+=1
+    # Parts that did not hold: half their material is recoverable as offcuts, half is lost.
+    for k,v in mass(failed).items():add_inventory(state,k,round(v*.5,2))
+    p['status']='built';p['outcome']=report;world['revision']+=1
     return {'success':True,'built':True,'object_id':target['id'],'text':('Completed construction plan: '+p['name']+'. '+
-            ('Recovered '+str(p['salvage'])+' kg of material.' if p['salvage'] else 'Used '+str(p['bill'])+' kg of material.'))}
+            ('Recovered '+str(p['salvage'])+' kg of material.' if p['salvage'] else 'Used '+str(p['bill'])+' kg of material. ')+report).strip()}
 
 
 def intersects_world(world, obj, x, z, ignore_id=None):

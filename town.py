@@ -110,7 +110,197 @@ def ensure(state):
             objects.setdefault(obj['id'], obj)
         world['town_added'] = True
         world['revision'] += 1
+    if not world.get('town_furnished'):
+        furnish(world['objects'])
+        world['town_furnished'] = True
+        world['revision'] += 1
+    keeper(state)
     return post
+
+
+def _p(ident, x, y, z, w, h, d, color, shape='box', material='wood'):
+    p = part(ident, x, y, z, w, h, d, color)
+    p['shape'] = shape
+    p['material'] = material
+    return p
+
+
+def furnish(objects):
+    """Interiors for the café and trading post (added once, also to existing saves)."""
+    cafe, post = objects.get(CAFE), objects.get(POST)
+    furnished = lambda o: any(p['id'] == 'counter' for p in o['parts'])
+    cafe = None if cafe and furnished(cafe) else cafe
+    post = None if post and furnished(post) else post
+    if cafe:
+        cafe['parts'] += [
+            _p('counter', -1.4, .45, -1.2, 1.6, .9, .5, '#6b4a32'),
+            _p('cup_shelf', -1.4, 1.6, -1.85, 1.3, .05, .25, '#5a3f2b'),
+            _p('cups', -1.4, 1.68, -1.85, 1.0, .12, .12, '#e8e1d2', 'cylinder'),
+            _p('terminal_desk', 1.3, .375, -1.3, 1.0, .75, .6, '#5a4636'),
+            _p('screen', 1.3, 1.0, -1.45, .6, .42, .05, '#7fd0ff'),
+            _p('keyboard', 1.3, .77, -1.15, .45, .03, .18, '#2c2c2c'),
+            _p('terminal_stool', 1.3, .25, -.65, .35, .5, .35, '#3f3a36', 'cylinder'),
+            _p('table', -1.2, .72, .7, .8, .05, .8, '#7a5a3c', 'cylinder'),
+            _p('table_leg', -1.2, .36, .7, .08, .72, .08, '#4b3a2a', 'cylinder'),
+            _p('chair_a', -1.9, .25, .7, .4, .5, .4, '#4f6b5a'),
+            _p('chair_b', -.5, .25, .7, .4, .5, .4, '#4f6b5a'),
+            _p('lamp', 0, 2.35, 0, .3, .3, .3, '#ffd98a', 'sphere', 'stone')]
+        cafe['details'] = ['A counter with a shelf of cups, a small table with two chairs, and a desk with a lit screen and keyboard.',
+                           'A notice reads: "Open. Search anything. Be patient with slow pages."']
+        cafe['revision'] += 1
+    if post:
+        post['parts'] += [
+            _p('counter', 0, .475, -.6, 2.2, .95, .55, '#5e4330'),
+            _p('shelf_low', 0, .8, -1.75, 4.2, .06, .35, '#4e3826'),
+            _p('shelf_mid', 0, 1.4, -1.75, 4.2, .06, .35, '#4e3826'),
+            _p('shelf_high', 0, 2.0, -1.75, 4.2, .06, .35, '#4e3826'),
+            _p('jars', -1.2, 1.55, -1.75, 1.4, .25, .2, '#b48a4a', 'cylinder'),
+            _p('bundles', 1.1, .95, -1.75, 1.6, .25, .25, '#8e6f4b'),
+            _p('tins', .4, 2.12, -1.75, 1.8, .18, .18, '#7d8c8f', 'cylinder', 'stone'),
+            _p('slate_board', -1.6, 1.75, 1.88, 1.1, .75, .05, '#2f3336', 'box', 'stone'),
+            _p('crate_a', 1.8, .3, 1.2, .6, .6, .6, '#9b7b52'),
+            _p('crate_b', 1.8, .85, 1.15, .5, .5, .5, '#a5875e'),
+            _p('barrel', -1.9, .45, 1.1, .6, .9, .6, '#6d5136', 'cylinder'),
+            _p('lamp', 0, 2.35, 0, .3, .3, .3, '#ffd98a', 'sphere', 'stone')]
+        post['details'] = ['Shelves of jars, bundles and tins, a counter, crates and a barrel, and a slate board of posted rates.',
+                           'A ledger records trade credit. Edda Thorne keeps the post and is usually behind the counter.']
+        post['revision'] += 1
+
+
+KEEPER_PERSONA = ('You are Edda Thorne, keeper of the small trading post beside the clearing. You are warm, chatty and fair-minded, '
+    'but shrewd: you drive a decent bargain, you notice who keeps their word, and you remember debts and kindnesses. '
+    'You have your own small concerns: the store-room roof leaks when it rains, deliveries arrive irregularly, and the post is '
+    'often quiet. You speak naturally and briefly, as a person, never as an assistant or narrator. You know only what Crow says '
+    'to you and what has happened between you; you cannot read his thoughts. Do not invent events in the world. You can only '
+    'change anything through the single proposal you return; the posted board shows normal prices.')
+
+
+def keeper(state):
+    return state.setdefault('keeper', {'name': 'Edda Thorne', 'where': POST, 'notes': [], 'warmth': 0., 'talks': 0,
+                                       'favours': [], 'next_favour': 1, 'last_gift': ''})
+
+
+PROPOSAL_KINDS = ['none', 'sell_item', 'buy_goods', 'favour', 'gift']
+
+
+def proposal_schema():
+    return {'type': 'object', 'additionalProperties': False,
+            'required': ['kind', 'item', 'quantity', 'credit', 'minutes', 'task'],
+            'properties': {'kind': {'type': 'string', 'enum': PROPOSAL_KINDS}, 'item': {'type': 'string'},
+                           'quantity': {'type': 'integer', 'minimum': 1, 'maximum': 20},
+                           'credit': {'type': 'number', 'minimum': 0, 'maximum': 60},
+                           'minutes': {'type': 'integer', 'minimum': 0, 'maximum': 180}, 'task': {'type': 'string'}}}
+
+
+def _goods_value(state, item, quantity):
+    """Posted value of goods Crow could hand over, or None if he does not have them."""
+    if item in SELL_RATES:
+        key = 'materials' if item == 'wood' else 'stone'
+        if state.get(key, 0) + 1e-9 < quantity:
+            return None
+        return quantity / SELL_RATES[item]['kg_per_credit']
+    obj = state['built_world']['objects'].get(item)
+    if not obj or obj.get('kind') != 'carving':
+        return None
+    creation = next((c for c in state.get('creations', []) if 'carving-' + str(c['id']) == item), {})
+    q = creation.get('quality', 5)
+    return 1 if q < 5 else 2 if q < 8 else 3
+
+
+def check_proposal(state, p, day):
+    """Is a proposed deal within the world's limits right now? Returns (ok, reason)."""
+    post = ensure(state)
+    kind = p.get('kind', 'none')
+    if kind == 'none':
+        return True, ''
+    if kind == 'sell_item':
+        stock = post['stock'].get(p['item'])
+        if not stock or stock['qty'] < p['quantity']:
+            return False, 'that is not in stock in that quantity'
+        if p['credit'] < .7 * stock['price'] * p['quantity'] - 1e-9:
+            return False, 'below what the post can afford to sell for'
+        if post['credit'] + 1e-9 < p['credit']:
+            return False, 'he does not have that much credit'
+        return True, ''
+    if kind == 'buy_goods':
+        value = _goods_value(state, p['item'], p['quantity'])
+        if value is None:
+            return False, 'he does not have those goods'
+        if p['credit'] > 1.3 * value + 1e-9:
+            return False, 'more than the post can pay for them'
+        return True, ''
+    if kind == 'favour':
+        if not 15 <= p['minutes'] <= 180 or not p['task'].strip():
+            return False, 'a favour needs a task and 15–180 minutes'
+        if p['credit'] > p['minutes'] / 30 * 1.5 + 1e-9:
+            return False, 'more pay than the post can give for that work'
+        return True, ''
+    if kind == 'gift':
+        if keeper(state)['last_gift'] == day:
+            return False, 'she has already given something today'
+        if p['credit'] > 1 + 1e-9:
+            return False, 'too generous for the post'
+        return True, ''
+    return False, 'unknown kind of deal'
+
+
+def apply_proposal(state, p, at, day):
+    """Carry out an agreed deal, re-checked at the moment it is settled."""
+    ok, why = check_proposal(state, p, day)
+    if not ok:
+        return {'success': False, 'text': f'The agreed deal could not be settled: {why}.'}
+    post = ensure(state)
+    kp = keeper(state)
+    kind = p['kind']
+    if kind == 'none':
+        return {'success': True, 'text': 'No deal was made.'}
+    if kind == 'sell_item':
+        stock = post['stock'][p['item']]
+        post['credit'] = round(post['credit'] - p['credit'], 2)
+        stock['qty'] -= p['quantity']
+        effect, _, value = stock['effect'].partition(':')
+        if effect == 'pantry':
+            state['provisions']['pantry'] = round(state['provisions']['pantry'] + float(value) * p['quantity'], 2)
+        else:
+            state['possessions'][value] = state['possessions'].get(value, 0) + p['quantity']
+        text = f'Bought {p["quantity"]} × {stock["name"]} from Edda for {p["credit"]:g} credit (board price {stock["price"] * p["quantity"]:g}).'
+    elif kind == 'buy_goods':
+        if p['item'] in SELL_RATES:
+            key = 'materials' if p['item'] == 'wood' else 'stone'
+            state[key] = round(state[key] - p['quantity'], 2)
+            what = f'{p["quantity"]:g} kg of {p["item"]}'
+        else:
+            obj = state['built_world']['objects'].pop(p['item'])
+            state['built_world']['revision'] += 1
+            what = obj['name']
+            for c in state.get('creations', []):
+                if 'carving-' + str(c['id']) == p['item']:
+                    c['sold'] = at
+        post['credit'] = round(post['credit'] + p['credit'], 2)
+        text = f'Edda took {what} for {p["credit"]:g} credit.'
+    elif kind == 'favour':
+        fav = {'id': f'favour-{kp["next_favour"]}', 'task': p['task'].strip()[:160], 'minutes': p['minutes'], 'credit': p['credit'], 'agreed': at}
+        kp['next_favour'] += 1
+        kp['favours'] = (kp['favours'] + [fav])[-6:]
+        text = f'Agreed a favour for Edda: "{fav["task"]}" ({fav["minutes"]} minutes, {fav["credit"]:g} credit). It can be done as job {fav["id"]}.'
+    else:
+        kp['last_gift'] = day
+        post['credit'] = round(post['credit'] + p['credit'], 2)
+        text = f'Edda gave him {p["credit"]:g} credit as a gift.'
+    _record(post, text, at)
+    return {'success': True, 'text': text, 'credit': post['credit']}
+
+
+def remember(state, note, warmth, at):
+    """Edda's own memory of Crow: short, finite, reworded notes merged."""
+    import memory_recall
+    kp = keeper(state)
+    note = ' '.join(str(note).split())[:200]
+    if note and not any(memory_recall.similar(n['text'], note) for n in kp['notes']):
+        kp['notes'] = (kp['notes'] + [{'text': note, 'at': at}])[-24:]
+    if isinstance(warmth, (int, float)) and math.isfinite(warmth):
+        kp['warmth'] = round(max(-1., min(1., .8 * kp['warmth'] + .2 * warmth)), 3)
+    kp['talks'] += 1
 
 
 def board(state):
@@ -120,7 +310,9 @@ def board(state):
             'for_sale': {k: {'name': v['name'], 'price': v['price'], 'left': v['qty']} for k, v in post['stock'].items() if v['qty'] > 0},
             'we_buy': {'wood': '1 credit per 3 kg', 'stone': '1 credit per 5 kg',
                        'carving': '1–3 credit for a carving you made, by how well it turned out'},
-            'jobs': {k: {'name': v['name'], 'minutes': v['minutes'], 'pays': v['credit']} for k, v in JOBS.items()}}
+            'jobs': {**{k: {'name': v['name'], 'minutes': v['minutes'], 'pays': v['credit']} for k, v in JOBS.items()},
+                     **{f['id']: {'name': 'Favour for Edda: ' + f['task'], 'minutes': f['minutes'], 'pays': f['credit']}
+                        for f in keeper(state)['favours']}}}
 
 
 def _record(post, text, at):
@@ -172,6 +364,13 @@ def trade(state, mode, item, quantity, at):
             text = f'Sold {obj["name"]} for {credits} credit. It now belongs to the trading post. Credit now: {post["credit"]:g}.'
     elif mode == 'job':
         job = JOBS.get(item)
+        favour = next((f for f in keeper(state)['favours'] if f['id'] == item), None)
+        if favour:
+            keeper(state)['favours'].remove(favour)
+            post['credit'] = round(post['credit'] + favour['credit'], 2)
+            text = f'Did the favour for Edda: "{favour["task"]}" and earned {favour["credit"]:g} credit. Credit now: {post["credit"]:g}.'
+            _record(post, text, at)
+            return {'success': True, 'text': text, 'credit': post['credit']}
         if not job:
             return {'success': False, 'text': 'There is no such posted job.'}
         post['credit'] = round(post['credit'] + job['credit'], 2)
