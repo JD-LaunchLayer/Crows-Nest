@@ -13,3 +13,4 @@ __pycache__/
 # Local updater status (never Crow source)
 crow-update-status.json
 crow-update-status.tmp
+crow-stock-orders.json

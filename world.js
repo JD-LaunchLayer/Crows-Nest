@@ -3,6 +3,7 @@ import {installTouchControls} from '/mobile_controls.js';
 import {createSky} from '/sky.js';
 import {createJournal} from '/journal.js';
 import {createLifeView} from '/life_view.js';
+import {createDiary} from '/diary_view.js';
 const $=id=>document.getElementById(id),txt=(id,v)=>$(id).textContent=v;
 const clientVersion=document.querySelector?.('meta[name="crow-version"]')?.content||null;
 let updateRequested=false;
@@ -12,7 +13,7 @@ let accessToken=tokenParams.get('token')||globalThis.sessionStorage?.getItem('cr
 if(tokenParams.has('token')){globalThis.sessionStorage?.setItem('crow-access-token',accessToken);globalThis.history?.replaceState(null,'',globalThis.location.pathname);}
 async function apiFetch(url,options={}){return fetch(url,{...options,headers:{...(options.headers||{}),...(accessToken?{'Authorization':'Bearer '+accessToken}:{})}})}
 const journal=createJournal({document,apiFetch});
-const lifeView=createLifeView({document});
+const lifeView=createLifeView({document});const diary=createDiary({document});
 const holder=$('view'),scene=new T.Scene();scene.background=new T.Color('#b7c6b0');scene.fog=new T.Fog('#b7c6b0',24,65);
 let renderer;try{renderer=new T.WebGLRenderer({antialias:true,powerPreference:'low-power'});}catch(e){txt('loading','3D graphics could not start. Check Firefox hardware acceleration. '+e.message);throw e;}
 renderer.setPixelRatio(Math.min(devicePixelRatio,globalThis.matchMedia?.('(pointer:coarse)').matches?1:1.5));renderer.shadowMap.enabled=true;renderer.shadowMap.type=T.PCFSoftShadowMap;holder.prepend(renderer.domElement);
@@ -24,7 +25,7 @@ function mesh(geo,c,x,y,z,parent=scene){const m=new T.Mesh(geo,mat(c));m.positio
 function box(w,h,d,c,x,y,z,p=scene){return mesh(new T.BoxGeometry(w,h,d),c,x,y,z,p)}
 const obstacles=[];function block(x,z,w,d){obstacles.push({x,z,w:w/2+.3,d:d/2+.3})}
 const floor=mesh(new T.PlaneGeometry(110,110,1,1),'#74815a',0,-.03,0);floor.rotation.x=-Math.PI/2;floor.castShadow=false;
-const stations={cabin:new T.Vector3(-10,0,-6),range:new T.Vector3(10,0,-7),woods:new T.Vector3(13,0,10),workbench:new T.Vector3(0,0,10),library:new T.Vector3(-11,0,5)};
+const stations={cabin:new T.Vector3(-10,0,-6),range:new T.Vector3(10,0,-7),woods:new T.Vector3(13,0,10),workbench:new T.Vector3(0,0,10),library:new T.Vector3(-11,0,5),cafe:new T.Vector3(9,0,-14.2),shop:new T.Vector3(-3,0,-14.2)};
 for(const p of Object.values(stations)){const mid=p.clone().multiplyScalar(.5),path=box(1.5,.035,p.length(),'#a39d77',mid.x,0,mid.z);path.rotation.y=Math.atan2(p.x,p.z);path.castShadow=false;}
 // Open-front cabin: floor and three walls, so it is possible to look inside.
 box(6,.15,5,'#806c4b',-10,.05,-10);box(6,3,.2,'#76644b',-10,1.5,-12.5);box(.2,3,5,'#806c4b',-13,1.5,-10);box(.2,3,5,'#806c4b',-7,1.5,-10);
@@ -109,26 +110,37 @@ for(const [x,z,h]of [[17,10,5],[15,14,6],[20,12,5],[18,6,4],[-18,-9,5],[-20,-15,
 // Small details without textures or outside image services.
 for(let i=0;i<65;i++){let a=i*2.4,r=6+(i%11)*1.4;const x=Math.cos(a)*r,z=Math.sin(a)*r;if(Math.abs(x)<2||Math.abs(z)<2)continue;const stone=mesh(new T.DodecahedronGeometry(.13+(i%3)*.06,0),i%4?'#828771':'#b4ac7e',x,.13,z);stone.scale.y=.6;}
 function sign(text,x,z){const c=document.createElement('canvas');c.width=512;c.height=96;const q=c.getContext('2d');q.fillStyle='#283b2b';q.fillRect(0,0,512,96);q.fillStyle='#eee5c7';q.font='30px Georgia';q.textAlign='center';q.fillText(text,256,60);const texture=new T.CanvasTexture(c);const m=new T.Sprite(new T.SpriteMaterial({map:texture,depthTest:true}));m.position.set(x,2.9,z);m.scale.set(4,.75,1);scene.add(m)}
-sign('THE CABIN',-10,-6);sign('ARCHERY RANGE',10,-7);sign('WORKBENCH',0,11.5);sign('READING CABIN',-11,6.8);sign('WOODLAND',16,12);
+sign('THE CABIN',-10,-6);sign('ARCHERY RANGE',10,-7);sign('WORKBENCH',0,11.5);sign('READING CABIN',-11,6.8);sign('WOODLAND',16,12);sign('INTERNET CAFÉ',9,-14);sign('TRADING POST',-3,-14);
 // Jointed placeholder elf: hips, knees, shoulders and elbows support sitting and reaching.
 const crow=new T.Group();scene.add(crow);
-const torso=box(.55,.8,.3,'#798c63',0,1.05,0,crow);
+// An original low-poly elf: slate cloak, teal tunic, rust sash, silver hair tied back.
+const SKIN='#e2c6a6',TUNIC='#3f6058',CLOAK='#3b4352',SASH='#9c4f2c',TROUSERS='#47443a',BOOTS='#2e2924',HAIR='#d8d3c6';
+function cyl(rt,rb,h,c,x,y,z,p,seg=7){return mesh(new T.CylinderGeometry(rt,rb,h,seg),c,x,y,z,p)}
+const torso=cyl(.27,.21,.62,TUNIC,0,1.12,0,crow);
+cyl(.215,.3,.26,TUNIC,0,.74,0,crow);                       // tunic skirt
+mesh(new T.TorusGeometry(.225,.035,4,10),SASH,0,.86,0,crow).rotation.x=Math.PI/2;
+box(.1,.2,.03,SASH,.13,.72,.2,crow).rotation.z=-.2;          // sash tail
+cyl(.2,.3,.95,CLOAK,0,.95,-.12,crow,6).scale.z=.35;                        // cloak hanging behind
+mesh(new T.TorusGeometry(.2,.06,4,10,Math.PI*1.4),CLOAK,0,1.43,-.02,crow).rotation.x=Math.PI/2; // folded hood at the collar
+cyl(.07,.08,.16,SKIN,0,1.5,0,crow);                          // neck
 const headPivot=new T.Group();headPivot.position.y=1.66;crow.add(headPivot);
-mesh(new T.DodecahedronGeometry(.24,0),'#d6b78e',0,.04,0,headPivot);
-box(.48,.1,.4,'#c7bc8e',0,.22,0,headPivot);
-for(const x of [-.21,.21])box(.09,.35,.27,'#b7aa78',x,.02,-.02,headPivot);
-for(const x of [-.29,.29])mesh(new T.ConeGeometry(.075,.23,3),'#d6b78e',x,.04,0,headPivot).rotation.z=x>0?-Math.PI/2:Math.PI/2;
-for(const x of [-.085,.085])box(.035,.035,.02,'#2b392c',x,.07,.2,headPivot);
+mesh(new T.IcosahedronGeometry(.2,1),SKIN,0,.04,0,headPivot).scale.set(.92,1.12,1);
+const hair=mesh(new T.SphereGeometry(.215,8,5,0,Math.PI*2,0,Math.PI*.55),HAIR,0,.07,-.025,headPivot);hair.rotation.x=-.25;
+mesh(new T.ConeGeometry(.06,.36,5),HAIR,0,-.12,-.2,headPivot).rotation.x=Math.PI*.92;   // tied-back tail
+for(const x of [-.2,.2]){const ear=mesh(new T.ConeGeometry(.045,.27,4),SKIN,x,.06,-.01,headPivot);ear.rotation.z=x>0?-1.05:1.05;ear.rotation.x=-.35;}
+for(const x of [-.075,.075]){box(.05,.03,.02,'#f4efe2',x,.07,.185,headPivot);box(.022,.026,.02,'#b0782e',x,.07,.193,headPivot);box(.065,.014,.02,'#9b958a',x,.115,.188,headPivot).rotation.z=x>0?-.15:.15;}
+mesh(new T.ConeGeometry(.025,.07,4),SKIN,0,.02,.205,headPivot).rotation.x=Math.PI/2;      // nose
+box(.07,.012,.01,'#a4705e',0,-.05,.19,headPivot);                                         // mouth
 const legs=[],knees=[],arms=[],elbows=[];
-for(const x of [-.15,.15]){
+for(const x of [-.12,.12]){
  const hip=new T.Group();hip.position.set(x,.76,0);crow.add(hip);legs.push(hip);
- box(.17,.36,.18,'#514d36',0,-.18,0,hip);
+ cyl(.085,.075,.36,TROUSERS,0,-.18,0,hip);
  const knee=new T.Group();knee.position.y=-.36;hip.add(knee);knees.push(knee);
- box(.15,.34,.16,'#514d36',0,-.17,0,knee);box(.19,.12,.3,'#3e3c2c',0,-.36,.06,knee);
- const shoulder=new T.Group();shoulder.position.set(Math.sign(x)*.36,1.36,0);crow.add(shoulder);arms.push(shoulder);
- box(.13,.3,.15,'#a8b38a',0,-.15,0,shoulder);
+ cyl(.075,.07,.3,BOOTS,0,-.15,0,knee);box(.15,.1,.27,BOOTS,0,-.33,.05,knee);
+ const shoulder=new T.Group();shoulder.position.set(Math.sign(x)*.33,1.36,0);crow.add(shoulder);arms.push(shoulder);
+ cyl(.07,.06,.3,TUNIC,0,-.15,0,shoulder);
  const elbow=new T.Group();elbow.position.y=-.3;shoulder.add(elbow);elbows.push(elbow);
- box(.11,.27,.13,'#a8b38a',0,-.135,0,elbow);box(.11,.11,.13,'#d6b78e',0,-.29,0,elbow);
+ cyl(.06,.055,.26,'#5b4635',0,-.13,0,elbow);mesh(new T.IcosahedronGeometry(.055,0),SKIN,0,-.29,0,elbow);
 }
 const heldAxe=new T.Group();box(.055,.55,.055,'#937449',0,0,0,heldAxe);box(.30,.14,.07,'#a8afaa',.10,.21,0,heldAxe);elbows[1].add(heldAxe);heldAxe.position.set(0,-.29,.08);heldAxe.visible=false;
 const bow=mesh(new T.TorusGeometry(.47,.025,4,12,Math.PI),'#b09a68',.48,1.14,-.2,crow);bow.rotation.z=-Math.PI/2;
@@ -150,6 +162,20 @@ function readingPlan(){
  anim.steps=[walk(new T.Vector3(0,0,0)),walk(LIB.door),walk(LIB.aisle),walk(LIB.shelf,0),
  wait('take',1.4,()=>{anim.book=true}),walk(LIB.aisle),...after];
 }
+// Where an activity actually happens: the chosen area, tree, plant or object, when the decision names one.
+const AREA_SPOTS={grove:[15.5,8.5],spring_side:[-15.6,-1.5],clearing:[1.5,2.5]};
+function targetFor(d){
+ if(!d.pending)return null;
+ if(d.action==='observe'){
+  if(AREA_SPOTS[d.area])return new T.Vector3(...[AREA_SPOTS[d.area][0],0,AREA_SPOTS[d.area][1]]);
+  const a=Math.atan2(crow.position.z,crow.position.x)||0;return new T.Vector3(Math.cos(a)*20,0,Math.sin(a)*20);
+ }
+ if(['inspect','gather'].includes(d.action)&&d.objectId){
+  const o=s.built_world?.objects?.[d.objectId]||s.built_world?.trees?.[d.objectId]||(s.ecology?.plants||[]).find(p=>p.id===d.objectId);
+  if(o){const r=Math.hypot(o.x,o.z)||1;return new T.Vector3(o.x-o.x/r*1.1,0,o.z-o.z/r*1.1)}
+ }
+ return null;
+}
 function beginDesired(){
  anim.returning=false;anim.seated=0;anim.floor=0;
  const d=anim.desired;if(!d)return;
@@ -158,13 +184,17 @@ function beginDesired(){
  let place=stations[d.location]||stations.cabin;
  if(d.pending&&['eat','drink'].includes(d.action)){const target=s.built_world?.objects[d.objectId||(d.action==='eat'?'food_store':'spring')];if(target)place=new T.Vector3(target.x,0,target.z-1);}
  if(d.pending&&d.action==='fell_tree'){const tree=s.built_world?.trees[d.objectId];if(tree)place=new T.Vector3(tree.x-.9,0,tree.z);}
+ place=targetFor(d)||place;
+ // The twin's clock outruns any walk, so its view shows him where he is rather than on the way there.
+ if(d.twin){crow.position.copy(place);anim.steps=[wait(d.pending?d.action:'idle',Infinity)];return}
  anim.steps=[walk(new T.Vector3(0,0,0)),walk(place),wait(d.pending?d.action:'idle',Infinity)];
 }
 function setActivity(data){
  const key=`${data.decisions}:${Boolean(data.pending)}`;if(key===anim.key)return;
- anim.key=key;anim.desired={action:data.action,location:data.location,pending:Boolean(data.pending),spot:data.pending?.decision?.reading_spot||'standing',objectId:data.pending?.decision?.object_id||''};
+ anim.key=key;anim.desired={action:data.action,location:data.location,pending:Boolean(data.pending),spot:data.pending?.decision?.reading_spot||'standing',objectId:data.pending?.decision?.object_id||'',area:data.pending?.decision?.observe_area||'',twin:Boolean(data.twin)};
  if(!initialized){initialized=true;crow.position.copy(stations[data.location]||stations.cabin);}
  if(anim.returning)return;
+ if(data.twin){anim.book=false;anim.seated=0;anim.floor=0;anim.activeAction='idle';beginDesired();return}
  if(anim.book){
  anim.returning=true;
  const rise=anim.seated>0?[wait(anim.floor>0?'standfloor':'stand',1.2)]:[];
@@ -205,6 +235,9 @@ $('find').onclick=()=>{const p=crow.position;if(p.x<-7&&p.x>-15&&p.z>6&&p.z<13){
 $('toggle').onclick=async()=>{const b=$('toggle');b.disabled=true;try{const r=await apiFetch('/api/toggle',{method:'POST',headers:{'X-Crow':'local'}});if(!r.ok)throw Error('Could not change pause state');await refresh()}catch(e){txt('error',e.message)}finally{b.disabled=false}};
 const touchInput=typeof $('touchPad').addEventListener==='function'?installTouchControls({canvas:renderer.domElement,pad:$('touchPad'),knob:$('stickKnob'),onLook:(dx,dy)=>{yaw-=dx;pitch=T.MathUtils.clamp(pitch-dy,-1.1,1.1)}}):{forward:0,right:0};
 $('mobileFind').onclick=()=>$('find').onclick();
+// Tab opens his journal; Escape closes it. The side panel keeps what is happening now.
+addEventListener('keydown',e=>{if(e.code==='Tab'){e.preventDefault();diary.toggle()}else if(e.code==='Escape')diary.open(false)});
+if($('diaryClose'))$('diaryClose').onclick=()=>diary.open(false);if($('mobileDiary'))$('mobileDiary').onclick=()=>diary.toggle();
 $('mobileMenu').onclick=()=>{const opened=document.body.classList.toggle('panel-open');$('mobileMenu').textContent=opened?'Close':'Journal';$('mobileMenu').setAttribute('aria-expanded',String(opened));};
 if(globalThis.matchMedia?.('(pointer:coarse)').matches)txt('help','Left thumb: walk · Drag the world: look around');
 if($('updateCrow'))$('updateCrow').onclick=async()=>{
@@ -222,7 +255,7 @@ if(clientVersion&&s.runtime.version&&clientVersion!==s.runtime.version){globalTh
 const maintenance=s.runtime.maintenance||{status:'idle'};if(updateRequested&&maintenance.status==='complete'){globalThis.location?.reload?.();return;}const updating=['checking','backing_up','pulling','restarting'].includes(maintenance.status);
 if($('updateCrow')){ $('updateCrow').disabled=updating||!s.maintenance_enabled; $('updateCrow').textContent=updating?'Updating…':'Back up and update';txt('updateStatus',maintenance.message||(s.maintenance_enabled?'Ready. Your private life data stays on the PC.':'Start Crow with --lan from its Git checkout to enable authenticated updates.'));}
 if(['complete','up_to_date','failed','interrupted'].includes(maintenance.status))updateRequested=false;
-txt('toggle',s.paused?'Begin life':'Pause');txt('clock',`${s.clock.date} · ${s.clock.time} · UK time`);txt('status',s.runtime.status+(s.last_seconds!==null?' · Last choice '+s.last_seconds+'s':''));txt('error',s.last_error);$('toggle').disabled=updating;txt('activity',({eat:'Eating',drink:'Drinking',rest:'Resting',practise:'Practising archery',explore:'Exploring',craft:'Making a carving',read:'Reading Wikipedia',sleep:'Sleeping',observe:'Watching the woodland',reflect:'Reflecting',gather:'Gathering materials',plan:'Preparing a construction plan',construct:'Constructing',move_object:'Carrying and placing an object',inspect:'Inspecting an object',fell_tree:'Felling a tree'})[s.action]);txt('reason',s.reason);$('energy').value=s.energy;txt('resources',`Wood: ${s.materials} kg · Stone: ${s.stone||0} kg · Archery sessions: ${s.skills.archery} · Carvings: ${s.skills.craft}`);txt('intention',s.current_intention||'Crow has not expressed an intention yet.');
+txt('toggle',s.paused?'Begin life':'Pause');txt('clock',`${s.clock.date} · ${s.clock.time} · ${s.twin?'twin clock':s.crow_clock?`Crow's time${s.crow_clock.scale>1?' ('+s.crow_clock.scale+'× speed)':''}`:'UK time'}`);txt('status',s.runtime.status+(s.last_seconds!==null?' · Last choice '+s.last_seconds+'s':''));txt('error',s.last_error);$('toggle').disabled=updating;txt('activity',({eat:'Eating',drink:'Drinking',rest:'Resting',practise:'Practising archery',explore:'Exploring',craft:'Making a carving',read:'Reading Wikipedia',sleep:'Sleeping',observe:'Watching the woodland',reflect:'Reflecting',gather:'Gathering materials',plan:'Preparing a construction plan',construct:'Constructing',move_object:'Carrying and placing an object',inspect:'Inspecting an object',fell_tree:'Felling a tree'})[s.action]);txt('reason',s.reason);$('energy').value=s.energy;txt('resources',`Wood: ${s.materials} kg · Stone: ${s.stone||0} kg · Archery sessions: ${s.skills.archery} · Carvings: ${s.skills.craft}`);txt('intention',s.current_intention||'Crow has not expressed an intention yet.');
 setActivity(s);
 $('feed').replaceChildren();for(const m of s.memories.slice(-16).reverse())entry($('feed'),m.event,[m.at?new Date(m.at).toLocaleString('en-GB',{timeZone:'Europe/London'}):`Earlier prototype · Day ${m.day} · ${m.time}`,m.intention?'Aim: '+m.intention:'',m.reason?'Why: '+m.reason:'',m.next_step?'Tentative next step: '+m.next_step:''].filter(Boolean).join(' · '));
 $('wishes').replaceChildren();for(const w of s.wishes.slice(-10).reverse())entry($('wishes'),w.text,`${w.reason} · First expressed day ${w.day} · ${w.mentions} mention(s)`);if(!s.wishes.length)entry($('wishes'),'No wishes expressed yet.');
@@ -233,7 +266,7 @@ $('longterm').replaceChildren();for(const m of s.long_term.slice(-6).reverse())e
 $('reading').replaceChildren();const source=s.pending?.reading;if(source){const a=document.createElement('a');a.textContent=source.title;a.href=source.url;a.target='_blank';a.rel='noopener noreferrer';$('reading').append(a)}
 const pending=s.pending;txt('remaining',pending?(pending.decision?.action==='read'&&pending.duration===0?`${s.paused?'Paused · ':''}Quick research · finishes after processing the excerpt`:`${s.paused?'Paused · ':''}${Math.ceil(pending.remaining/60)} min remaining · ${Math.round(pending.duration/60)} min session`):s.reflection_pending?'Processing this experience.':'Choosing the next activity.');
 journal.update(s);
-lifeView.update(s);
+lifeView.update(s);diary.update(s);
 $('creations').replaceChildren();for(const c of s.creations.slice(-8).reverse())entry($('creations'),c.name,`${c.shape} · Day ${c.day}`);if(s.built_world){syncBuiltWorld(s.built_world)}else{creations(s.creations)}syncEcology(s.ecology_view);lamp.intensity=s.action==='read'&&s.pending?15:(s.daylight<.2?8:1.5);
 const celestial=sky.update(new Date(s.clock.iso));if($('skyInfo'))txt('skyInfo',`Sun ${celestial.sun.altitude.toFixed(0)}° · Moon ${celestial.moon.altitude.toFixed(0)}° above horizon · Wickford`);
 if($('worldPlans')&&s.built_world){$('worldPlans').replaceChildren();for(const p of s.built_world.plans.slice(-5).reverse())entry($('worldPlans'),`${p.name} · ${p.status}`,`Plan ${p.id} · ${Object.entries(p.bill).map(([m,q])=>q+' kg '+m).join(', ')||'No new materials'} · ${p.work_done_minutes||0}/${p.minutes} min work`);$('worldObjects').replaceChildren();for(const o of Object.values(s.built_world.objects))entry($('worldObjects'),o.name,`${o.id} · (${o.x.toFixed(1)}, ${o.z.toFixed(1)}) · ${o.parts.length} parts`);txt('sourceStocks',Object.entries(s.built_world.sources).map(([m,v])=>`${m}: ${v.stock} kg remains`).join(' · '));}
@@ -278,6 +311,8 @@ const turn=anim.elapsed%24;pagePivot.rotation.z=anim.pose.startsWith('reading')&
 if(anim.pose==='practise'&&!moving){arms[0].rotation.x=-1.25;arms[1].rotation.x=-1.1;elbows[1].rotation.x=-.8;}
 if(heldAxe.visible){arms[1].rotation.x=-.75+Math.sin(anim.elapsed*2)*.55;elbows[1].rotation.x=-.4;}
 if(['eat','drink'].includes(anim.pose)&&!moving){arms[1].rotation.x=-1.25;elbows[1].rotation.x=-1.2+Math.sin(anim.elapsed*1.2)*.12;headPivot.rotation.x=.08;}
+if(anim.pose==='inspect'&&!moving){headPivot.rotation.x=.38;arms[1].rotation.x=-.9;elbows[1].rotation.x=-.4+Math.sin(anim.elapsed*1.5)*.08;}
+if(anim.pose==='gather'&&!moving){const bend=.5+Math.sin(anim.elapsed*1.4)*.25;arms[0].rotation.x=-bend;arms[1].rotation.x=-bend;headPivot.rotation.x=.3;}
 if(anim.pose==='craft'&&!moving){arms[1].rotation.x=-.8+Math.sin(anim.elapsed*4)*.12;elbows[1].rotation.x=-.5;headPivot.rotation.x=.18;}
 if(anim.pose==='observe'&&!moving)headPivot.rotation.y=Math.sin(anim.elapsed*.2)*.35;else headPivot.rotation.y=0;
 crow.visible=!(anim.pose==='sleep');

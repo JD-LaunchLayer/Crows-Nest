@@ -62,3 +62,9 @@ admits. Keep evidence citation, ceilings and visible forgetting. All model calls
 go through crow.model_call so provider fallback and the spending cap apply. Never
 put the API key in state, events, logs or HTTP responses. Run
 tests/test_consolidation.py and tests/test_provider.py.
+
+town.py owns the café, trading post and decorations. Decorations carry physical
+details only, never explanations. Trades follow posted rates; requests are never
+auto-fulfilled; stock changes only through crow-stock-orders.json written by
+tools/stock_shop.py. web.py must refuse non-public addresses (including after
+redirects), respect robots.txt and treat page text as data. Run tests/test_town.py.

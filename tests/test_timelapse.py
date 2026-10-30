@@ -50,9 +50,9 @@ with tempfile.TemporaryDirectory() as td:
         return model(*a,**k)
     real_sleep=timelapse.time.sleep;timelapse.time.sleep=lambda s:None
     before_outage=json.loads((twin/'crow-save.json').read_text())['twin']
-    with contextlib.redirect_stdout(io.StringIO()):timelapse.run(twin,real/'crow-save.json',3.2,model=flaky)
+    with contextlib.redirect_stdout(io.StringIO()):timelapse.run(twin,real/'crow-save.json',4.5,model=flaky)
     timelapse.time.sleep=real_sleep
     after=json.loads((twin/'crow-save.json').read_text())['twin']
-    assert down['n']==0 and len(after['errors'])==len(before_outage['errors'])
+    assert down['n']==0 and len(after['errors'])==len(before_outage['errors']), (before_outage['errors'][-2:],after['errors'][-2:],before_outage.get('virtual_now'),after.get('virtual_now'))
 print('PASS: outage waited out without ageing; separate twin copy; refuses the real folder; virtual clock without real waiting; real life untouched; '
       'body, sleep and observation continue through simulated days; resumable.')
