@@ -31,11 +31,11 @@ for(const p of Object.values(stations)){const mid=p.clone().multiplyScalar(.5),p
 box(6,.15,5,'#806c4b',-10,.05,-10);box(6,3,.2,'#76644b',-10,1.5,-12.5);box(.2,3,5,'#806c4b',-13,1.5,-10);box(.2,3,5,'#806c4b',-7,1.5,-10);
 block(-10,-12.5,6,.2);block(-13,-10,.2,5);block(-7,-10,.2,5);
 const roof=mesh(new T.ConeGeometry(4.5,2.5,4),'#4e5540',-10,4,-10);roof.rotation.y=Math.PI/4;
-box(1.5,.4,2.6,'#a3a782',-11.5,.35,-10.3);const blanket=box(1.3,.1,1.6,'#6f7f63',-11.5,.95,-9.7);blanket.visible=false;box(1.3,.18,.55,'#d5ccb1',-11.5,.65,-11.1);box(.7,1,.6,'#8c704e',-8.2,.5,-11.5);
+const legacyBed=[box(1.5,.4,2.6,'#a3a782',-11.5,.35,-10.3),box(1.3,.18,.55,'#d5ccb1',-11.5,.65,-11.1)];const blanket=box(1.3,.1,1.6,'#6f7f63',-11.5,.95,-9.7);blanket.visible=false;box(.7,1,.6,'#8c704e',-8.2,.5,-11.5);
 // Range target with concentric faces pointing into the clearing.
 box(.18,2.5,.18,'#6e593e',10,1.25,-10);for(const [r,col,z] of [[1,'#dfd6b4',-9.9],[.7,'#877249',-9.86],[.45,'#d6c99e',-9.82],[.17,'#935d3e',-9.78]]){mesh(new T.CylinderGeometry(r,r,.07,16),'#'+col.replace('#',''),10,2,z).rotation.x=Math.PI/2;}block(10,-10,2,.5);
 // Workbench, reading cabin and a small quiet pond.
-box(3,.23,1.4,'#a58c5c',0,1.2,12);for(const x of [-1.2,1.2])for(const z of [11.5,12.5])box(.17,1.2,.17,'#645739',x,.6,z);block(0,12,3,1.4);
+const benchStart=scene.children.length;box(3,.23,1.4,'#a58c5c',0,1.2,12);for(const x of [-1.2,1.2])for(const z of [11.5,12.5])box(.17,1.2,.17,'#645739',x,.6,z);block(0,12,3,1.4);const legacyBench=scene.children.slice(benchStart),legacyBenchBlock=obstacles.at(-1);
 // Reading cabin: legacy shell is replaced by persistent world geometry on sync.
 const shellStart=scene.children.length,blockStart=obstacles.length;
 // Reading cabin: open doorway, low-poly timber shell and shelves.
@@ -69,7 +69,7 @@ box(.95,.12,.95,'#795d3f',0,.43,0,chair);box(.78,.10,.75,'#8f9a71',0,.53,-.04,ch
 box(.95,.95,.12,'#795d3f',0,.95,.45,chair);box(.73,.68,.08,'#8f9a71',0,1.03,.36,chair);
 for(const x of [-.39,.39])for(const z of [-.37,.37])box(.10,.43,.10,'#795d3f',x,.2,z,chair);
 for(const x of [-.49,.49]){box(.10,.10,.85,'#9f8055',x,.85,0,chair);box(.08,.38,.08,'#795d3f',x,.65,-.3,chair)}
-block(LIB.seat.x,LIB.seat.z,1,1);
+block(LIB.seat.x,LIB.seat.z,1,1);const legacyChairBlock=obstacles.at(-1);
 // Small side table and warm reading lamp. Only one local light; no extra shadow map.
 box(.9,.1,.9,'#94784e',-8.15,.78,9.3);box(.14,.75,.14,'#715a3a',-8.15,.38,9.3);block(-8.15,9.3,.9,.9);
 mesh(new T.CylinderGeometry(.18,.22,.06,8),'#6e6043',-8.15,.86,9.3);
@@ -167,6 +167,8 @@ function walk(point,face=null){return {kind:'walk',point:point.clone(),face}}
 function wait(pose,duration,done=null){return {kind:'wait',pose,duration,done,elapsed:0}}
 function readingPlan(){
  anim.activeAction='read';
+ const seat=s?.built_world?.objects?.library_chair;
+ if(seat?.parts?.length){LIB.seat.set(seat.x,0,seat.z);LIB.approach.set(seat.x,0,seat.z-.8);}
  const spot=anim.desired?.spot||'standing';
  const after=spot==='chair'?[walk(LIB.approach,Math.PI),wait('sit',1.2),wait('reading',Infinity)]:
  spot==='floor'?[walk(LIB.floor,Math.PI),wait('sitfloor',1.2),wait('readingFloor',Infinity)]:
@@ -187,7 +189,8 @@ function targetFor(d){
   if(AREA_SPOTS[d.area])return new T.Vector3(...[AREA_SPOTS[d.area][0],0,AREA_SPOTS[d.area][1]]);
   const a=Math.atan2(crow.position.z,crow.position.x)||0;return new T.Vector3(Math.cos(a)*20,0,Math.sin(a)*20);
  }
- if(['inspect','gather'].includes(d.action)&&d.objectId){
+ if(d.action==='interact'&&d.posture)return new T.Vector3(d.posture.x,0,d.posture.z);
+ if(['inspect','gather','interact'].includes(d.action)&&d.objectId){
   const o=s.built_world?.objects?.[d.objectId]||s.built_world?.trees?.[d.objectId]||(s.ecology?.plants||[]).find(p=>p.id===d.objectId);
   if(o){const r=Math.hypot(o.x,o.z)||1;return new T.Vector3(o.x-o.x/r*1.1,0,o.z-o.z/r*1.1)}
  }
@@ -198,6 +201,7 @@ function beginDesired(){
  const d=anim.desired;if(!d)return;
  if(d.pending&&d.action==='read'){readingPlan();return}
  anim.activeAction=d.pending?d.action:'idle';
+ const pose=d.pending&&d.action==='interact'&&d.posture?(d.posture.verb==='sit'?'objectSit':'objectLie'):(d.pending?d.action:'idle');
  let place=stations[d.location]||stations.cabin;
  if(d.pending&&['eat','drink'].includes(d.action)){const target=s.built_world?.objects[d.objectId||(d.action==='eat'?'food_store':'spring')];if(target)place=new T.Vector3(target.x,0,target.z-1);}
  if(d.pending&&d.action==='fell_tree'){const tree=s.built_world?.trees[d.objectId];if(tree)place=new T.Vector3(tree.x-.9,0,tree.z);}
@@ -205,13 +209,13 @@ function beginDesired(){
  const toBed=d.pending&&['sleep','rest'].includes(d.action);if(toBed)place=BEDSIDE.clone();
  // The twin's clock outruns any walk, so its view shows him where he is rather than on the way there.
  // Opening the page mid-activity shows him where he already is; the twin's clock outruns any walk.
- if(d.twin||anim.snap){anim.snap=false;crow.position.copy(place);anim.steps=[wait(d.pending?d.action:'idle',Infinity)];return}
+ if(d.twin||anim.snap){anim.snap=false;crow.position.copy(place);anim.steps=[wait(pose,Infinity)];return}
  anim.steps=toBed?[walk(new T.Vector3(0,0,0)),walk(stations.cabin),walk(place),wait(d.action,Infinity)]
-  :[walk(new T.Vector3(0,0,0)),walk(place),wait(d.pending?d.action:'idle',Infinity)];
+  :[walk(new T.Vector3(0,0,0)),walk(place),wait(pose,Infinity)];
 }
 function setActivity(data){
  const key=`${data.decisions}:${Boolean(data.pending)}`;if(key===anim.key)return;
- anim.key=key;anim.desired={action:data.action,location:data.location,pending:Boolean(data.pending),spot:data.pending?.decision?.reading_spot||'standing',objectId:data.pending?.decision?.object_id||'',area:data.pending?.decision?.observe_area||'',twin:Boolean(data.twin)};
+ anim.key=key;anim.desired={action:data.action,location:data.location,pending:Boolean(data.pending),spot:data.pending?.decision?.reading_spot||'standing',objectId:data.pending?.decision?.object_id||'',area:data.pending?.decision?.observe_area||'',twin:Boolean(data.twin),posture:data.pending?.posture||null,verb:data.pending?.decision?.verb||''};
  if(!initialized){initialized=true;crow.position.copy(stations[data.location]||stations.cabin);anim.snap=true;}
  if(anim.returning)return;
  if(data.twin){anim.book=false;anim.seated=0;anim.floor=0;anim.activeAction='idle';beginDesired();return}
@@ -225,9 +229,14 @@ function setActivity(data){
 }
 const made=new T.Group();scene.add(made);let creationKey='';
 function creations(items){const key=JSON.stringify(items);if(key===creationKey)return;creationKey=key;while(made.children.length){const c=made.children[0];made.remove(c);c.geometry.dispose()}for(const [i,obj]of items.slice(-20).entries()){const x=3+(i%5)*.9,z=9+Math.floor(i/5)*1;let geo;switch(obj.shape){case'orb':geo=new T.IcosahedronGeometry(.3,0);break;case'spire':geo=new T.ConeGeometry(.24,.85,5);break;case'bowl':geo=new T.CylinderGeometry(.35,.15,.25,8);break;default:geo=new T.BoxGeometry(.3,.65,.3)}mesh(geo,'#bb9564',x,.45,z,made);}}
-const worldMeshes=new Map();let worldObstacleRecords=[];
+const worldMeshes=new Map();let worldObstacleRecords=[],furnitureReplaced=false;
 function syncBuiltWorld(world){
  if(!world)return;syncTrees(world);
+ if(world.interaction_furniture&&!furnitureReplaced){
+  for(const m of [...legacyBed,...legacyBench,chair]){scene.remove(m);m.traverse?.(c=>c.geometry?.dispose());}
+  for(const b of [legacyBenchBlock,legacyChairBlock]){const i=obstacles.indexOf(b);if(i>=0)obstacles.splice(i,1);}
+  furnitureReplaced=true;
+ }
  if(!shellReplaced){for(const m of legacyShell){scene.remove(m);m.geometry?.dispose()}for(const b of legacyShellBlocks){const i=obstacles.indexOf(b);if(i>=0)obstacles.splice(i,1)}shellReplaced=true;}
  for(const c of worldObstacleRecords){const i=obstacles.indexOf(c);if(i>=0)obstacles.splice(i,1)}worldObstacleRecords=[];
  for(const [id,record]of worldMeshes)if(!world.objects[id]){scene.remove(record.group);record.group.traverse(m=>m.geometry?.dispose());worldMeshes.delete(id)}
@@ -277,7 +286,7 @@ if(clientVersion&&s.runtime.version&&clientVersion!==s.runtime.version){globalTh
 const maintenance=s.runtime.maintenance||{status:'idle'};if(updateRequested&&maintenance.status==='complete'){globalThis.location?.reload?.();return;}const updating=['checking','backing_up','pulling','restarting'].includes(maintenance.status);
 if($('updateCrow')){ $('updateCrow').disabled=updating||!s.maintenance_enabled; $('updateCrow').textContent=updating?'Updating…':'Back up and update';txt('updateStatus',maintenance.message||(s.maintenance_enabled?'Ready. Your private life data stays on the PC.':'Start Crow with --lan from its Git checkout to enable authenticated updates.'));}
 if(['complete','up_to_date','failed','interrupted'].includes(maintenance.status))updateRequested=false;
-txt('toggle',s.paused?'Begin life':'Pause');txt('clock',`${s.clock.date} · ${s.clock.time} · ${s.twin?'twin clock':s.crow_clock?`Crow's time${s.crow_clock.scale>1?' ('+s.crow_clock.scale+'× speed)':''}`:'UK time'}`);txt('status',s.runtime.status+(s.last_seconds!==null?' · Last choice '+s.last_seconds+'s':''));txt('error',s.last_error);$('toggle').disabled=updating;txt('activity',({eat:'Eating',drink:'Drinking',rest:'Resting',practise:'Practising archery',explore:'Exploring',craft:'Making a carving',read:'Reading Wikipedia',sleep:'Sleeping',observe:'Watching the woodland',reflect:'Reflecting',gather:'Gathering materials',plan:'Preparing a construction plan',construct:'Constructing',move_object:'Carrying and placing an object',inspect:'Inspecting an object',fell_tree:'Felling a tree'})[s.action]);txt('reason',s.reason);$('energy').value=s.energy;txt('resources',`Wood: ${s.materials} kg · Stone: ${s.stone||0} kg · Archery sessions: ${s.skills.archery} · Carvings: ${s.skills.craft}`);txt('intention',s.current_intention||'Crow has not expressed an intention yet.');
+txt('toggle',s.paused?'Begin life':'Pause');txt('clock',`${s.clock.date} · ${s.clock.time} · ${s.twin?'twin clock':s.crow_clock?`Crow's time${s.crow_clock.scale>1?' ('+s.crow_clock.scale+'× speed)':''}`:'UK time'}`);txt('status',s.runtime.status+(s.last_seconds!==null?' · Last choice '+s.last_seconds+'s':''));txt('error',s.last_error);$('toggle').disabled=updating;txt('activity',({eat:'Eating',drink:'Drinking',rest:'Resting',practise:'Practising archery',explore:'Exploring',craft:'Making a carving',read:'Reading Wikipedia',sleep:'Sleeping',observe:'Watching the woodland',reflect:'Reflecting',gather:'Gathering materials',plan:'Preparing a construction plan',construct:'Constructing',move_object:'Carrying and placing an object',inspect:'Inspecting an object',fell_tree:'Felling a tree',interact:'Working with objects',browse:'Browsing the web',talk:'Talking with Edda',trade:'At the trading post',use_item:'Using an item'})[s.action]||s.action);txt('reason',s.reason);$('energy').value=s.energy;txt('resources',`Wood: ${s.materials} kg · Stone: ${s.stone||0} kg · Archery sessions: ${s.skills.archery} · Carvings: ${s.skills.craft}`);txt('intention',s.current_intention||'Crow has not expressed an intention yet.');
 setActivity(s);
 $('feed').replaceChildren();for(const m of s.memories.slice(-16).reverse())entry($('feed'),m.event,[m.at?new Date(m.at).toLocaleString('en-GB',{timeZone:'Europe/London'}):`Earlier prototype · Day ${m.day} · ${m.time}`,m.intention?'Aim: '+m.intention:'',m.reason?'Why: '+m.reason:'',m.next_step?'Tentative next step: '+m.next_step:''].filter(Boolean).join(' · '));
 $('wishes').replaceChildren();for(const w of s.wishes.slice(-10).reverse())entry($('wishes'),w.text,`${w.reason} · First expressed day ${w.day} · ${w.mentions} mention(s)`);if(!s.wishes.length)entry($('wishes'),'No wishes expressed yet.');
@@ -313,6 +322,7 @@ if(step){
   }else if(step.pose==='stand'){
    const t=T.MathUtils.smoothstep(step.elapsed,0,step.duration);crow.position.lerpVectors(LIB.seat,LIB.approach,t);anim.seated=1-t;
   }else if(step.pose==='rest'&&crow.position.distanceTo(BEDSIDE)<.6){anim.seated=1;crow.rotation.y=Math.PI/2;crow.position.x=-10.95;crow.position.z=-10.0;
+  }else if(step.pose==='objectSit'){anim.seated=1;crow.rotation.y=Math.PI;
   }else if(step.pose==='reading'){anim.seated=1;crow.rotation.y=Math.PI;}else if(step.pose==='readingFloor'){anim.seated=1;anim.floor=1;crow.rotation.y=Math.PI;}
   if(step.elapsed>=step.duration){anim.steps.shift();if(step.done)step.done();}
  }
@@ -328,6 +338,9 @@ for(let i=0;i<2;i++){
 if(anim.pose==='take'||anim.pose==='putback'){arms[1].rotation.x=-1.4*Math.sin(Math.min(1,step.elapsed/step.duration)*Math.PI);elbows[1].rotation.x=-.15;}
 headPivot.rotation.x=anim.book?.22+Math.sin(anim.elapsed*.5)*.015:0;
 crow.position.y=-.28*seated-.36*anim.floor+(moving?Math.abs(walking)*.025:0);
+if(anim.pose==='objectSit'&&!moving)crow.position.y=(anim.desired?.posture?.height||.49)-.77;
+if(anim.pose==='objectLie'&&!moving){const p=anim.desired.posture;crow.position.set(p.x,p.height+.25,p.z+.65);crow.rotation.set(-Math.PI/2,0,0);anim.objectLying=true;}
+else if(anim.objectLying){anim.objectLying=false;crow.rotation.x=0;}
 const inBed=anim.pose==='sleep'&&!moving&&(anim.inBed||crow.position.distanceTo(BEDSIDE)<.6);
 if(inBed){anim.inBed=true;crow.position.set(-11.5,.82,-9.25);crow.rotation.set(-Math.PI/2,0,0);
  for(let i=0;i<2;i++){legs[i].rotation.x=0;knees[i].rotation.x=0;arms[i].rotation.x=0;elbows[i].rotation.x=0}}
@@ -342,6 +355,7 @@ if(['eat','drink'].includes(anim.pose)&&!moving){arms[1].rotation.x=-1.25;elbows
 if(anim.pose==='inspect'&&!moving){headPivot.rotation.x=.38;arms[1].rotation.x=-.9;elbows[1].rotation.x=-.4+Math.sin(anim.elapsed*1.5)*.08;}
 if(anim.pose==='gather'&&!moving){const bend=.5+Math.sin(anim.elapsed*1.4)*.25;arms[0].rotation.x=-bend;arms[1].rotation.x=-bend;headPivot.rotation.x=.3;}
 if(anim.pose==='craft'&&!moving){arms[1].rotation.x=-.8+Math.sin(anim.elapsed*4)*.12;elbows[1].rotation.x=-.5;headPivot.rotation.x=.18;}
+if(anim.pose==='interact'&&!moving){arms[1].rotation.x=-.8+Math.sin(anim.elapsed*3)*.12;elbows[1].rotation.x=-.5;headPivot.rotation.x=.18;}
 if(anim.pose==='observe'&&!moving)headPivot.rotation.y=Math.sin(anim.elapsed*.2)*.35;else headPivot.rotation.y=0;
 crow.visible=true;if(inBed){headPivot.rotation.set(0,0,0);torso.scale.y=1+Math.sin(anim.elapsed*.9)*.02;}
 sky.frame();renderer.render(scene,camera);requestAnimationFrame(frame)}

@@ -71,6 +71,13 @@ export function createJournal({document,apiFetch}){
    const plan=state.built_world?.plans?.find(p=>p.id===d.plan_id);
    if(plan){node('p',`Plan ${plan.id}: ${plan.name}`,parent);node('p',`${plan.work_done_minutes||0}/${plan.minutes} minutes worked · ${plan.status}`,parent,'muted');node('p','Materials: '+(Object.entries(plan.bill||{}).map(([m,q])=>`${q} kg ${m}`).join(', ')||'No additional materials'),parent,'muted');}
    if(d.action==='gather')node('p','Collecting: '+d.material,parent);
+   if(d.action==='interact'){
+    node('p','Operation: '+d.verb,parent);
+    if(d.other_id)node('p','Support: '+(state.built_world?.objects?.[d.other_id]?.name||d.other_id),parent);
+    if(d.hypothesis)node('p','His hypothesis: '+d.hypothesis,parent);
+    if(d.prediction)node('p','His prediction: '+d.prediction,parent);
+    if(d.procedure_id)node('p','Reusing '+d.procedure_id,parent,'muted');
+   }
    if(d.action==='move_object'&&Number.isFinite(d.destination_x)&&Number.isFinite(d.destination_z))node('p',`Chosen position: (${d.destination_x}, ${d.destination_z})`,parent);
    if(pending.start)node('p','Started: '+date(pending.start),parent,'muted');
   }else if(state.reflection_pending){node('p','Considering the result before choosing what to do next.',parent,'muted');}

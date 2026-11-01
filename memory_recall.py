@@ -79,6 +79,16 @@ def candidates(state):
                                      f"tolerance {t.get('target_error_mm')} mm, {'met' if t.get('goal_met') else 'missed'}. "
                                      f"{t.get('adjustment') or ''}", 220),
                       'why': _short(t.get('hypothesis'), 120), 'when': t.get('at', '')[:16], 'importance': .3})
+    for a in state.get('procedures', {}).get('attempts', []):
+        items.append({'type':'procedure_result','id':a['source_id'],'order':a['source_id'],
+                      'text':_short(a['verb']+' with '+a['method_id']+': '+a['result'],220),
+                      'why':_short(a.get('hypothesis') or a.get('intention'),120),
+                      'when':a.get('at','')[:16],'importance':.3})
+    for entry in state.get('interest_history', {}).values():
+        for e in entry['episodes'][-2:]:
+            items.append({'type':'self_report','id':e['source_id'],'order':e['source_id'],
+                          'text':_short(entry['topic']+': '+e['feeling'],200),
+                          'why':_short(e.get('intention'),100),'when':e.get('at','')[:16],'importance':.1})
     for i, f in enumerate(state.get('research_feedback', [])):
         items.append({'type': 'search_miss', 'id': None, 'order': 0,
                       'text': _short(f"Search '{f.get('query')}' found nothing relevant: {f.get('reason')}", 200),
@@ -89,15 +99,15 @@ def candidates(state):
     return items
 
 
-def query_terms(state):
+def query_terms(state, focus=None):
     """What Crow is currently concerned with, taken only from his own saved state.
 
     His own intention, next step and active project count fully; the last few
     events count less, so a run of similar recent events cannot dominate recall.
     """
     terms = {}
-    focus = [state.get('current_intention', ''), state.get('next_step', '')]
-    focus += [p.get('title', '') for p in state.get('projects', []) if p.get('status') == 'active']
+    focus = [focus] if focus else [state.get('current_intention', ''), state.get('next_step', '')]+[
+        p.get('title', '') for p in state.get('projects', []) if p.get('status') == 'active']
     pending = state.get('pending') or {}
     if pending.get('decision'):
         focus.append(pending['decision'].get('intention', ''))
@@ -109,7 +119,7 @@ def query_terms(state):
     return terms
 
 
-def recall(state, budget_chars=1700, exclude_ids=(), limit=8):
+def recall(state, budget_chars=1700, exclude_ids=(), limit=8, focus=None):
     """Return the most relevant saved items that fit in budget_chars of JSON.
 
     Recent events are supplied separately, so their IDs can be excluded here.
@@ -119,7 +129,7 @@ def recall(state, budget_chars=1700, exclude_ids=(), limit=8):
     items = candidates(state)
     if not items:
         return []
-    query = query_terms(state)
+    query = query_terms(state,focus)
     exclude = set(exclude_ids)
     docs = [words(i['text'] + ' ' + i['why']) for i in items]
     df = {}
@@ -141,17 +151,19 @@ def recall(state, budget_chars=1700, exclude_ids=(), limit=8):
     chosen, seen, used, per_type = [], {}, 2, {}
     out_terms = {}
 
-    def _near_duplicate(terms, seen):
+    def _near_duplicate(item, terms, seen):
         # Reworded versions of the same note (e.g. repeated "did not answer my question") count once.
         for k, other in out_terms.items():
+            if seen[k]['type'] != item['type'] or negated(seen[k]['text']) != negated(item['text']):
+                continue  # a source, an interpretation and contradictory evidence are not interchangeable
             if terms and other and len(terms & other) / len(terms | other) >= .5:
                 return seen[k]
         return None
     for score, item in scored:
         if per_type.get(item['type'], 0) >= max(2, limit // 3):
             continue  # keep several kinds of evidence visible rather than one flooded kind
-        key = re.sub(r'\W+', ' ', item['text'].casefold()).strip()
-        twin = seen.get(key) or _near_duplicate(words(item['text']), seen)
+        key = item['type']+':'+re.sub(r'\W+', ' ', item['text'].casefold()).strip()
+        twin = seen.get(key) or _near_duplicate(item, words(item['text']), seen)
         if twin:
             twin['times_recorded'] = twin.get('times_recorded', 1) + 1
             continue
@@ -197,7 +209,13 @@ def recent_pattern(state, window=12):
 
 def similar(a, b, threshold=.5):
     """True when two short texts share most of their meaningful words (reworded duplicates)."""
+    if negated(a) != negated(b):return False
     x, y = words(a), words(b)
     if not x or not y:
         return str(a).casefold().strip() == str(b).casefold().strip()
     return len(x & y) / len(x | y) >= threshold
+
+
+def negated(text):
+    """A conservative polarity guard, not a claim to understand contradiction."""
+    return bool(re.search(r"\b(no|not|never|cannot|can't|failed|fails|without|didn't|doesn't|couldn't)\b",str(text).casefold()))

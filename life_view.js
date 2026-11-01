@@ -33,8 +33,8 @@ export function createLifeView({document}){
   const used=state.runtime?.model_usage?.choose_action,spendLine=state.model_spend;
   if($('modelSpend'))$('modelSpend').textContent=(used?`Last decision: ${used.provider==='anthropic'?'Claude '+used.model:'local '+used.model}. `:'')+
    (spendLine?`Cloud spend today $${spendLine.usd.toFixed(3)} · total $${spendLine.total_usd.toFixed(2)}${spendLine.fallbacks?` · ${spendLine.fallbacks} fallbacks to local today`:''}.`:'');
-  const pending=state.pending?.decision?.action==='craft'?state.pending.decision:null;
-  const key=JSON.stringify([state.practical||{},state.suspended_work||[],pending]);if(key===previous)return;previous=key;
+  const pending=['craft','interact'].includes(state.pending?.decision?.action)?state.pending.decision:null;
+  const key=JSON.stringify([state.practical||{},state.procedures||{},state.suspended_work||[],pending]);if(key===previous)return;previous=key;
   const trials=$('experiments'),methods=$('testedMethods');trials.replaceChildren();methods.replaceChildren();
   const practical=state.practical||{trials:[],methods:[]};
   if(pending?.attempt){const a=pending.attempt,div=card(trials,'Current attempt: '+pending.intention);if(a.hypothesis)line(div,'His hypothesis: '+a.hypothesis);line(div,`Chosen tolerance: ${a.target_error_mm} mm · Expected width error: ${a.expected_error_mm} mm.`);line(div,'Result pending.','muted');}
@@ -49,13 +49,33 @@ export function createLifeView({document}){
    if(t.adjustment)line(div,'His possible adjustment: '+t.adjustment);
    line(div,`Workpiece: ${t.object_id||'record pending'} · Experience ${t.source_id??'pending'}`,'muted');
   }
-  if(!practical.trials.length)line(trials,'No measured practical attempts yet.','muted');
+  if(pending?.action==='interact'){
+   const div=card(trials,'Current attempt: '+pending.verb);
+   if(pending.hypothesis)line(div,'His hypothesis: '+pending.hypothesis);
+   if(pending.prediction)line(div,'His prediction: '+pending.prediction);
+   line(div,pending.procedure_id?'Reusing '+pending.procedure_id:'Trying parameters of his own.','muted');
+   line(div,'Result pending.','muted');
+  }
+  for(const a of (state.procedures?.attempts||[]).slice(-10).reverse()){
+   const div=card(trials,`${a.verb} · ${a.success?'Operation succeeded':'Attempt failed'}`);
+   if(a.hypothesis)line(div,'His hypothesis: '+a.hypothesis);
+   if(a.prediction)line(div,'His prediction: '+a.prediction);
+   line(div,a.result);
+   line(div,`${a.method_id}${a.reused?' · reused method':''} · Experience ${a.source_id}`,'muted');
+  }
+  if(!practical.trials.length&&!(state.procedures?.attempts||[]).length)line(trials,'No measured practical attempts yet.','muted');
   for(const m of practical.methods){
    const div=card(methods,m.id.replaceAll(':',' · '));
    line(div,`${m.successes}/${m.attempts} attempts met their chosen tolerances. Best measured width error: ${m.best_error_mm} mm.`);
    line(div,m.shapes.length?'Tested successfully on: '+m.shapes.join(', '):'No successful trial recorded yet.','muted');
   }
-  if(!practical.methods.length)line(methods,'No practical methods tested yet.','muted');
+  for(const m of state.procedures?.methods||[]){
+   const div=card(methods,`${m.verb} · ${m.id}`);
+   line(div,`${m.successes}/${m.attempts} operations succeeded. These outcomes do not guarantee the next attempt.`);
+   line(div,Object.entries(m.parameters).map(([k,v])=>`${k}: ${v}`).join(' · '),'muted');
+   line(div,'Evidence: '+m.evidence.join(', '),'muted');
+  }
+  if(!practical.methods.length&&!(state.procedures?.methods||[]).length)line(methods,'No practical methods tested yet.','muted');
  }
  return {update};
 }

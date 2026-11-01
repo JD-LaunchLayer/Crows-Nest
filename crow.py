@@ -9,6 +9,8 @@ import life
 import memory_recall
 import ecology
 import consolidation
+import experience
+import interactions
 import town
 import web
 import sys
@@ -34,7 +36,7 @@ ACCESS_TOKEN = None
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.15.0'
+APP_VERSION = '0.16.0'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -62,8 +64,8 @@ def pass_time(seconds):
         own['virtual'] = (datetime.fromisoformat(own['virtual']) + timedelta(seconds=seconds)).isoformat()
 
 
-ACTIONS = {'rest': 'cabin', 'sleep': 'cabin', 'practise': 'range', 'explore': 'woods', 'craft': 'workbench', 'read': 'library', 'observe': 'woods', 'reflect': 'cabin', 'gather': 'woods', 'plan': 'workbench', 'construct': 'workbench', 'move_object': 'workbench', 'inspect': 'workbench', 'fell_tree': 'woods', 'eat':'cabin', 'drink':'cabin', 'resume_work':'cabin', 'browse':'cafe', 'trade':'shop', 'talk':'shop', 'use_item':'workbench'}
-DURATIONS = {'rest': 900, 'practise': 1800, 'explore': 1200, 'craft': 2700, 'read': 900, 'observe': 600, 'reflect': 600, 'gather': 1200, 'plan': 600, 'construct': 1800, 'move_object': 300, 'inspect': 60, 'fell_tree': 5400, 'eat':300, 'drink':120, 'browse':900, 'trade':300, 'talk':600, 'use_item':300}
+ACTIONS = {'rest': 'cabin', 'sleep': 'cabin', 'practise': 'range', 'explore': 'woods', 'craft': 'workbench', 'read': 'library', 'observe': 'woods', 'reflect': 'cabin', 'gather': 'woods', 'plan': 'workbench', 'construct': 'workbench', 'move_object': 'workbench', 'inspect': 'workbench', 'fell_tree': 'woods', 'eat':'cabin', 'drink':'cabin', 'resume_work':'cabin', 'browse':'cafe', 'trade':'shop', 'talk':'shop', 'use_item':'workbench', 'interact':'workbench'}
+DURATIONS = {'rest': 900, 'practise': 1800, 'explore': 1200, 'craft': 2700, 'read': 900, 'observe': 600, 'reflect': 600, 'gather': 1200, 'plan': 600, 'construct': 1800, 'move_object': 300, 'inspect': 60, 'fell_tree': 5400, 'eat':300, 'drink':120, 'browse':900, 'trade':300, 'talk':600, 'use_item':300, 'interact':600}
 CONFIG = ROOT / 'crow-config.json'
 if CONFIG.exists():
     config = json.loads(CONFIG.read_text())
@@ -87,6 +89,9 @@ state = {'minute': 420, 'day': 1, 'location': 'cabin', 'action': 'rest', 'energy
 if SAVE.exists():
     old_bytes = SAVE.read_bytes()
     state.update(json.loads(old_bytes))
+    if not state.get('built_world',{}).get('interaction_furniture'):
+        migration_backup=ROOT/'crow-save-before-v0.16.json'
+        if not migration_backup.exists():migration_backup.write_bytes(old_bytes)
     if state.get('version',0)<5:
         migration_backup=ROOT/'crow-save-before-v0.5.json'
         if not migration_backup.exists():migration_backup.write_bytes(old_bytes)
@@ -133,6 +138,8 @@ life.ensure(state)
 ecology.ensure(state)
 consolidation.ensure(state)
 town.ensure(state)
+interactions.ensure(state)
+experience.ensure(state)
 state['version']=5
 if TIME_SCALE>1 and not state.get('crow_clock'):
     # From now on he keeps his own calendar, starting at the real present. It is never wound back.
@@ -358,7 +365,8 @@ DECISION_DEFAULTS={'wish':'','wish_reason':'','object_id':'','plan_id':0,'destin
     'material':'wood','plan_operation':'new','part_id':'','reading_spot':'standing','library_query':'',
     'reading_mode':'lookup','research_question':'','next_step':'','creation_name':'','creation_shape':'orb',
     'project_id':-1,'project_title':'','project_status':'active','target_action':'rest','target_sessions':1,
-    'observe_area':'woodland_edge','focus':'','trade_mode':'ask','trade_item':'','trade_quantity':1,'opening':'','hope':'','use_item':'','use_on':'','use_how':''}
+    'observe_area':'woodland_edge','focus':'','trade_mode':'ask','trade_item':'','trade_quantity':1,'opening':'','hope':'','use_item':'','use_on':'','use_how':'',
+    'verb':'','other_id':'','procedure_id':'','hypothesis':'','prediction':''}
 # One neutral line per action. Details are requested only after an action is chosen.
 ACTION_MENU={'rest':'quiet rest in the cabin','sleep':'sleep (until 07:00 at night, 90 minutes by day)',
     'eat':'eat from an available food source','drink':'drink from the spring',
@@ -372,7 +380,8 @@ ACTION_MENU={'rest':'quiet rest in the cabin','sleep':'sleep (until 07:00 at nig
     'browse':'use the terminal at the internet café to search the wider web and read pages',
     'trade':'go to the trading post: buy, sell, do a posted job, or ask for something',
     'talk':'talk with Edda Thorne, who keeps the trading post: chat, bargain, barter, ask or offer favours',
-    'use_item':'use something you own, in whatever way you choose'}
+    'use_item':'use something you own, in whatever way you choose',
+    'interact':'work material, divide or arrange solids, place objects on surfaces, or choose a supported posture'}
 # The local 4,096-token model needs a tight context; the cloud model gets roughly three times the room.
 WIDE=PROVIDER=='anthropic'
 CONTEXT_BUDGET=int(os.environ.get('CROW_CONTEXT_CHARS','16000' if WIDE else '5600'))
@@ -429,7 +438,7 @@ def decision_context():
         'research':reading_journal.research_context(state),
         'self_notes':[n['text'] for n in state['personality_notes'][-(6 if WIDE else 3):]],
         'wishes':[w['text'] for w in state['wishes'][-(8 if WIDE else 4):]],
-        'interests':dict(sorted(state['interests'].items(),key=lambda kv:-abs(kv[1]))[:(10 if WIDE else 6)]),
+        'interests':experience.summary(state,4 if WIDE else 2),
         'inventory_kg':near['inventory_kg'],'supplies':life.perceive(state)['supplies'],
         'trade_credit':state.get('trading',{}).get('credit',0),'possessions':state.get('possessions',{}),
         'people':[{'name':'Edda Thorne','where':'trading post','times_talked':town.keeper(state)['talks'],
@@ -447,10 +456,11 @@ def choose_action():
     prompt=('Choose your own intention and next action from the actual state below. Rest, doing little, keeping, revising, '
         'pausing or abandoning goals are all valid. Bodily sensations can matter; none commands a response. '
         'relevant_memories are saved evidence from your own past (event=happened, reading=what a source said, lesson=your earlier '
-        'interpretation, appraisal=how it mattered to you, trial=measured result, search_miss=failed search); use them if they help. '
+        'interpretation, appraisal/self_report=how it mattered to you, trial/procedure_result=executor result, search_miss=failed search); use them if they help. '
         'recent_pattern only counts what you recently did; repeating, changing or stopping are all choices. '
         'Reading is knowledge, not practical skill. Planning or research does not complete a physical creation. '
-        'No other people, shop or currency exist. Details of the action (targets, methods, search terms) are asked next, only for the action you choose. '
+        'Only people, resources and capabilities described in this world exist. Details of the action (targets, methods, search terms) are asked next, only for the action you choose. '
+        'Interest histories separate your reported enjoyment from repeated choices and physical results; none defines your identity or orders a return. '
         'project: none, continue/pause/abandon with project_id, or start (titled next). wish may be empty; a wish creates nothing. '
         'memory_ids_used lists IDs of memories that actually informed this choice, or is empty. Keep text brief. '
         'Actions: '+json.dumps(menu)+' State: '+json.dumps(context,ensure_ascii=False))
@@ -475,6 +485,12 @@ def choose_action():
 def parameter_request(d):
     """Instructions, schema properties and context for the one chosen action. None means no details are needed."""
     a=d['action'];world=world_state.ensure(state);objects=world['objects']
+    if a=='interact':
+        return ('Choose a physical operation, or a supported posture. You may attempt any listed operation; physical properties determine the result. '
+                'shape works inventory material; split divides an existing solid; stack arranges two loose objects; '
+                'place_on puts an object on a face; sit/lie use a face for that posture. Targets and methods are chosen next.',
+                {'verb':{'type':'string','enum':interactions.VERBS}},
+                {'objects':interactions.context(state,4),'recent_work':interactions.learning_context(state,limit=2)})
     if a=='eat':
         ids=[i for i,o in objects.items() if i in ['food_store','berry_patch'] and o.get('parts')]
         return ('Choose which food source to eat from.',{'object_id':{'type':'string','enum':ids or ['food_store']}},{'supplies':life.perceive(state)['supplies']})
@@ -565,11 +581,13 @@ def parameter_request(d):
                  'direction':{'type':'string','enum':['along','across']}},
                 {'learning':life.learning_context(state),'body':life.perceive(state)['sensations']})
     if a=='read':
+        spots=['standing','floor']
+        if interactions.posture_target(state,{'verb':'sit','object_id':'library_chair','interaction_params':{'part_id':'seat'}}):spots.insert(0,'chair')
         return ('library_query is your search subject. research_question is the specific thing you want to know, or empty. '
                 'reading_mode lookup has no simulated wait (always used when there is a question); leisure means time with the text is itself the purpose. '
                 'Choose reading_spot chair/standing/floor yourself. Earlier sources and failed searches are evidence about which queries help.',
                 {'library_query':STRING,'research_question':STRING,'reading_mode':{'type':'string','enum':['lookup','leisure']},
-                 'reading_spot':{'type':'string','enum':['chair','standing','floor']}},
+                'reading_spot':{'type':'string','enum':spots}},
                 {'research':reading_journal.research_context(state),
                  'recent_reading':[{k:r.get(k) for k in ['title','query','question','summary','answer_status']} for r in state['reading_log'][-2:]]})
     return None
@@ -582,6 +600,8 @@ def choose_parameters(d):
         projects=[p['id'] for p in state['projects']]
     props={};instruction='';context={}
     if request:instruction,props,context=request
+    if request and d['action']!='interact':
+        with LOCK:context['relevant_memories']=memory_recall.recall(state,900,limit=3,focus=d['intention'])
     single={k:v['enum'][0] for k,v in props.items() if len(v.get('enum',[]))==1}
     for k in single:props.pop(k)
     if d['project']=='start':
@@ -595,6 +615,8 @@ def choose_parameters(d):
         # Only the requested detail fields are accepted, so this step can never change the chosen action.
         params={k:v for k,v in params.items() if k in props}
     params.update(single)
+    if d['action']=='interact':
+        params={**params,**choose_interaction(d,params.get('verb'))}
     merged={**DECISION_DEFAULTS,**{k:v for k,v in d.items() if k!='project'}}
     attempt_keys=['hypothesis','predicted_success','expected_error_mm','target_error_mm','support','passes','direction']
     if d['action']=='craft':merged['attempt']={k:params.pop(k) for k in attempt_keys if k in params}
@@ -611,6 +633,47 @@ def choose_parameters(d):
     merged['project_choice']=choice
     validate_decision(merged)
     return merged
+
+
+def choose_interaction(d, verb):
+    """Only details of the selected primitive; targets never come from a hobby script."""
+    if verb not in interactions.VERBS:raise ValueError('Unknown physical operation')
+    with LOCK:
+        objects={i:o for i,o in state['built_world']['objects'].items() if o.get('parts')}
+        methods=interactions.learning_context(state,verb)
+        props={'hypothesis':STRING,'prediction':STRING}
+        if verb not in ('sit','lie'):
+            props['procedure_id']={'type':'string','enum':['']+[m['id'] for m in methods['methods']]}
+        if verb=='shape':
+            props.update(creation_name=STRING,material={'type':'string','enum':['wood','stone']},
+                shape={'type':'string','enum':world_state.SHAPES},mass_kg={'type':'number','minimum':.1,'maximum':20},
+                width_m={'type':'number','minimum':.05,'maximum':2},depth_m={'type':'number','minimum':.05,'maximum':2},
+                support={'type':'string','enum':['hand','bench']},passes={'type':'string','enum':['light','deep']})
+        else:
+            props['object_id']={'type':'string','enum':list(objects)}
+            if verb=='split':props.update(fraction={'type':'number','minimum':.1,'maximum':.9},creation_name=STRING)
+            if verb in ('stack','place_on'):props['other_id']={'type':'string','enum':list(objects)}
+            if verb!='split':props['part_id']=STRING
+            if verb=='stack':props['creation_name']=STRING
+        context={'objects':interactions.context(state,8 if WIDE else 4),'methods':methods,
+                 'inventory_kg':{'wood':state['materials'],'stone':state['stone']}}
+        # Relevant earlier evidence reaches this action's detail step too.
+        context['memories']=memory_recall.recall(state,900,limit=3,focus=d['intention'])
+        context=fit(context,12000 if WIDE else 5700,['objects','methods'])
+    prompt=('You chose '+verb+' for '+d['intention']+'. Choose its targets and parameters. '
+            'object_id is the object worked or placed; other_id is its supporting object. part_id names a flat face on the support '
+            '(on object_id for sit/lie). A saved procedure_id reuses its recorded parameters on your selected targets; '
+            'leave it empty to try new parameters. A tested method can still fail in different circumstances. '
+            'hypothesis and prediction are your own expectations BEFORE acting, and can be empty if none. '
+            'The executor reports actual geometry and material changes; descriptions alone cannot change the world. '+
+            json.dumps(context,ensure_ascii=False))
+    raw,_=model_call(prompt,fields_schema(props),650,'interaction:'+verb)
+    raw={k:v for k,v in raw.items() if k in props}
+    generic={'object_id','other_id','creation_name','hypothesis','prediction','procedure_id'}
+    out={k:v for k,v in raw.items() if k in generic}
+    out.update(verb=verb,interaction_params={k:v for k,v in raw.items() if k not in generic})
+    with LOCK:interactions.prepare(state,out)
+    return out
 
 
 def validate_decision(d):
@@ -640,6 +703,7 @@ def choose():
 def start_action(d, seconds, reading=None):
     dt = clock()
     life.ensure(state)
+    if d['action']=='interact':interactions.prepare(state,d)
     if d['action']=='read' and d.get('research_question','').strip():d['reading_mode']='lookup'
     if d['action']=='resume_work':
         job=next((w for w in state['suspended_work'] if w['id']==d.get('resume_work_id')),None)
@@ -685,6 +749,7 @@ def start_action(d, seconds, reading=None):
         for p in state['projects']:
             if p['id']!=project['id'] and p['status']=='active':p['status']='paused'
     action = d['action']
+    state.pop('posture',None)
     if action=='sleep':
         if dt.hour>=21 or dt.hour<7:
             wake=dt.replace(hour=7,minute=0,second=0,microsecond=0)
@@ -692,6 +757,7 @@ def start_action(d, seconds, reading=None):
             duration=wake.timestamp()-dt.timestamp()
         else:duration=5400
     else: duration=DURATIONS[action]
+    if action=='interact':duration=interactions.duration(d)
     if action == 'read' and d.get('reading_mode', 'lookup') == 'lookup':
         duration = 0
     if action=='construct':
@@ -705,6 +771,7 @@ def start_action(d, seconds, reading=None):
     state.update(action=action,location=ACTIONS[action],reason=d['reason'][:350],last_seconds=seconds,last_error='')
     state['decisions'] += 1
     state['pending']={'decision':copy.deepcopy(d),'project_id':project['id'] if project and project['status']=='active' else None,'remaining':duration,'duration':duration,'ends_at':time.time()+duration,'start':dt.isoformat(),'reading':reading,'review_in':900}
+    if action=='interact':state['pending']['posture']=interactions.posture_target(state,d)
     if action=='use_item' and d.get('use_item')=='whetstone' and d.get('use_on'):
         state['pending']['remaining']=state['pending']['duration']=1200
     if action=='trade' and d.get('trade_mode')=='job' and d.get('trade_item') in town.JOBS:
@@ -715,7 +782,9 @@ def start_action(d, seconds, reading=None):
     if action=='read':details['research_question']=d.get('research_question','')[:240]
     for key in ['recalled_ids','memory_ids_used','project_choice']:
         if key in d:details[key]=d[key]
-    event(description,d['reason'],'started',**details)
+    if action=='interact':details.update(verb=d['verb'],hypothesis=d.get('hypothesis',''),prediction=d.get('prediction',''),procedure_id=d.get('procedure_id',''))
+    started_event=event(description,d['reason'],'started',**details)
+    state['pending']['choice_id']=started_event['id']
     runtime['status']=('Processing a Wikipedia excerpt…' if action=='read' and duration==0 else
                        'Sleeping until morning' if action=='sleep' and duration>5400 else 'Spending time on '+action)
     persist()
@@ -780,6 +849,8 @@ def finish_action(geometry=None):
         if plan:life.build_practice(state,plan['parts'],plan.get('work_done_minutes',0)-before)
     elif a=='move_object':
         result=world_state.move(state,d.get('object_id',''),d.get('destination_x',0),d.get('destination_z',0));description=result['text']
+    elif a=='interact':
+        result=interactions.execute(state,d,p['duration']);description=result['text']
     elif a=='inspect':
         ident=d.get('object_id','')
         obj=world_state.ensure(state)['objects'].get(ident)
@@ -796,6 +867,9 @@ def finish_action(geometry=None):
         else:
             description=('Inspected '+json.dumps(obj,ensure_ascii=False)[:1500]) if obj else 'Inspection failed: that world object does not exist.'
             result={'success':bool(obj),'text':description}
+        if obj and obj.get('parts'):
+            result['properties']=interactions.properties(obj)
+            description+=' Physical properties: '+json.dumps(result['properties'],ensure_ascii=False)
     elif a in ['rest','sleep']:
         description='Finished sleeping in his cabin.' if a=='sleep' else 'Finished a quiet rest in his cabin.'
     elif a=='explore':
@@ -858,11 +932,15 @@ def finish_action(geometry=None):
     world_state.ensure(state)
     details={'action':a,'intention':d.get('intention','')[:300],'next_step':state['next_step'],
              'session':{'started':p['start'],'seconds':p['duration']}}
+    if p.get('choice_id') is not None:details['choice_id']=p['choice_id']
+    if a=='interact':details.update(verb=d['verb'],hypothesis=d.get('hypothesis',''),prediction=d.get('prediction',''),
+                                   procedure_id=d.get('procedure_id',''),interaction_params=copy.deepcopy(d['interaction_params']))
     if result:details['world_result']=result
     if a in ('read','browse'):details.update(source=copy.deepcopy(p['reading']),research_question=d.get('research_question','')[:240])
     details['body_after']=life.perceive(state)['sensations']
     if a=='observe':details['new_evidence']=new_evidence
     m=event(description,d['reason'],**details)
+    if a=='interact':interactions.record(state,d,result,m)
     if trial:life.bind_trial(state,trial,m)
     if a in ('read','browse'):
         reading_journal.record_reading(state,m,p,ROOT)
@@ -920,6 +998,7 @@ def reflect(memory):
         signal=life.appraise(state,memory,result)
         appraisal={'at':now().isoformat(),'source_id':memory['id'],'feeling':result['feeling'][:350],'topic':result['topic'][:60],'enjoyment':clamp(result['enjoyment'],-2,2),'meaning':signal['meaning'],'concern':signal['concern'],'valence':signal['valence'],'importance':signal['importance']}
         state['appraisals'].append(appraisal);state['appraisals']=state['appraisals'][-400:]
+        experience.record(state,memory,appraisal)
         lesson=result['lesson'].strip()
         repeated_lesson=any(memory_recall.similar(x['interpretation'],lesson) for x in state['long_term'][-30:])
         # Unchanged sources, or looking without noticing anything new, are not fresh evidence for new lessons or interest.
@@ -956,10 +1035,13 @@ def tick(elapsed):
     clock()
     if state['paused']:return
     p=state['pending']
-    life.advance(state,elapsed,p['decision']['action'] if p else 'reflect')
+    active=p['decision']['action'] if p else 'reflect'
+    if active=='interact':
+        active={'shape':'craft','split':'gather','stack':'move_object','place_on':'move_object','sit':'rest','lie':'rest'}.get(p['decision'].get('verb'),'interact')
+    life.advance(state,elapsed,active)
     if p:
         # Tired, hungry or working outdoors in the dark: the same job takes longer (see life.work_rate).
-        p['remaining']=max(0,p['remaining']-elapsed*life.work_rate(state,p['decision']['action']))
+        p['remaining']=max(0,p['remaining']-elapsed*life.work_rate(state,active))
         if p['remaining']<.5:p['remaining']=0
         p['review_in']=max(0,p.get('review_in',900)-elapsed)
         p['ends_at']=time.time()+p['remaining']
@@ -1124,7 +1206,7 @@ def talk_session(opening, hope):
             'note':str(last.get('note_about_crow',''))[:200],'warmth':last.get('warmth',0)}
 
 
-REVIEWABLE=['craft','construct','fell_tree','practise','gather','explore','move_object']
+REVIEWABLE=['craft','construct','fell_tree','practise','gather','explore','move_object','interact']
 
 
 def decide_and_start(generation):
@@ -1282,6 +1364,9 @@ class Handler(BaseHTTPRequestHandler):
                 clock();body=json.dumps({**state,'ecology_view':ecology.view(state,now().timetuple().tm_yday),'reading_log':reading_journal.page(state)['items'],
                     'reading_count':len(state['reading_log']),'runtime':runtime,
                     'maintenance_enabled':ACCESS_TOKEN is not None and (ROOT/'.git').exists()}).encode()
+            return self.send(200,body,'application/json')
+        if self.path=='/api/behaviour':
+            with LOCK:body=json.dumps(experience.report(state)).encode()
             return self.send(200,body,'application/json')
         parsed=urllib.parse.urlsplit(self.path)
         if parsed.path=='/api/reading':

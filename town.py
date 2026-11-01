@@ -200,7 +200,7 @@ def _goods_value(state, item, quantity):
             return None
         return quantity / SELL_RATES[item]['kg_per_credit']
     obj = state['built_world']['objects'].get(item)
-    if not obj or obj.get('kind') != 'carving':
+    if not obj or not obj.get('parts') or obj.get('kind') != 'carving':
         return None
     creation = next((c for c in state.get('creations', []) if 'carving-' + str(c['id']) == item), {})
     q = creation.get('quality', 5)
@@ -352,7 +352,7 @@ def trade(state, mode, item, quantity, at):
             text = f'Sold {credits * per:g} kg of {item} for {credits} credit. Credit now: {post["credit"]:g}.'
         else:
             obj = state['built_world']['objects'].get(item)
-            if not obj or obj.get('kind') != 'carving':
+            if not obj or not obj.get('parts') or obj.get('kind') != 'carving':
                 return {'success': False, 'text': 'The trading post only buys wood, stone or carvings he made.'}
             creation = next((c for c in state.get('creations', []) if 'carving-' + str(c['id']) == item), {})
             quality = creation.get('quality', 5)

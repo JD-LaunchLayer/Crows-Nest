@@ -160,3 +160,22 @@ Observation returns findings generated from world state (species, positions,
 real-date phenology, light from actual trees), never model-invented facts.
 Focus biases attention without closing it. The woodland is an authored world
 that Jordan can change; it supplies things to notice, not interests to adopt.
+
+## Transferable methods and observable interests (0.16.0)
+
+The latest implementation builds on the two-step decision and finite-memory
+work already present in 0.6–0.15. General object operations are selected after
+the intention/action choice; only that operation's details are requested.
+Actual geometry, finite inventories and target revisions constrain outcomes.
+Procedures store executed parameters with successes, failures and source event
+IDs; using a procedure again does not bypass those constraints. They are not
+general self-written programs. Descriptions cannot grant material or abilities.
+
+Reported enjoyment, separate choices, new evidence and physical results are
+recorded separately. These records reach recall and the observer journal, but
+no count declares a passion, assigns an identity or selects the next action.
+Legacy scores remain in the save; their missing evidence is not fabricated.
+Consolidated memories remain labelled interpretations, including skill notes.
+Read-only reports support assessment over days of actual operation, rather
+than treating fluent diary entries as proof of development. See
+docs/EXPERIENCE_LOOPS.md for mechanics, limits and verification.

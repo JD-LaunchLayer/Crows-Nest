@@ -19,7 +19,7 @@ export function createDiary({document}){
  }
  const VERB={rest:'resting',sleep:'asleep',eat:'eating',drink:'drinking',observe:'watching the woodland',reflect:'thinking quietly',
   explore:'exploring',practise:'practising archery',read:'reading',inspect:'examining something',gather:'gathering materials',
-  fell_tree:'felling a tree',craft:'carving',plan:'drafting a plan',construct:'building',move_object:'carrying something',resume_work:'returning to his work'};
+  fell_tree:'felling a tree',craft:'carving',plan:'drafting a plan',construct:'building',move_object:'carrying something',resume_work:'returning to his work',interact:'working with an object',browse:'browsing the web',talk:'talking with Edda',trade:'at the trading post',use_item:'using something'};
  function summary(s){
   const parts=[];const twin=s.twin;
   parts.push(s.pending?`He is ${VERB[s.action]||s.action}.`:'He is between activities.');
@@ -38,7 +38,7 @@ export function createDiary({document}){
  }
  function update(s){
   if(!$('diary'))return;
-  const key=JSON.stringify([s.keeper,s.trading,s.possessions,s.decisions,s.pending&&s.pending.start,(s.diary||[]).length,s.interests,(s.personality_notes||[]).length,s.affect,s.current_intention,s.clock&&s.clock.date]);
+  const key=JSON.stringify([s.keeper,s.trading,s.possessions,s.decisions,s.pending&&s.pending.start,(s.diary||[]).length,s.interests,s.interest_history,(s.personality_notes||[]).length,s.affect,s.current_intention,s.clock&&s.clock.date]);
   if(key===last)return;last=key;
   if(s.clock)$('diaryDate').textContent=`${s.clock.date} · ${s.clock.time}${s.twin?' · twin clock':s.crow_clock?' · Crow\'s own time':' · UK time'}`;
   $('diaryBadge').textContent=s.twin?'CROW · TIME-LAPSE TWIN':'CROW\'S JOURNAL';
@@ -52,11 +52,17 @@ export function createDiary({document}){
   if(!(s.diary||[]).length)thoughts.append(el('p','No reflections recorded yet.','muted'));
   const box=$('diaryInterests');box.replaceChildren();
   const items=Object.entries(s.interests||{}).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1])).slice(0,10);
-  for(const [topic,score] of items){
-   box.append(el('div',`${topic} · ${score>0?'drawn to':'put off by'} (${score})`));
-   const bar=el('div',undefined,'bar'+(score<0?' neg':''));const fill=el('i');fill.style&&(fill.style.width=Math.min(100,Math.abs(score)*10)+'%');bar.append(fill);box.append(bar);
+  const histories=Object.values(s.interest_history||{}).filter(x=>x.episodes?.length).sort((a,b)=>b.episodes.at(-1).source_id-a.episodes.at(-1).source_id).slice(0,10);
+  for(const h of histories){
+   const es=h.episodes,choices=new Set(es.map(e=>e.choice_id).filter(i=>i!=null));
+   box.append(el('p',h.topic));
+   box.append(el('p',`${es.length} recorded experiences · ${choices.size} separate choices · ${es.filter(e=>e.fresh).length} with new evidence`,'muted'));
+   for(const e of es.slice(-3))box.append(el('p',`“${e.feeling}” · ${e.action} · Experience ${e.source_id}`,'thought'));
   }
-  if(!items.length)box.append(el('p','No interests have formed yet.','muted'));
+  if(!histories.length){
+   for(const [topic,score]of items)box.append(el('p',`${topic} · ${score>0?'drawn to':'put off by'} · earlier reported preference; no detailed trail recorded yet`,'muted'));
+   if(!items.length)box.append(el('p','No interest history recorded yet.','muted'));
+  }
   const trade=$('diaryTrade');if(trade){trade.replaceChildren();const t=s.trading;
    if(t){trade.append(el('p',`Trade credit: ${t.credit}`));
     const owned=Object.entries(s.possessions||{}).filter(([,n])=>n);trade.append(el('p',owned.length?'He owns: '+owned.map(([k,n])=>n>1?`${k} ×${n}`:k).join(', '):'He has not bought anything yet.','muted'));

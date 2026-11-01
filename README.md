@@ -746,3 +746,40 @@ python3 tests/test_building.py
 ```bash
 python3 tests/test_tools.py
 ```
+
+## v0.16.0 — broader physical methods and evidence of developing interests
+
+Crow stays on the Linux host; the phone is still an observer of the same life.
+Existing provider, speed, memories and pending work are preserved.
+
+- Recall now includes actual physical-method outcomes and reported interest
+  episodes. Similar wording no longer merges evidence types or easily erases
+  a negated result. Relevant memory also reaches action-specific detail calls.
+- Crow may choose general object operations: shape inventory wood as a chosen
+  solid, divide a wooden blank, arrange two portable solids, place an object
+  on a real surface, or sit/lie on a suitable face. Materials, surfaces,
+  available tools and target revisions constrain results. Failures are atomic.
+- Tested methods store parameters with actual successes/failures and event
+  evidence. They can be reused on new targets; changed conditions can still
+  make them fail. These are typed procedures, not arbitrary generated code.
+- The existing chair, bed and workbench become saved geometry, replacing their
+  static renderings. The chair can be moved and reading follows its position.
+  Other static scenery remains; this is not unrestricted physics.
+- The journal shows interest evidence over time: separate choices, new
+  experiences, his reported feelings and physical outcomes. Earlier scores
+  remain in the save without fabricated history. No return count declares a
+  hobby or instructs his next action.
+- A read-only report helps assess several days of actual behaviour:
+  `python3 tools/behaviour_report.py --days 7`. It makes no AI calls or changes
+  to Crow. Mechanical fixture tests do not establish real-model autonomy.
+
+The old instruction claiming no shop, currency or other people existed is
+removed, so it no longer contradicts the town already implemented in v0.12–15.
+No new inference provider or paid service is introduced. The pre-migration
+save is backed up as `crow-save-before-v0.16.json`.
+
+See [mechanics, architectural references and limits](docs/EXPERIENCE_LOOPS.md).
+
+```bash
+python3 tests/test_experience.py
+```

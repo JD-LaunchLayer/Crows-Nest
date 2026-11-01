@@ -148,7 +148,8 @@ def apply(state, section, result, digest_ids, at):
                 continue
             old.setdefault('previous', []).append({'text': old['text'], 'until': at})
             old['previous'] = old['previous'][-5:]
-            old.update(text=text, revised=at, strength=round(max(old['strength'], .5 + .5 * importance), 4))
+            old.update(text=text, revised=at, strength=round(max(old['strength'], .5 + .5 * importance), 4),
+                       epistemic='interpretation')
             old['evidence'] = (old.get('evidence', []) + evidence)[-8:]
             report['revised'].append(revises)
             continue
@@ -174,7 +175,8 @@ def apply(state, section, result, digest_ids, at):
             mind['forgotten'].append({**weakest, 'section': section, 'forgotten': at})
             mind['forgotten'] = mind['forgotten'][-200:]
             report['forgotten'].append(weakest['id'])
-        entry = {'id': mind['next_id'], 'text': text, 'strength': strength, 'created': at, 'evidence': evidence}
+        entry = {'id': mind['next_id'], 'text': text, 'strength': strength, 'created': at, 'evidence': evidence,
+                 'epistemic':'interpretation'}
         mind['next_id'] += 1
         entries.append(entry)
         by_id[entry['id']] = entry
@@ -207,7 +209,8 @@ def prompt(section, entries, digest):
             'revisions (revises = the id of a held memory whose wording today\'s events change), held ids today reinforced, and '
             'held ids today contradicted. Fewer, sharper memories are better than many. Do not restate a held memory in new '
             'words; reinforce it instead. Nothing new is a valid result. Do not record what you did not experience, and do not '
-            'turn an absence of information into an insight. '
+            'turn an absence of information into an insight. These entries are your interpretations, not certified facts or skills. '
+            'Reading can suggest a method but cannot demonstrate competence. Only executor-recorded attempts test a procedure. '
             + 'TODAY: ' + str(digest) + ' HELD: ' + str(held))
 
 
@@ -242,7 +245,7 @@ def recall_items(state):
     """Consolidated memories as recall candidates, weighted by strength."""
     mind = ensure(state)
     return [{'type': 'held_' + section, 'id': None, 'order': 0, 'text': e['text'][:220],
-             'why': f"strength {round(e['strength'], 2)}", 'when': (e.get('revised') or e.get('created', ''))[:16],
+             'why': f"interpretation; evidence {e.get('evidence', [])[-4:]}; strength {round(e['strength'], 2)}", 'when': (e.get('revised') or e.get('created', ''))[:16],
              'importance': .4 + .4 * min(1., e['strength'])}
             for section in SECTIONS for e in mind[section]]
 

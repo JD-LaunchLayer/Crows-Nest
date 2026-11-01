@@ -25,13 +25,15 @@ with tempfile.TemporaryDirectory() as td:
         with urllib.request.urlopen(req) as response:return response.read()
     assert json.loads(get('/api/state'))['paused']
     app.ACCESS_TOKEN='test-token-for-tests-only'
-    for path in ['/api/state','/api/state?token=test-token-for-tests-only']:
+    for path in ['/api/state','/api/state?token=test-token-for-tests-only','/api/behaviour']:
         try:get(path);raise AssertionError('Private state was exposed')
         except urllib.error.HTTPError as error:assert error.code==401
     assert b'installTouchControls' in get('/mobile_controls.js')
     assert b'touchPad' in get('/')
     assert b'celestialState' in get('/sky.js')
     assert json.loads(get('/api/state',{'Authorization':'Bearer '+app.ACCESS_TOKEN}))['paused']
+    report=json.loads(get('/api/behaviour',{'Authorization':'Bearer '+app.ACCESS_TOKEN}))
+    assert report['physical_attempts']==0 and 'by_day' in report
     for headers,expected in [({'X-Crow':'local'},401),({'X-Crow':'local','Authorization':'Bearer '+app.ACCESS_TOKEN},200)]:
         req=urllib.request.Request(base+'/api/toggle',method='POST',headers=headers)
         try:

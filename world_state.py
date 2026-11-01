@@ -82,7 +82,7 @@ def nearby(state):
     world=ensure(state)
     # Area-based observations, not claims of visual recognition or pixel vision.
     x,z={'cabin':[-10,-6],'range':[10,-7],'woods':[13,10],'workbench':[0,10],'library':[-11,5]}.get(state['location'],[0,0])
-    objects=sorted(world['objects'].values(),key=lambda o:(o['x']-x)**2+(o['z']-z)**2)
+    objects=sorted((o for o in world['objects'].values() if o.get('parts')),key=lambda o:(o['x']-x)**2+(o['z']-z)**2)
     return {'observation_method':'area-based spatial state',
             'inventory_kg':{'wood':state['materials'],'stone':state['stone']},
             'sources':world['sources'],
@@ -173,6 +173,8 @@ def construct(state, plan_id, work_minutes=None, execute=None):
     target=world['objects'].get(p['target_id'])
     if p['operation'] in ['add','remove'] and (not target or target['revision']!=p['target_revision']):
         return {'success':False,'text':'The target changed after planning. A new plan is needed.'}
+    if p['operation']=='remove' and any(o.get('on')==p['target_id'] and o.get('parts') for o in world['objects'].values()):
+        return {'success':False,'text':'Objects are resting on the target; move them before removing supporting parts.'}
     if not affordable(state,p):return {'success':False,'text':'The required materials are not in inventory. No building occurred.'}
     if work_minutes is not None:
         remaining=max(0,p['minutes']-p.get('work_done_minutes',0))
@@ -226,12 +228,20 @@ def intersects_world(world, obj, x, z, ignore_id=None):
 
 def move(state, ident, x, z):
     world=ensure(state);o=world['objects'].get(ident)
-    if not o:return {'success':False,'text':'That object does not exist.'}
+    if not o or not o.get('parts'):return {'success':False,'text':'That object does not exist.'}
+    if any(obj.get('on')==ident and obj.get('parts') for obj in world['objects'].values()):
+        return {'success':False,'text':'Other objects rest on it; move those before carrying their support.'}
     if not o['portable']:return {'success':False,'text':'That object is too heavy to carry whole; it did not move.'}
     if type(x) not in [int,float] or type(z) not in [int,float] or not -25<=x<=25 or not -25<=z<=25:
         return {'success':False,'text':'That destination is outside the clearing.'}
     # Moving an object is a supported macro: travel, carry and put down. It does
     # not mean inventing a teleporting ability in the agent's autobiographical log.
-    if intersects_world(world,o,x,z,ident):return {'success':False,'text':'The destination intersects another solid object; it was not moved.'}
-    o['x']=x;o['z']=z;o['revision']+=1;world['revision']+=1
+    moved=copy.deepcopy(o)
+    # Carrying a supported object away puts it on the ground, rather than
+    # leaving it floating at the old table height.
+    if moved.get('on'):
+        bottom=min(p['y']-p['height']/2 for p in moved['parts'])
+        for p in moved['parts']:p['y']-=bottom
+    if intersects_world(world,moved,x,z,ident):return {'success':False,'text':'The destination intersects another solid object; it was not moved.'}
+    o.update(parts=moved['parts'],x=x,z=z,revision=o['revision']+1);o.pop('on',None);world['revision']+=1
     return {'success':True,'object_id':ident,'text':f'Carried {o["name"]} and put it down at ({x:g}, {z:g}).'}

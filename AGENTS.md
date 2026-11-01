@@ -74,3 +74,13 @@ she never sees Crow's internal state. Every deal goes through
 town.check_proposal before it is offered and again when it is settled. Work
 pace comes from life.work_rate; keep it a world consequence, not a reward.
 Run tests/test_keeper.py.
+
+interactions.py executes typed physical operations; experience.py indexes their
+evidence and reported interests. Failed operations must be atomic. Splitting,
+stacking and placement must preserve actual material, object IDs/history and
+support dependencies. A saved procedure is parameters with real event evidence,
+never arbitrary executable code or automatic competence from reading. Do not
+derive a passion or force a return from the interest history. Run
+tests/test_experience.py, tests/test_decision.py, tests/test_world.py and the
+animation/journal tests. tools/behaviour_report.py is read-only and makes no AI
+calls. Report fixture tests separately from real-model multi-day observations.

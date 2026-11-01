@@ -16,5 +16,10 @@ assert.ok(get('diaryNow').includes('time-lapse twin')&&get('diaryBadge').include
 assert.ok(get('diaryThoughts').includes('Pleased to see the insects.')&&get('diaryThoughts').includes('Observed ivy flowers'));
 assert.ok(get('diaryInterests').includes('ivy · drawn to')&&get('diaryInterests').includes('put off by'));
 assert.ok(get('diarySelf').includes('I return to living things.'));
+state.interest_history={ivy:{topic:'ivy',episodes:[{source_id:4,choice_id:3,action:'observe',fresh:true,feeling:'Curious.'},
+ {source_id:6,choice_id:5,action:'read',fresh:false,feeling:'This has become tedious.'}]}};
+diary.update(state);
+assert.ok(get('diaryInterests').includes('2 recorded experiences · 2 separate choices · 1 with new evidence'));
+assert.ok(get('diaryInterests').includes('This has become tedious.')&&!get('diaryInterests').includes('drawn to'));
 diary.toggle();assert.equal(document.getElementById('diary').hidden,false);diary.open(false);assert.equal(document.getElementById('diary').hidden,true);
 console.log('PASS: journal summary from saved values; twin labelling; reflections linked to events; interests; self-observations; open/close.');
