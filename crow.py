@@ -22,6 +22,7 @@ import json
 import math
 import os
 import re
+import gzip
 import hashlib
 import threading
 import time
@@ -36,10 +37,12 @@ from zoneinfo import ZoneInfo
 ROOT = Path(__file__).resolve().parent
 SAVE = ROOT / 'crow-save.json'
 ACCESS_TOKEN = None
+STATE_CACHE = {}
+PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token can change anything
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.21.6'
+APP_VERSION = '0.22.0'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -1423,26 +1426,40 @@ def perform_update(was_paused):
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self,*args):pass
-    def send(self,code,body,kind):
-        self.send_response(code);self.send_header('Content-Type',kind);self.send_header('Cache-Control','no-store');self.send_header('Content-Length',str(len(body)));self.end_headers()
+    def send(self,code,body,kind,encoding=None):
+        self.send_response(code);self.send_header('Content-Type',kind);self.send_header('Cache-Control','no-store')
+        if encoding:self.send_header('Content-Encoding',encoding);self.send_header('Vary','Accept-Encoding')
+        self.send_header('Content-Length',str(len(body)));self.end_headers()
         try:self.wfile.write(body)
         except (BrokenPipeError,ConnectionResetError):pass
     def authorised(self):
         if ACCESS_TOKEN is None:return True
         header=self.headers.get('Authorization','')
         return secrets.compare_digest(header,'Bearer '+ACCESS_TOKEN)
+    def end_headers(self):
+        self.send_header('X-Content-Type-Options','nosniff');self.send_header('Referrer-Policy','no-referrer')
+        super().end_headers()
+    def log_message(self,*args):
+        if not PUBLIC:super().log_message(*args)  # a public site would fill the terminal with visitors
     def do_GET(self):
-        if self.path.startswith('/api/') and not self.authorised():
+        owner=self.authorised()
+        if self.path.startswith('/api/') and not owner and not PUBLIC:
             return self.send(401,b'Open the full phone access link from the terminal.','text/plain')
         static={'/':('index.html','text/html; charset=utf-8'),'/world.js':('world.js','application/javascript'),'/life_view.js':('life_view.js','application/javascript'),'/diary_view.js':('diary_view.js','application/javascript'),'/journal.js':('journal.js','application/javascript'),'/mobile_controls.js':('mobile_controls.js','application/javascript'),'/sky.js':('sky.js','application/javascript'),'/village.js':('village.js','application/javascript'),'/vendor/astronomy.browser.min.js':('vendor/astronomy.browser.min.js','application/javascript'),'/vendor/three.module.js':('vendor/three.module.js','application/javascript')}
         if self.path in static:
             name,kind=static[self.path];return self.send(200,(ROOT/name).read_bytes(),kind)
         if self.path=='/api/state':
-            with LOCK:
-                clock();body=json.dumps({**state,'ecology_view':ecology.view(state,now().timetuple().tm_yday),'reading_log':reading_journal.page(state)['items'],
-                    'reading_count':len(state['reading_log']),'runtime':runtime,
-                    'maintenance_enabled':ACCESS_TOKEN is not None and (ROOT/'.git').exists()}).encode()
-            return self.send(200,body,'application/json')
+            viewer='owner' if owner else 'visitor'
+            cached=STATE_CACHE.get(viewer)
+            if not cached or time.monotonic()-cached[0]>1.5:
+                with LOCK:
+                    clock();body=json.dumps({**state,'ecology_view':ecology.view(state,now().timetuple().tm_yday),'reading_log':reading_journal.page(state)['items'],
+                        'reading_count':len(state['reading_log']),'runtime':runtime,'viewer':viewer,
+                        'maintenance_enabled':owner and ACCESS_TOKEN is not None and (ROOT/'.git').exists()}).encode()
+                cached=STATE_CACHE[viewer]=(time.monotonic(),body,gzip.compress(body,5))
+            if 'gzip' in self.headers.get('Accept-Encoding',''):
+                return self.send(200,cached[2],'application/json',encoding='gzip')
+            return self.send(200,cached[1],'application/json')
         if self.path=='/api/behaviour':
             with LOCK:body=json.dumps(experience.report(state)).encode()
             return self.send(200,body,'application/json')
@@ -1481,14 +1498,25 @@ class Handler(BaseHTTPRequestHandler):
                 state['pending']['ends_at']=None if state['paused'] else time.time()+state['pending']['remaining']
             runtime['status']='Paused — clock still follows UK time' if state['paused'] else 'Living in the clearing'
             persist()
+        STATE_CACHE.clear()
         return self.send(200,b'{}','application/json')
 
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description='Crow local world')
     parser.add_argument('--lan',action='store_true',help='Allow authenticated phone access on your home Wi-Fi')
+    parser.add_argument('--public',action='store_true',help='Let anyone watch read-only (for a Cloudflare Tunnel); controls need your private link')
     args=parser.parse_args()
-    if args.lan:ACCESS_TOKEN=RESTART_TOKEN or secrets.token_urlsafe(24)
+    PUBLIC=args.public
+    if args.lan or args.public:
+        ACCESS_TOKEN=RESTART_TOKEN or SETTINGS.get('owner_token') or secrets.token_urlsafe(24)
+        if args.public and not SETTINGS.get('owner_token'):
+            # Keep the owner link the same across restarts, so a bookmarked private link keeps working.
+            SETTINGS['owner_token']=ACCESS_TOKEN
+            try:
+                config=json.loads((ROOT/'crow-config.json').read_text()) if (ROOT/'crow-config.json').exists() else {}
+                config['owner_token']=ACCESS_TOKEN;(ROOT/'crow-config.json').write_text(json.dumps(config,indent=2))
+            except (OSError,ValueError):pass
     clock();server=ThreadingHTTPServer(('0.0.0.0' if args.lan else '127.0.0.1',8765),Handler)
     if RESTART_RESUME=='1':
         state['paused']=False
@@ -1508,6 +1536,10 @@ if __name__=='__main__':
         except OSError:address='<your-PC-IP>'
         print('Phone link (same Wi-Fi): http://'+address+':8765/#token='+ACCESS_TOKEN)
         print('Keep this link private. The PC must stay on. No router port forwarding is needed.\n')
+    if args.public:
+        print('Public mode: anyone reaching this server can watch, read-only.')
+        print('Your private owner link (keeps Pause/Update): add  /#token='+ACCESS_TOKEN+'  to your public address.')
+        print('Keep that link to yourself.\n')
     try:server.serve_forever()
     except KeyboardInterrupt:
         with LOCK:state['paused']=True;persist()

@@ -940,3 +940,27 @@ The same moments, plus questions the library or web left unanswered, are counted
 in `world_gaps` for you as world builder: in the journal under "Where the world ran
 out", or `python3 tools/world_gaps.py`. They are never shown to him or used in his
 decisions. Use them to decide what to add to his world next.
+
+## v0.22.0 — a public window, like Pino
+
+`python3 crow.py --public` lets anyone who reaches the server watch Crow and read
+his journal, read-only. Pause and Back up and update are hidden from visitors and
+refused by the server without your owner token. The owner token is saved in your
+private crow-config.json, so your private link stays the same across restarts:
+your public address followed by `/#token=…` (printed when Crow starts). State is
+shared, cached for 1.5 s and compressed, so many visitors cost the PC very little.
+Visitor requests are not logged in the terminal.
+
+Publishing it on your own domain uses a free Cloudflare Tunnel: the PC makes an
+outgoing connection to Cloudflare, so no router ports are opened and your home
+address is never shown. Steps (Linux Mint, once):
+
+1. Put your domain on Cloudflare (buy it there, or add it and change the
+   nameservers at your registrar).
+2. Install cloudflared:
+   `curl -L -o cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb && sudo dpkg -i cloudflared.deb`
+3. `cloudflared tunnel login` (opens a browser; pick your domain)
+4. `cloudflared tunnel create crow`
+5. `cloudflared tunnel route dns crow yourdomain.example`
+6. `cloudflared tunnel run --url http://127.0.0.1:8765 crow`
+   (keep it running beside Crow; `sudo cloudflared service install` makes it start with the PC)
