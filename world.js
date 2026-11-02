@@ -185,38 +185,34 @@ sign('WOODLAND',13.8,1.55,8.1,[6,3.6],{w:1.8,h:.4,post:true});
 sign('GARDEN',-12.9,1.3,-14.7,[-8,-8],{w:1.5,h:.38,post:true});
 // Jointed placeholder elf: hips, knees, shoulders and elbows support sitting and reaching.
 const crow=new T.Group();scene.add(crow);
-// A cute low-poly crow on two legs (looks only: he still thinks of himself as he always has).
-// Same joints as before (hips, knees, shoulders, elbows, head), so every pose still works.
-const FEATHER='#1d2028',SHEEN='#2c3446',BELLY='#3a3f4c',BEAK='#4a4c52',LEG='#3b3d42',SCARF='#9c4f2c',EYE='#f6f2e6';
+// An original low-poly elf: slate cloak, teal tunic, rust sash, silver hair tied back.
+const SKIN='#e2c6a6',TUNIC='#3f6058',CLOAK='#3b4352',SASH='#9c4f2c',TROUSERS='#47443a',BOOTS='#2e2924',HAIR='#d8d3c6';
 function cyl(rt,rb,h,c,x,y,z,p,seg=7){return mesh(new T.CylinderGeometry(rt,rb,h,seg),c,x,y,z,p)}
-const torso=mesh(new T.IcosahedronGeometry(.36,1),FEATHER,0,1.02,0,crow);torso.scale.set(1,1.18,.92);   // round body
-mesh(new T.IcosahedronGeometry(.27,1),BELLY,0,.98,.13,crow).scale.set(.95,1.1,.6);                        // lighter belly
-for(const [x,r] of [[-.07,.35],[0,0],[.07,-.35]]){const f=box(.1,.04,.42,SHEEN,x,.82,-.36,crow);f.rotation.x=.55;f.rotation.y=r*.4;} // tail fan
-mesh(new T.TorusGeometry(.2,.05,5,12),SCARF,0,1.4,0,crow).rotation.x=Math.PI/2;                           // a little rust scarf
-box(.09,.2,.03,SCARF,.1,1.27,.19,crow).rotation.z=-.25;
-const headPivot=new T.Group();headPivot.position.y=1.62;crow.add(headPivot);
-mesh(new T.IcosahedronGeometry(.25,1),FEATHER,0,.04,0,headPivot).scale.set(1,.98,1);                     // big round head
-for(const [x,r] of [[-.04,-.3],[.04,.3],[0,0]]){const t=box(.03,.13,.03,FEATHER,x,.29,-.03,headPivot);t.rotation.z=r;t.rotation.x=-.3;} // head tuft
-const beak=mesh(new T.ConeGeometry(.075,.24,5),BEAK,0,0,.28,headPivot);beak.rotation.x=Math.PI/2;       // short stout beak
-for(const x of [-.105,.105]){                                                                             // big shiny eyes
- mesh(new T.SphereGeometry(.062,10,8),EYE,x,.075,.19,headPivot);
- mesh(new T.SphereGeometry(.04,10,8),'#14161b',x*1.04,.075,.235,headPivot);
- mesh(new T.SphereGeometry(.013,6,5),'#ffffff',x*1.04+.012,.09,.27,headPivot);
-}
-for(const x of [-.17,.17])mesh(new T.SphereGeometry(.035,8,6),'#6a4a5a',x,-.04,.17,headPivot).scale.set(1,.6,.4); // rosy cheeks
+const torso=cyl(.27,.21,.62,TUNIC,0,1.12,0,crow);
+cyl(.215,.3,.26,TUNIC,0,.74,0,crow);                       // tunic skirt
+mesh(new T.TorusGeometry(.225,.035,4,10),SASH,0,.86,0,crow).rotation.x=Math.PI/2;
+box(.1,.2,.03,SASH,.13,.72,.2,crow).rotation.z=-.2;          // sash tail
+cyl(.2,.3,.95,CLOAK,0,.95,-.12,crow,6).scale.z=.35;                        // cloak hanging behind
+mesh(new T.TorusGeometry(.2,.06,4,10,Math.PI*1.4),CLOAK,0,1.43,-.02,crow).rotation.x=Math.PI/2; // folded hood at the collar
+cyl(.07,.08,.16,SKIN,0,1.5,0,crow);                          // neck
+const headPivot=new T.Group();headPivot.position.y=1.66;crow.add(headPivot);
+mesh(new T.IcosahedronGeometry(.2,1),SKIN,0,.04,0,headPivot).scale.set(.92,1.12,1);
+const hair=mesh(new T.SphereGeometry(.215,8,5,0,Math.PI*2,0,Math.PI*.55),HAIR,0,.07,-.025,headPivot);hair.rotation.x=-.25;
+mesh(new T.ConeGeometry(.06,.36,5),HAIR,0,-.12,-.2,headPivot).rotation.x=Math.PI*.92;   // tied-back tail
+for(const x of [-.2,.2]){const ear=mesh(new T.ConeGeometry(.045,.27,4),SKIN,x,.06,-.01,headPivot);ear.rotation.z=x>0?-1.05:1.05;ear.rotation.x=-.35;}
+for(const x of [-.075,.075]){box(.05,.03,.02,'#f4efe2',x,.07,.185,headPivot);box(.022,.026,.02,'#b0782e',x,.07,.193,headPivot);box(.065,.014,.02,'#9b958a',x,.115,.188,headPivot).rotation.z=x>0?-.15:.15;}
+mesh(new T.ConeGeometry(.025,.07,4),SKIN,0,.02,.205,headPivot).rotation.x=Math.PI/2;      // nose
+box(.07,.012,.01,'#a4705e',0,-.05,.19,headPivot);                                         // mouth
 const legs=[],knees=[],arms=[],elbows=[];
 for(const x of [-.12,.12]){
  const hip=new T.Group();hip.position.set(x,.76,0);crow.add(hip);legs.push(hip);
- cyl(.075,.05,.36,FEATHER,0,-.18,0,hip);                         // feathered thighs
+ cyl(.085,.075,.36,TROUSERS,0,-.18,0,hip);
  const knee=new T.Group();knee.position.y=-.36;hip.add(knee);knees.push(knee);
- cyl(.03,.03,.32,LEG,0,-.16,0,knee);
- for(const r of [-.45,0,.45]){const toe=box(.025,.02,.16,LEG,Math.sin(r)*.06,-.34,.06+Math.cos(r)*.02,knee);toe.rotation.y=r;} // three toes
- box(.025,.02,.08,LEG,0,-.34,-.06,knee);                         // back toe
- const shoulder=new T.Group();shoulder.position.set(Math.sign(x)*.34,1.3,0);crow.add(shoulder);arms.push(shoulder);
- const wing=box(.07,.36,.2,FEATHER,Math.sign(x)*.02,-.16,-.02,shoulder);wing.rotation.z=Math.sign(x)*.12; // wing as upper arm
- const elbow=new T.Group();elbow.position.y=-.32;shoulder.add(elbow);elbows.push(elbow);
- box(.06,.26,.17,SHEEN,0,-.13,0,elbow);
- for(let k=0;k<3;k++){const q=box(.04,.13,.05,FEATHER,0,-.3,-.06+k*.06,elbow);q.rotation.x=(k-1)*.25;}   // feather 'fingers'
+ cyl(.075,.07,.3,BOOTS,0,-.15,0,knee);box(.15,.1,.27,BOOTS,0,-.33,.05,knee);
+ const shoulder=new T.Group();shoulder.position.set(Math.sign(x)*.33,1.36,0);crow.add(shoulder);arms.push(shoulder);
+ cyl(.07,.06,.3,TUNIC,0,-.15,0,shoulder);
+ const elbow=new T.Group();elbow.position.y=-.3;shoulder.add(elbow);elbows.push(elbow);
+ cyl(.06,.055,.26,'#5b4635',0,-.13,0,elbow);mesh(new T.IcosahedronGeometry(.055,0),SKIN,0,-.29,0,elbow);
 }
 // His lantern: carried and lit after dark once he owns one. The light is real in the scene.
 const heldLantern=new T.Group();elbows[0].add(heldLantern);heldLantern.position.set(0,-.38,.06);heldLantern.visible=false;

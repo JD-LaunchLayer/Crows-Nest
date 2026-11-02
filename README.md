@@ -1129,3 +1129,14 @@ the same way. Her weekly delivery still only tops up her usual lines.
 - "past …" now counts as excluding something, like "not …".
 - Supplies he perceives now state their units: servings of ready food and of fruit
   on the bushes, litres of spring water.
+
+## v0.25.1 — the elf again; carrying can choose nothing
+
+- **His figure** is the elf again in the 3D view. The birds stay.
+- **Carrying can choose nothing.** Carrying used to force a choice among the loose
+  objects that can be picked up, so when he meant the crates at the trading post
+  (part of the building, not loose objects) it moved a carving or the reading chair
+  instead, about sixteen times, and he took that as his own carelessness. Now the
+  choice says these are the only things that can be carried and offers "none", which
+  moves nothing and names what can be picked up. Where he put the carvings and the
+  chair is left as it is: that happened.

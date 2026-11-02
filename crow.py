@@ -44,7 +44,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.25.0'
+APP_VERSION = '0.25.1'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -411,7 +411,7 @@ ACTION_MENU={'rest':'quiet rest in the cabin','sleep':'sleep (until 07:00 at nig
     'read':'look something up on Wikipedia, or read at leisure','inspect':'examine one object, tree or plant closely',
     'gather':'carry 3 kg of wood or stone into inventory','fell_tree':'fell a standing tree with the axe; timber stays at the site',
     'craft':'carve a small piece from 1 kg wood with a measured outcome','plan':'draft a construction blueprint (builds nothing)',
-    'construct':'work on an existing blueprint if materials allow','move_object':'carry a portable object somewhere',
+    'construct':'work on an existing blueprint if materials allow','move_object':'carry one of the loose objects that can be picked up somewhere else',
     'resume_work':'resume one of your paused jobs with its saved progress',
     'browse':'use the terminal at the internet café to search the wider web and read pages',
     'trade':'go to the trading post: buy, sell, do a posted job or a favour you agreed with Edda, or ask for something',
@@ -599,9 +599,13 @@ def parameter_request(d):
                 {'areas':ecology.area_summary(),'daylight':round(state.get('daylight',0),2)})
     if a=='move_object':
         portable=[i for i,o in objects.items() if o.get('portable')]
-        return ('Choose a portable object and destination in metres (x east, z south; clearing -25..25).',
-                {'object_id':{'type':'string','enum':portable},'destination_x':{'type':'number'},'destination_z':{'type':'number'}},
-                {'portable':[{k:objects[i][k] for k in ['id','name','x','z']} for i in portable[-8:]]})
+        # 'none' (v0.25.1): if none of the things that can be picked up is what he meant, nothing moves.
+        # Before, the list forced a choice, so carrying 'the crates' moved a carving or the chair instead.
+        return ('Choose which of these things that can be picked up to carry, and where to put it down, in metres '
+                '(x east, z south; clearing -25..25). These are the only loose objects that can be carried; '
+                'if none of them is what you meant, choose none and nothing is moved.',
+                {'object_id':{'type':'string','enum':portable+['none']},'destination_x':{'type':'number'},'destination_z':{'type':'number'}},
+                {'can_be_picked_up':[{k:objects[i][k] for k in ['id','name','x','z']} for i in portable[-20:]]})
     if a=='construct':
         open_plans=[p for p in world['plans'] if p['status'] in ['proposed','in_progress']]
         return ('Choose which blueprint to work on. Work only proceeds if inventory covers its bill; it may take several sessions.',
@@ -964,7 +968,13 @@ def finish_action(geometry=None):
                                      execute=lambda parts:life.build_parts(state,d.get('plan_id'),parts));description=result['text']
         if plan:life.build_practice(state,plan['parts'],plan.get('work_done_minutes',0)-before)
     elif a=='move_object':
-        result=world_state.move(state,d.get('object_id',''),d.get('destination_x',0),d.get('destination_z',0));description=result['text']
+        if d.get('object_id') in ('none','',None):
+            names=[o['name'] for o in world_state.ensure(state)['objects'].values() if o.get('portable')]
+            description=('Nothing was carried: none of the things that can be picked up was the one meant. '
+                         'The loose objects here that can be picked up and carried are: '+', '.join(names)+'.')
+            result={'success':False,'text':description}
+        else:
+            result=world_state.move(state,d.get('object_id',''),d.get('destination_x',0),d.get('destination_z',0));description=result['text']
     elif a=='interact':
         result=interactions.execute(state,d,p['duration']);description=result['text']
     elif a=='inspect':
