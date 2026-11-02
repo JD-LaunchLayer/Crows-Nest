@@ -370,13 +370,26 @@ def observe(state, area, focus, doy, daylight, limit=5, lamp=False):
         for k in list(eco['seen'])[:100]:
             del eco['seen'][k]
     new = sum(f['new'] for f in findings)
+    # The honest edge of what can be seen (v0.21.6). Stated plainly, with no suggestion of what to do.
+    edge, edge_text = None, ''
+    if named and not focused:
+        edge = {'kind': 'not_here', 'target': ', '.join(sorted(named)), 'place': area, 'focus': focus[:160]}
+        edge_text = f' {", ".join(sorted(named))} is not in {a["name"]}.'
+    elif focused and findings and not new:
+        target = ', '.join(sorted(named))
+        edge = {'kind': 'seen_all', 'target': target, 'place': area, 'focus': focus[:160]}
+        edge_text = (f' Everything that can be made out about {target} by eye has been seen before;'
+                     f' nothing about it has changed since.')
+    elif want and not named and not any(want & _terms(f['text']) for f in findings):
+        edge = {'kind': 'not_found', 'target': '', 'place': area, 'focus': focus[:160]}
+        edge_text = ' Nothing matching what he was looking for could be made out here.'
     text = (f'Observed {a["name"]}' + (f' (ground light about {round(light * 100)}% of open sky). ' if light is not None else '. ') +
             ' '.join(f['text'] for f in findings) +
-            ('' if findings else ' Nothing distinct stood out.'))
+            ('' if findings else ' Nothing distinct stood out.') + edge_text)
     # Whether each detail was new is kept for bookkeeping (consolidation evidence, reports) but is no
     # longer told to him: a running novelty score was our yardstick, and it made watching feel like progress.
     return {'success': True, 'text': text, 'findings': findings, 'area': area, 'ground_light': light,
-            'new_details': new, 'focus': focus[:160]}
+            'new_details': new, 'focus': focus[:160], 'edge': edge}
 
 
 def inspect(state, ident, doy, daylight, lamp=False):
@@ -396,9 +409,32 @@ def inspect(state, ident, doy, daylight, lamp=False):
         x, z = plant['x'], plant['z']
         if not facts:
             facts = [(ident, f'Nothing of {plant["species"]} is visible above ground at ({x:.0f}, {z:.0f}) at this time of year.')]
+    for _, f in facts:
+        eco['seen'][_key(f)] = eco['seen'].get(_key(f), 0) + 1
     text = f'Inspected {ident} at ({x:.0f}, {z:.0f}); ground light {round(ground_light(state, x, z, doy) * 100)}% of open sky. ' + \
         ' '.join(f for _, f in facts)
-    return {'success': True, 'text': text, 'findings': [{'about': a, 'text': f} for a, f in facts]}
+    return {'success': True, 'text': text, 'findings': [{'about': a, 'text': f} for a, f in facts],
+            'seen_key': ' '.join(sorted(_key(f) for _, f in facts))}
+
+
+def note_gap(state, edge, at, action):
+    """For the world builder only: where Crow looked for more than the world holds.
+
+    Never shown to him or used in his decisions. Repeats of the same gap are counted."""
+    if not edge:
+        return None
+    gaps = state.setdefault('world_gaps', [])
+    key = (edge['kind'], edge.get('target') or '', ' '.join(sorted(_terms(edge.get('focus', ''))))[:120])
+    gap = next((g for g in gaps if (g['kind'], g['target'], g['key']) == key), None)
+    if gap is None:
+        gap = {'kind': edge['kind'], 'target': key[1], 'key': key[2], 'first': at, 'times': 0, 'focuses': []}
+        gaps.append(gap)
+    gap.update(last=at, times=gap['times'] + 1, place=edge.get('place'), action=action)
+    f = edge.get('focus', '')
+    if f and f not in gap['focuses']:
+        gap['focuses'] = (gap['focuses'] + [f])[-5:]
+    state['world_gaps'] = sorted(gaps, key=lambda g: g['last'])[-80:]
+    return gap
 
 
 def view(state, doy):

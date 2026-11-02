@@ -922,3 +922,21 @@ that tree's close detail (bark, branching, buds and leaf form, written per speci
 from British natural history) and nothing about its neighbours. Before, only
 species, height, leaves and seeds existed, so a named look filled up with other
 trees and he read that as drifting.
+
+## v0.21.6 — the honest edge, and where the world ran out
+
+He can always want more than the world holds. Now he is told plainly when he
+reaches the edge, with no suggestion of what to do about it:
+
+- inspecting anything (tree, plant, building, decoration, tool, possession) that
+  shows exactly what it showed last time adds "Everything that can be made out
+  about X by eye has been seen before; nothing about it has changed since";
+- a look focused on a named tree whose details he has all seen says the same;
+- a look for a named thing that is somewhere else says it is not there;
+- a look for something the place does not hold says nothing matching could be
+  made out.
+
+The same moments, plus questions the library or web left unanswered, are counted
+in `world_gaps` for you as world builder: in the journal under "Where the world ran
+out", or `python3 tools/world_gaps.py`. They are never shown to him or used in his
+decisions. Use them to decide what to add to his world next.

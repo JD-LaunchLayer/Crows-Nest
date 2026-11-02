@@ -38,7 +38,7 @@ export function createDiary({document}){
  }
  function update(s){
   if(!$('diary'))return;
-  const key=JSON.stringify([s.beliefs&&s.beliefs.length,s.beliefs&&s.beliefs.at(-1),s.stories&&s.stories.length,s.stories&&s.stories.at(-1)&&s.stories.at(-1).count,s.threads,s.promises,s.keeper,s.trading,s.possessions,s.decisions,s.pending&&s.pending.start,(s.diary||[]).length,s.interests,s.interest_history,(s.personality_notes||[]).length,s.affect,s.current_intention,s.clock&&s.clock.date]);
+  const key=JSON.stringify([s.beliefs&&s.beliefs.length,s.beliefs&&s.beliefs.at(-1),s.stories&&s.stories.length,s.stories&&s.stories.at(-1)&&s.stories.at(-1).count,s.threads,s.promises,s.keeper,s.trading,s.world_gaps,s.possessions,s.decisions,s.pending&&s.pending.start,(s.diary||[]).length,s.interests,s.interest_history,(s.personality_notes||[]).length,s.affect,s.current_intention,s.clock&&s.clock.date]);
   if(key===last)return;last=key;
   if(s.clock)$('diaryDate').textContent=`${s.clock.date} · ${s.clock.time}${s.twin?' · twin clock':s.crow_clock?' · Crow\'s own time':' · UK time'}`;
   $('diaryBadge').textContent=s.twin?'CROW · TIME-LAPSE TWIN':'CROW\'S JOURNAL';
@@ -69,6 +69,13 @@ export function createDiary({document}){
     if((t.requests||[]).length){trade.append(el('p','Things he has asked the post to stock:'));for(const r of [...t.requests].reverse().slice(0,8))trade.append(el('p',`“${r.item}”${r.times>1?` (asked ${r.times} times)`:''}`,'thought'));}
     else trade.append(el('p','He has not asked for anything to be stocked.','muted'));
     const last=(t.ledger||[]).at(-1);if(last)trade.append(el('p','Last at the post: '+last.text,'muted'));}}
+  const gapBox=$('diaryGaps');if(gapBox){gapBox.replaceChildren();
+   const WORDS={seen_all:'Had seen everything there',not_found:'Looked for something not there',not_here:'Looked in the wrong place for',unanswered:'Question not answered by the'};
+   const gaps=[...(s.world_gaps||[])].sort((a,b)=>b.times-a.times||String(b.last).localeCompare(String(a.last))).slice(0,12);
+   for(const g of gaps){const what=g.kind==='unanswered'?`${WORDS[g.kind]} ${g.target}`:`${WORDS[g.kind]||g.kind}${g.target?': '+g.target.replace('_',' '):''}`;
+    gapBox.append(el('p',`${what} · ${g.times} time${g.times===1?'':'s'} · last ${String(g.last||'').slice(0,16).replace('T',' ')}`));
+    for(const f of (g.focuses||[]).slice(-2))gapBox.append(el('p','“'+f+'”','thought'));}
+   if(!gaps.length)gapBox.append(el('p','He has not reached the edge of anything yet.','muted'));}
   const people=$('diaryPeople');if(people){people.replaceChildren();const k=s.keeper;
    const talk=[...(s.memories||[])].reverse().find(m=>m.world_result&&m.world_result.conversation);
    if(talk){people.append(el('p',`Last talked: ${(talk.at||'').slice(0,16).replace('T',' ')}`,'muted'));

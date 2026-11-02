@@ -22,6 +22,7 @@ import json
 import math
 import os
 import re
+import hashlib
 import threading
 import time
 import urllib.request
@@ -38,7 +39,7 @@ ACCESS_TOKEN = None
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.21.5'
+APP_VERSION = '0.21.6'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -907,6 +908,16 @@ def finish_action(geometry=None):
         if obj and obj.get('parts'):
             result['properties']=interactions.properties(obj)
             description+=' Physical properties: '+json.dumps(result['properties'],ensure_ascii=False)
+        # The honest edge, for anything he can examine (v0.21.6): if what can be made out is exactly what he
+        # found last time, he is told so plainly. Ground-light figures are left out of the comparison.
+        if result.get('success') and 'Too dark' not in description:
+            seen=state.setdefault('inspected',{})
+            fingerprint=result.get('seen_key') or hashlib.sha1(re.sub(r'ground light \d+%','',description).encode()).hexdigest()
+            if seen.get(ident)==fingerprint:
+                description+=f' Everything that can be made out about {ident.replace("_"," ")} by eye has been seen before; nothing about it has changed since.'
+                ecology.note_gap(state,{'kind':'seen_all','target':ident,'place':'inspect','focus':''},now().isoformat(),a)
+            seen[ident]=fingerprint
+            if len(seen)>400:seen.pop(next(iter(seen)))
     elif a in ['rest','sleep']:
         description='Finished sleeping in his cabin.' if a=='sleep' else 'Finished a quiet rest in his cabin.'
     elif a=='explore':
@@ -956,6 +967,7 @@ def finish_action(geometry=None):
                                now().timetuple().tm_yday,state.get('daylight',0),lamp=bool(state.get('possessions',{}).get('lantern')))
         description=result['text']
         new_evidence=bool(result.get('new_details'))
+        ecology.note_gap(state,result.get('edge'),now().isoformat(),a)
     else:description='Spent quiet time reflecting in his cabin.'
     tool={'fell_tree':'axe','gather':'axe','craft':'carving_knife'}.get(a)
     if tool and state.get('tool_condition',{}).get(tool,1)<.6:
@@ -1074,6 +1086,11 @@ def reflect(memory):
         if 'source' in memory:
             reading_journal.appraise(state,memory,result,ROOT)
         story.settle(state,memory,result.get('answer_status'))
+        if result.get('answer_status')=='not_answered' and memory.get('action') in ('read','browse'):
+            # For the world builder: a question the library or the web did not answer for him.
+            question=memory.get('research_question') or (memory.get('decision') or {}).get('research_question') or memory.get('intention','')
+            ecology.note_gap(state,{'kind':'unanswered','target':'library' if memory['action']=='read' else 'web',
+                                    'place':memory['action'],'focus':str(question)[:160]},appraisal['at'],memory['action'])
         story.update_beliefs(state,appraisal['at'])
         story.record_feel(state,memory,signal['valence'],result.get('answer_status'))
         place=memory.get('world_result',{}).get('area') if isinstance(memory.get('world_result'),dict) else None
