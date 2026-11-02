@@ -974,3 +974,10 @@ from ("not", "other than", "instead of", "away from"…) are now ignored. His ac
 list also states a rule of his world he had to guess at: every action includes
 walking to where it happens, so there is no separate walking step (he had been
 choosing "explore" to walk to a tree and gathering wood instead).
+
+## v0.22.2 — name boards instead of floating labels
+
+Place names were sprites that turned to face the viewer and showed through walls.
+They are now fixed, two-sided boards: over the doors of the cabin, reading cabin,
+trading post and café, and on posts at the archery range, workbench, woodland and
+garden. Scenery only; Crow's world is unchanged.

@@ -122,8 +122,29 @@ for(let i=0;i<65;i++){const a=i*2.39996,r=23+(i%7)*1.1;tree(Math.cos(a)*r,Math.s
 for(const [x,z,h]of [[17,10,5],[15,14,6],[20,12,5],[18,6,4],[-18,-9,5],[-20,-15,6]])tree(x,z,h);
 // Small details without textures or outside image services.
 for(let i=0;i<65;i++){let a=i*2.4,r=6+(i%11)*1.4;const x=Math.cos(a)*r,z=Math.sin(a)*r;if(Math.abs(x)<2||Math.abs(z)<2)continue;const stone=mesh(new T.DodecahedronGeometry(.13+(i%3)*.06,0),i%4?'#828771':'#b4ac7e',x,.13,z);stone.scale.y=.6;}
-function sign(text,x,z){const c=document.createElement('canvas');c.width=512;c.height=96;const q=c.getContext('2d');q.fillStyle='#283b2b';q.fillRect(0,0,512,96);q.fillStyle='#eee5c7';q.font='30px Georgia';q.textAlign='center';q.fillText(text,256,60);const texture=new T.CanvasTexture(c);const m=new T.Sprite(new T.SpriteMaterial({map:texture,depthTest:true}));m.position.set(x,2.9,z);m.scale.set(4,.75,1);scene.add(m)}
-sign('THE CABIN',-10,-6);sign('ARCHERY RANGE',10,-7);sign('WORKBENCH',0,11.5);sign('READING CABIN',-11,6.8);sign('WOODLAND',16,12);sign('INTERNET CAFÉ',9,-14);sign('TRADING POST',-3,-14);
+// Fixed name boards: over doorways, or on posts for open places. Readable from both sides,
+// they stay where they are mounted instead of turning to face the viewer.
+function sign(text,x,y,z,face,{w=2.6,h=.46,post=false}={}){
+ const c=document.createElement('canvas');c.width=512;c.height=Math.round(512*h/w);const q=c.getContext('2d');
+ q.fillStyle='#283b2b';q.fillRect(0,0,c.width,c.height);q.strokeStyle='#8a7550';q.lineWidth=6;q.strokeRect?.(3,3,c.width-6,c.height-6);
+ q.fillStyle='#eee5c7';let size=Math.round(c.height*.52);q.font=`${size}px Georgia`;while((q.measureText?.(text)?.width||0)>c.width*.86&&size>10){size-=2;q.font=`${size}px Georgia`;}
+ q.textAlign='center';q.textBaseline='middle';q.fillText(text,c.width/2,c.height/2+2);
+ const texture=new T.CanvasTexture(c);texture.colorSpace=T.SRGBColorSpace;
+ const face_=new T.MeshStandardMaterial({map:texture,emissiveMap:texture,emissive:0xffffff,emissiveIntensity:.18,roughness:1});
+ const g=new T.Group();g.position.set(x,y,z);g.rotation.y=Math.atan2(face[0]-x,face[1]-z);scene.add(g);
+ box(w+.08,h+.08,.05,'#4b3b27',0,0,0,g);
+ for(const side of [1,-1]){const m=new T.Mesh(new T.PlaneGeometry(w,h),face_);m.position.z=side*.03;if(side<0)m.rotation.y=Math.PI;g.add(m);}
+ if(post)for(const px of [-w/2+.12,w/2-.12])box(.1,y,.1,'#5b4a33',px,-y/2,0,g);
+ return g;
+}
+sign('THE CABIN',-10,2.72,-7.38,[-10,0],{w:2.4});
+sign('READING CABIN',-11,2.75,6.84,[-11,0],{w:2.8});
+sign('TRADING POST',-3,2.56,-14.78,[-3,0],{w:3.2});
+sign('INTERNET CAFÉ',9,2.56,-14.78,[9,0],{w:3.2});
+sign('ARCHERY RANGE',12.4,1.55,-8.4,[2,0],{w:2.2,h:.42,post:true});
+sign('WORKBENCH',-2.4,1.45,11.2,[0,0],{w:1.9,h:.4,post:true});
+sign('WOODLAND',13.8,1.55,8.1,[6,3.6],{w:1.8,h:.4,post:true});
+sign('GARDEN',-12.9,1.3,-14.7,[-8,-8],{w:1.5,h:.38,post:true});
 // Jointed placeholder elf: hips, knees, shoulders and elbows support sitting and reaching.
 const crow=new T.Group();scene.add(crow);
 // An original low-poly elf: slate cloak, teal tunic, rust sash, silver hair tied back.
