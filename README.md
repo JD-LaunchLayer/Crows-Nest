@@ -1041,3 +1041,27 @@ all but their first finding, and the plain "every shrub here has been seen befor
 statement, which came last, never reached him. Recent events now keep up to 700
 characters with the cloud model (320 locally; the context budget still trims), and
 edge statements come straight after "Observed …" so they are never the part lost.
+
+## v0.24.0 — a harp, sitting to think, honest exploring
+
+- **A harp at the trading post** (12 credit). A real 19-string lever harp: white
+  notes from C3 to G5, levers for sharps. `play_music` (only when he owns one) lets
+  him compose a piece (title, notes, tempo), revise one, practise one, or learn one
+  from sheet music. Music is written as NOTE+OCTAVE:BEATS (`C4:1 E4:0.5 R:1`).
+  Playing is measured: notes that go astray and how even the timing was. Both
+  improve with hours at the harp and with familiarity with a piece; fatigue and
+  fast, leaping or lever-heavy pieces make them worse. What he actually played is
+  kept. Edda knows how harps work (only if he asks; nothing prompts him).
+- **Sheet music** on a shelf in the reading cabin (public-domain tunes). Inspecting
+  it makes them learnable. Anything he finds elsewhere he can copy down in the same
+  notation.
+- **You can hear him.** "Sound off/on" beside Find Crow: while he plays, his
+  performance repeats softly. The journal's "His music" lists his pieces with
+  "As he last played it" and "As written" buttons. Sound is synthesised in the
+  browser; nothing is downloaded.
+- **Sitting to think.** Between activities he sits down where he is instead of
+  walking back to the centre, then gets up for the next thing. Walks go straight
+  to the destination unless something is in the way.
+- **Exploring does what it says.** It walks him through a part of the woods he
+  chooses, noticing a few things (what he has not recorded first), and picks up a
+  little loose wood. Before, it only picked up wood.

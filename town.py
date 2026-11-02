@@ -39,6 +39,7 @@ STARTING_STOCK = {
     'hazel_sapling': {'name': 'Young hazel tree, bare-rooted', 'price': 2, 'qty': 4, 'effect': 'possession:hazel_sapling'},
     'birch_sapling': {'name': 'Young silver birch, bare-rooted', 'price': 2, 'qty': 3, 'effect': 'possession:birch_sapling'},
     'oak_sapling': {'name': 'Young oak, bare-rooted', 'price': 3, 'qty': 2, 'effect': 'possession:oak_sapling'},
+    'harp': {'name': 'Small harp in a cloth case', 'price': 12, 'qty': 1, 'effect': 'possession:harp'},
 }
 RESTOCK_DAYS = 7  # Edda's delivery comes once a week on Crow's own calendar, topping shelves back up to these levels
 
@@ -131,6 +132,16 @@ def ensure(state):
     post['seeds_added'] = True
     for k, v in STARTING_STOCK.items():  # new lines on the board for older saves (v0.23)
         post['stock'].setdefault(k, dict(v))
+    if not world.get('sheet_music_added'):
+        import music  # a shelf of sheet music in the reading cabin (v0.24)
+        world['objects'].setdefault('sheet_music', {
+            'id': 'sheet_music', 'name': 'Shelf of sheet music', 'kind': 'furniture', 'x': -13.6, 'z': 9.2, 'portable': False,
+            'revision': 0, 'parts': [_p('post', 0, .55, 0, .06, 1.1, .06, '#5b4a33'), _p('desk', 0, 1.15, 0, .55, .04, .4, '#8a7350')],
+            'details': ['A narrow shelf and a slanted reading desk holding sheets of music.',
+                        'The music is written as note names with how long each lasts, for example "C4:1 E4:0.5 G4:0.5 R:1".',
+                        'The sheets are titled: ' + '; '.join(t['title'] for t in music.SONGBOOK) + '.']})
+        world['sheet_music_added'] = True
+        world['revision'] += 1
     return post
 
 
@@ -497,6 +508,14 @@ def apply_stock_orders(state, root, at):
 
 # How owned things look when he examines them. No uses are stated.
 POSSESSION_LOOKS = {
+    'harp': ('A small harp of pale wood, about knee height, in a cloth case. It has 19 strings of graded length, '
+             'a small lever near the top of each string, and a metal tuning key in a pocket of the case.'),
+    'salad_seeds': 'A paper packet of tiny pale seeds.', 'radish_seeds': 'A paper packet of round brown seeds.',
+    'seed_potatoes': 'A small sack of potatoes with short purple sprouts.', 'broad_bean_seeds': 'A packet of large flat beans.',
+    'garlic_bulbs': 'Two papery garlic bulbs.', 'onion_sets': 'A net of tiny onions.',
+    'hazel_sapling': 'A knee-high hazel whip with bare roots wrapped in damp sacking.',
+    'birch_sapling': 'A slender young birch with bare roots wrapped in damp sacking.',
+    'oak_sapling': 'A small young oak with bare roots wrapped in damp sacking.',
     'lantern': 'A brass and glass oil lantern with a wick, a small oil reservoir and a wire handle.',
     'whetstone': 'A flat grey stone about the length of a hand, fine-grained and smooth, slightly hollowed in the middle.',
     'seeds': 'A paper packet of small dry seeds of mixed sizes.',
@@ -515,6 +534,11 @@ ITEM_KNOWLEDGE = {
     'hazel_sapling': 'a young hazel, about knee high: plant it in open ground in the dormant season, November to March; it grows quickly and could be cut for poles or firewood in about seven years',
     'birch_sapling': 'a young birch: plant November to March; fast growing, ready to fell in perhaps six or seven years',
     'oak_sapling': 'a young oak: plant November to March; slow, it takes a dozen years or more to make a felling-size tree, and lives for centuries',
+    'harp': ('a small lever harp, a good one for learning: 19 strings tuned to the white notes from low C to high G. You pluck '
+             'with the pads of the fingers, not the nails. Each string is one note; the little lever at the top of a string '
+             'raises it half a step, which is how you get sharps. Tunes are written as note names with how long each lasts; '
+             'beginners start with simple folk tunes and get steadier with practice. Fast tunes, big jumps and lots of lever '
+             'changes are harder. Music for it can be copied from sheets, made up, or found written down somewhere'),
     'whetstone': 'for sharpening blades: drawn along an axe or carving knife it restores a dulled edge; dull blades make chopping slow and carving rough',
 }
 TOOLS = {'axe', 'carving_knife'}

@@ -1,7 +1,7 @@
 import * as T from '/vendor/three.module.js';
 import {installTouchControls} from '/mobile_controls.js';
 import {createSky} from '/sky.js';
-import {createJournal} from '/journal.js';import {buildVillage} from '/village.js';
+import {createJournal} from '/journal.js';import {buildVillage} from '/village.js';import {createPlayer} from '/music_player.js';
 import {createLifeView} from '/life_view.js';
 import {createDiary} from '/diary_view.js';
 const $=id=>document.getElementById(id),txt=(id,v)=>$(id).textContent=v;
@@ -13,7 +13,7 @@ let accessToken=tokenParams.get('token')||globalThis.sessionStorage?.getItem('cr
 if(tokenParams.has('token')){globalThis.sessionStorage?.setItem('crow-access-token',accessToken);globalThis.history?.replaceState(null,'',globalThis.location.pathname);}
 async function apiFetch(url,options={}){return fetch(url,{...options,headers:{...(options.headers||{}),...(accessToken?{'Authorization':'Bearer '+accessToken}:{})}})}
 const journal=createJournal({document,apiFetch});
-const lifeView=createLifeView({document});const diary=createDiary({document});
+const lifeView=createLifeView({document});const player=createPlayer();const diary=createDiary({document,player});
 const holder=$('view'),scene=new T.Scene();scene.background=new T.Color('#b7c6b0');scene.fog=new T.Fog('#b7c6b0',24,65);
 let renderer;try{renderer=new T.WebGLRenderer({antialias:true,powerPreference:'low-power'});}catch(e){txt('loading','3D graphics could not start. Check Firefox hardware acceleration. '+e.message);throw e;}
 renderer.setPixelRatio(Math.min(devicePixelRatio,globalThis.matchMedia?.('(pointer:coarse)').matches?1:1.5));renderer.shadowMap.enabled=true;renderer.shadowMap.type=T.PCFSoftShadowMap;holder.prepend(renderer.domElement);
@@ -185,6 +185,9 @@ const heldLantern=new T.Group();elbows[0].add(heldLantern);heldLantern.position.
 mesh(new T.CylinderGeometry(.06,.07,.14,6),'#b08a3c',0,-.07,0,heldLantern);mesh(new T.SphereGeometry(.045,8,6),'#ffd27a',0,-.07,0,heldLantern);
 const lanternLight=new T.PointLight(0xffc56b,0,9,1.6);lanternLight.position.set(0,-.07,0);heldLantern.add(lanternLight);
 const heldAxe=new T.Group();box(.055,.55,.055,'#937449',0,0,0,heldAxe);box(.30,.14,.07,'#a8afaa',.10,.21,0,heldAxe);elbows[1].add(heldAxe);heldAxe.position.set(0,-.29,.08);heldAxe.visible=false;
+const heldHarp=new T.Group();crow.add(heldHarp);heldHarp.position.set(.05,.62,.34);heldHarp.rotation.y=Math.PI/2;
+box(.05,.62,.05,'#c9b48a',-.16,.3,0,heldHarp);box(.36,.05,.05,'#c9b48a',.02,.6,0,heldHarp);const harpNeck=box(.05,.5,.05,'#b89c6e',.2,.36,0,heldHarp);harpNeck.rotation.z=-.5;
+for(let i=0;i<7;i++)box(.006,.12+i*.06,.006,'#eee6cf',-.12+i*.045,.3+i*.03,0,heldHarp);heldHarp.visible=false;
 const bow=mesh(new T.TorusGeometry(.47,.025,4,12,Math.PI),'#b09a68',.48,1.14,-.2,crow);bow.rotation.z=-Math.PI/2;
 const heldBook=new T.Group();heldBook.position.set(0,1.05,.44);heldBook.rotation.x=.28;crow.add(heldBook);heldBook.visible=false;
 for(const x of [-.17,.17]){box(.34,.025,.43,'#79523c',x,0,0,heldBook);box(.30,.045,.39,'#eee4c7',x,.033,0,heldBook)}
@@ -234,9 +237,20 @@ function targetFor(d){
  }
  return null;
 }
+// Walk straight there unless something solid is in the way; then go round by the green as before.
+function route(to){
+ const from=crow.position,dx=to.x-from.x,dz=to.z-from.z,len=Math.hypot(dx,dz);
+ for(let k=1;k<len/.4;k++){const t=k*.4/len;if(t*len<.9||len-t*len<.9)continue;const x=from.x+dx*t,z=from.z+dz*t;
+  if(obstacles.some(o=>Math.abs(x-o.x)<o.w&&Math.abs(z-o.z)<o.d))return [walk(new T.Vector3(0,0,0)),walk(to)];}
+ return [walk(to)];
+}
 function beginDesired(){
+ const wasPondering=anim.activeAction==='ponder'&&anim.floor>0;
  anim.returning=false;anim.seated=0;anim.floor=0;
  const d=anim.desired;if(!d)return;
+ // Between activities he is choosing what to do next: he sits down where he is rather than heading off (v0.24).
+ if(!d.pending&&!d.twin&&!anim.snap){anim.activeAction='ponder';anim.steps=[wait('ponderdown',1.1),wait('ponder',Infinity)];return}
+ const rise=wasPondering?[wait('ponderup',.9)]:[];
  if(d.pending&&d.action==='read'){readingPlan();return}
  anim.activeAction=d.pending?d.action:'idle';
  const pose=d.pending&&d.action==='interact'&&d.posture?(d.posture.verb==='sit'?'objectSit':'objectLie'):(d.pending?d.action:'idle');
@@ -249,8 +263,9 @@ function beginDesired(){
  // The twin's clock outruns any walk, so its view shows him where he is rather than on the way there.
  // Opening the page mid-activity shows him where he already is; the twin's clock outruns any walk.
  if(d.twin||anim.snap){anim.snap=false;crow.position.copy(place);anim.steps=[wait(pose,Infinity)];return}
- anim.steps=toBed?[walk(new T.Vector3(0,0,0)),walk(stations.cabin),walk(place),wait(d.action,Infinity)]
-  :[walk(new T.Vector3(0,0,0)),walk(place),wait(pose,Infinity)];
+ if(wasPondering){anim.seated=1;anim.floor=1;}
+ anim.steps=toBed?[...rise,...route(stations.cabin),walk(place),wait(d.action,Infinity)]
+  :[...rise,...route(place),wait(pose,Infinity)];
 }
 function setActivity(data){
  const key=`${data.decisions}:${Boolean(data.pending)}`;if(key===anim.key)return;
@@ -305,6 +320,7 @@ $('find').onclick=()=>{const p=crow.position;if(p.x<-7&&p.x>-15&&p.z>6&&p.z<13){
 $('toggle').onclick=async()=>{const b=$('toggle');b.disabled=true;try{const r=await apiFetch('/api/toggle',{method:'POST',headers:{'X-Crow':'local'}});if(!r.ok)throw Error('Could not change pause state');await refresh()}catch(e){txt('error',e.message)}finally{b.disabled=false}};
 const touchInput=typeof $('touchPad').addEventListener==='function'?installTouchControls({canvas:renderer.domElement,pad:$('touchPad'),knob:$('stickKnob'),onLook:(dx,dy)=>{yaw-=dx;pitch=T.MathUtils.clamp(pitch-dy,-1.1,1.1)}}):{forward:0,right:0};
 $('mobileFind').onclick=()=>$('find').onclick();
+if($('sound'))$('sound').onclick=()=>{player.setEnabled(!player.enabled);$('sound').textContent=player.enabled?'Sound on':'Sound off';if(player.enabled&&s)player.follow(s);};
 // Tab opens his journal; Escape closes it. The side panel keeps what is happening now.
 addEventListener('keydown',e=>{if(e.code==='Tab'){e.preventDefault();diary.toggle()}else if(e.code==='Escape')diary.open(false)});
 if($('diaryClose'))$('diaryClose').onclick=()=>diary.open(false);if($('mobileDiary'))$('mobileDiary').onclick=()=>diary.toggle();
@@ -325,7 +341,7 @@ if(clientVersion&&s.runtime.version&&clientVersion!==s.runtime.version){globalTh
 const maintenance=s.runtime.maintenance||{status:'idle'};if(updateRequested&&maintenance.status==='complete'){globalThis.location?.reload?.();return;}const updating=['checking','backing_up','pulling','restarting'].includes(maintenance.status);
 if($('updateCrow')){ $('updateCrow').disabled=updating||!s.maintenance_enabled; $('updateCrow').textContent=updating?'Updating…':'Back up and update';txt('updateStatus',maintenance.message||(s.maintenance_enabled?'Ready. Your private life data stays on the PC.':'Start Crow with --lan from its Git checkout to enable authenticated updates.'));}
 if(['complete','up_to_date','failed','interrupted'].includes(maintenance.status))updateRequested=false;
-txt('toggle',s.paused?'Begin life':'Pause');{const visitor=s.viewer==='visitor';$('toggle').hidden=visitor;const up=$('updateCrow')?.closest?.('section');if(up)up.hidden=visitor;document.body?.classList?.toggle('visitor',visitor);}txt('clock',`${s.clock.date} · ${s.clock.time} · ${s.twin?'twin clock':s.crow_clock?`Crow's time${s.crow_clock.scale>1?' ('+s.crow_clock.scale+'× speed)':''}`:'UK time'}`);txt('status',s.runtime.status+(s.last_seconds!==null?' · Last choice '+s.last_seconds+'s':''));txt('error',s.last_error);$('toggle').disabled=updating;txt('activity',({eat:'Eating',drink:'Drinking',rest:'Resting',practise:'Practising archery',explore:'Exploring',craft:'Making a carving',read:'Reading Wikipedia',sleep:'Sleeping',observe:'Watching the woodland',reflect:'Reflecting',gather:'Gathering materials',plan:'Preparing a construction plan',construct:'Constructing',move_object:'Carrying and placing an object',inspect:'Inspecting an object',fell_tree:'Felling a tree',interact:'Working with objects',browse:'Browsing the web',talk:'Talking with Edda',trade:'At the trading post',use_item:'Using an item',garden:'Working in the garden',plant_tree:'Planting a tree',resume_work:'Returning to his work'})[s.action]||s.action);txt('reason',s.reason);$('energy').value=s.energy;txt('resources',`Wood: ${s.materials} kg · Stone: ${s.stone||0} kg · Archery sessions: ${s.skills.archery} · Carvings: ${s.skills.craft}`);txt('intention',s.current_intention||'Crow has not expressed an intention yet.');
+txt('toggle',s.paused?'Begin life':'Pause');{const visitor=s.viewer==='visitor';$('toggle').hidden=visitor;const up=$('updateCrow')?.closest?.('section');if(up)up.hidden=visitor;document.body?.classList?.toggle('visitor',visitor);}txt('clock',`${s.clock.date} · ${s.clock.time} · ${s.twin?'twin clock':s.crow_clock?`Crow's time${s.crow_clock.scale>1?' ('+s.crow_clock.scale+'× speed)':''}`:'UK time'}`);txt('status',s.runtime.status+(s.last_seconds!==null?' · Last choice '+s.last_seconds+'s':''));txt('error',s.last_error);$('toggle').disabled=updating;txt('activity',({eat:'Eating',drink:'Drinking',rest:'Resting',practise:'Practising archery',explore:'Exploring',craft:'Making a carving',read:'Reading Wikipedia',sleep:'Sleeping',observe:'Watching the woodland',reflect:'Reflecting',gather:'Gathering materials',plan:'Preparing a construction plan',construct:'Constructing',move_object:'Carrying and placing an object',inspect:'Inspecting an object',fell_tree:'Felling a tree',interact:'Working with objects',browse:'Browsing the web',talk:'Talking with Edda',trade:'At the trading post',use_item:'Using an item',garden:'Working in the garden',plant_tree:'Planting a tree',play_music:'Playing the harp',resume_work:'Returning to his work'})[s.action]||s.action);txt('reason',s.reason);$('energy').value=s.energy;txt('resources',`Wood: ${s.materials} kg · Stone: ${s.stone||0} kg · Archery sessions: ${s.skills.archery} · Carvings: ${s.skills.craft}`);txt('intention',s.current_intention||'Crow has not expressed an intention yet.');
 setActivity(s);
 $('feed').replaceChildren();for(const m of s.memories.slice(-16).reverse())entry($('feed'),m.event,[m.at?new Date(m.at).toLocaleString('en-GB',{timeZone:'Europe/London'}):`Earlier prototype · Day ${m.day} · ${m.time}`,m.intention?'Aim: '+m.intention:'',m.reason?'Why: '+m.reason:'',m.next_step?'Tentative next step: '+m.next_step:''].filter(Boolean).join(' · '));
 $('wishes').replaceChildren();for(const w of s.wishes.slice(-10).reverse())entry($('wishes'),w.text,`${w.reason} · First expressed day ${w.day} · ${w.mentions} mention(s)`);if(!s.wishes.length)entry($('wishes'),'No wishes expressed yet.');
@@ -336,7 +352,7 @@ $('longterm').replaceChildren();for(const m of s.long_term.slice(-6).reverse())e
 $('reading').replaceChildren();const source=s.pending?.reading;if(source){const a=document.createElement('a');a.textContent=source.title;a.href=source.url;a.target='_blank';a.rel='noopener noreferrer';$('reading').append(a)}
 const pending=s.pending;txt('remaining',pending?(pending.decision?.action==='read'&&pending.duration===0?`${s.paused?'Paused · ':''}Quick research · finishes after processing the excerpt`:`${s.paused?'Paused · ':''}${Math.ceil(pending.remaining/60)} min remaining · ${Math.round(pending.duration/60)} min session`):s.reflection_pending?'Processing this experience.':'Choosing the next activity.');
 journal.update(s);
-lifeView.update(s);diary.update(s);syncGarden(s.garden);edda.visible=Boolean(s.keeper&&s.built_world?.objects?.trading_post);const lit=Boolean(s.possessions?.lantern)&&s.daylight<.12;heldLantern.visible=lit;lanternLight.intensity=lit?6:0;
+lifeView.update(s);diary.update(s);player.follow(s);syncGarden(s.garden);edda.visible=Boolean(s.keeper&&s.built_world?.objects?.trading_post);const lit=Boolean(s.possessions?.lantern)&&s.daylight<.12;heldLantern.visible=lit;lanternLight.intensity=lit?6:0;
 $('creations').replaceChildren();for(const c of s.creations.slice(-8).reverse())entry($('creations'),c.name,`${c.shape} · Day ${c.day}`);if(s.built_world){syncBuiltWorld(s.built_world)}else{creations(s.creations)}syncEcology(s.ecology_view);lamp.intensity=s.action==='read'&&s.pending?15:(s.daylight<.2?8:1.5);
 const celestial=sky.update(new Date(s.clock.iso));if($('skyInfo'))txt('skyInfo',`Sun ${celestial.sun.altitude.toFixed(0)}° · Moon ${celestial.moon.altitude.toFixed(0)}° above horizon · Wickford`);
 if($('worldPlans')&&s.built_world){$('worldPlans').replaceChildren();for(const p of s.built_world.plans.slice(-5).reverse())entry($('worldPlans'),`${p.name} · ${p.status}`,`Plan ${p.id} · ${Object.entries(p.bill).map(([m,q])=>q+' kg '+m).join(', ')||'No new materials'} · ${p.work_done_minutes||0}/${p.minutes} min work`);$('worldObjects').replaceChildren();for(const o of Object.values(s.built_world.objects))entry($('worldObjects'),o.name,`${o.id} · (${o.x.toFixed(1)}, ${o.z.toFixed(1)}) · ${o.parts.length} parts`);txt('sourceStocks',Object.entries(s.built_world.sources).map(([m,v])=>`${m}: ${v.stock} kg remains`).join(' · '));}
@@ -356,6 +372,10 @@ if(step){
    const t=T.MathUtils.smoothstep(step.elapsed,0,step.duration);crow.position.lerpVectors(LIB.approach,LIB.seat,t);crow.rotation.y=Math.PI;anim.seated=t;
   }else if(step.pose==='sitfloor'){
    const t=T.MathUtils.smoothstep(step.elapsed,0,step.duration);anim.seated=t;anim.floor=t;crow.rotation.y=Math.PI;
+  }else if(step.pose==='ponderdown'||step.pose==='ponder'||step.pose==='play_music'){
+   const t=step.pose==='ponderdown'?T.MathUtils.smoothstep(step.elapsed,0,step.duration):1;anim.seated=t;anim.floor=t;
+  }else if(step.pose==='ponderup'){
+   const t=T.MathUtils.smoothstep(step.elapsed,0,step.duration);anim.seated=1-t;anim.floor=1-t;
   }else if(step.pose==='standfloor'){
    const t=T.MathUtils.smoothstep(step.elapsed,0,step.duration);anim.seated=1-t;anim.floor=1-t;
   }else if(step.pose==='stand'){
@@ -395,6 +415,9 @@ if(anim.pose==='inspect'&&!moving){headPivot.rotation.x=.38;arms[1].rotation.x=-
 if((anim.pose==='gather'||anim.pose==='garden')&&!moving){const bend=.5+Math.sin(anim.elapsed*1.4)*.25;arms[0].rotation.x=-bend;arms[1].rotation.x=-bend;headPivot.rotation.x=.3;}
 if(anim.pose==='craft'&&!moving){arms[1].rotation.x=-.8+Math.sin(anim.elapsed*4)*.12;elbows[1].rotation.x=-.5;headPivot.rotation.x=.18;}
 if(anim.pose==='interact'&&!moving){arms[1].rotation.x=-.8+Math.sin(anim.elapsed*3)*.12;elbows[1].rotation.x=-.5;headPivot.rotation.x=.18;}
+heldHarp.visible=anim.pose==='play_music'&&!moving;
+if(anim.pose==='play_music'&&!moving){arms[0].rotation.x=-.9+Math.sin(anim.elapsed*5)*.1;arms[1].rotation.x=-.75+Math.sin(anim.elapsed*4.3+1)*.12;elbows[0].rotation.x=-.6;elbows[1].rotation.x=-.7;headPivot.rotation.x=.15;}
+if(anim.pose==='ponder'&&!moving){headPivot.rotation.x=.12+Math.sin(anim.elapsed*.35)*.05;arms[1].rotation.x=-.5;elbows[1].rotation.x=-1.1;}
 if(anim.pose==='observe'&&!moving)headPivot.rotation.y=Math.sin(anim.elapsed*.2)*.35;else headPivot.rotation.y=0;
 crow.visible=true;if(inBed){headPivot.rotation.set(0,0,0);torso.scale.y=1+Math.sin(anim.elapsed*.9)*.02;}
 sky.frame();renderer.render(scene,camera);requestAnimationFrame(frame)}

@@ -1,7 +1,7 @@
 // His journal (Tab): a calmer, longer view of how Crow is, what he thinks, wants and holds.
 // Read-only. Everything shown comes from his saved state; the summary sentence is
 // assembled from those values by fixed rules, not written by a model.
-export function createDiary({document}){
+export function createDiary({document,player=null}){
  const $=id=>document.getElementById(id);let last='';
  function el(tag,text,cls){const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e;}
  function mood(v,a){
@@ -19,7 +19,7 @@ export function createDiary({document}){
  }
  const VERB={rest:'resting',sleep:'asleep',eat:'eating',drink:'drinking',observe:'watching the woodland',reflect:'thinking quietly',
   explore:'exploring',practise:'practising archery',read:'reading',inspect:'examining something',gather:'gathering materials',
-  fell_tree:'felling a tree',craft:'carving',plan:'drafting a plan',construct:'building',move_object:'carrying something',resume_work:'returning to his work',interact:'working with an object',browse:'browsing the web',talk:'talking with Edda',trade:'at the trading post',use_item:'using something',garden:'gardening',plant_tree:'planting a tree'};
+  fell_tree:'felling a tree',craft:'carving',plan:'drafting a plan',construct:'building',move_object:'carrying something',resume_work:'returning to his work',interact:'working with an object',browse:'browsing the web',talk:'talking with Edda',trade:'at the trading post',use_item:'using something',garden:'gardening',plant_tree:'planting a tree',play_music:'playing the harp'};
  function summary(s){
   const parts=[];const twin=s.twin;
   parts.push(s.pending?`He is ${VERB[s.action]||s.action}.`:'He is between activities.');
@@ -39,7 +39,7 @@ export function createDiary({document}){
  function update(s){
   latest=s;
   if(!$('diary'))return;
-  const key=JSON.stringify([s.beliefs&&s.beliefs.length,s.beliefs&&s.beliefs.at(-1),s.stories&&s.stories.length,s.stories&&s.stories.at(-1)&&s.stories.at(-1).count,s.threads,s.promises,s.keeper,s.trading,s.world_gaps,s.possessions,s.decisions,s.pending&&s.pending.start,(s.diary||[]).length,s.interests,s.interest_history,(s.personality_notes||[]).length,s.affect,s.current_intention,s.clock&&s.clock.date]);
+  const key=JSON.stringify([s.beliefs&&s.beliefs.length,s.beliefs&&s.beliefs.at(-1),s.stories&&s.stories.length,s.stories&&s.stories.at(-1)&&s.stories.at(-1).count,s.threads,s.promises,s.keeper,s.trading,s.world_gaps,s.music&&s.music.sessions,s.possessions,s.decisions,s.pending&&s.pending.start,(s.diary||[]).length,s.interests,s.interest_history,(s.personality_notes||[]).length,s.affect,s.current_intention,s.clock&&s.clock.date]);
   if(key===last)return;last=key;
   if(s.clock)$('diaryDate').textContent=`${s.clock.date} · ${s.clock.time}${s.twin?' · twin clock':s.crow_clock?' · Crow\'s own time':' · UK time'}`;
   $('diaryBadge').textContent=s.twin?'CROW · TIME-LAPSE TWIN':'CROW\'S JOURNAL';
@@ -70,6 +70,16 @@ export function createDiary({document}){
     if((t.requests||[]).length){trade.append(el('p','Things he has asked the post to stock:'));for(const r of [...t.requests].reverse().slice(0,8))trade.append(el('p',`“${r.item}”${r.times>1?` (asked ${r.times} times)`:''}`,'thought'));}
     else trade.append(el('p','He has not asked for anything to be stocked.','muted'));
     const last=(t.ledger||[]).at(-1);if(last)trade.append(el('p','Last at the post: '+last.text,'muted'));}}
+  const musicBox=$('diaryMusic');if(musicBox){musicBox.replaceChildren();const pieces=[...(s.music?.pieces||[])].reverse();
+   if(s.music&&pieces.length)musicBox.append(el('p',`${Math.round((s.music.hours||0)*10)/10} hours at the harp · ${s.music.sessions||0} sessions`,'muted'));
+   for(const pc of pieces.slice(0,10)){const box=el('div',undefined,'story');
+    box.append(el('p',`${pc.title}${pc.source==='composed'?' · his own':' · from '+pc.source+(pc.by&&pc.by!=='traditional'?' ('+pc.by+')':'')}`));
+    box.append(el('p',`played ${pc.times_played} time${pc.times_played===1?'':'s'}${pc.revisions?` · revised ${pc.revisions}×`:''}${pc.last_slips!=null?` · last time ${pc.last_slips} slip${pc.last_slips===1?'':'s'}, ${pc.last_timing}`:''}`,'muted'));
+    if(player){const row=el('p');
+     if(pc.last_played){const b=el('button','As he last played it','secondary');b.onclick=()=>{player.setEnabled(true);player.play(pc.last_played,pc.tempo)};row.append(b,document.createTextNode(' '));}
+     const w=el('button','As written','secondary');w.onclick=()=>{player.setEnabled(true);player.play(pc.notes,pc.tempo)};row.append(w);box.append(row);}
+    musicBox.append(box);}
+   if(!pieces.length)musicBox.append(el('p',s.possessions?.harp?'He has not played anything yet.':'He has no instrument.','muted'));}
   const gapBox=$('diaryGaps');if(gapBox){gapBox.replaceChildren();
    const WORDS={seen_all:'Had seen everything there',not_found:'Looked for something not there',not_here:'Looked in the wrong place for',unanswered:'Question not answered by the'};
    const gaps=[...(s.world_gaps||[])].sort((a,b)=>b.times-a.times||String(b.last).localeCompare(String(a.last))).slice(0,12);
@@ -133,6 +143,7 @@ export function createDiary({document}){
   const lastTalk=[...(s.memories||[])].reverse().find(m=>m.world_result&&m.world_result.conversation);if(lastTalk)L.push('Last talk: '+cut(lastTalk.world_result.conversation.map(c=>c.who+': '+c.text).join(' / '),400));
   L.push('','GARDEN');for(const b of (s.garden?.beds||[]))L.push(`- bed ${b.n}: ${b.crop||'empty'}${b.item?' ('+b.item+')':''} growth ${Math.round((b.growth||0)*100)}% health ${Math.round((b.health??1)*100)}%`);
   L.push('','WHERE THE WORLD RAN OUT (top)');for(const g of [...(s.world_gaps||[])].sort((a,b)=>b.times-a.times).slice(0,8))L.push(`- ${g.kind} ${g.target||''} ×${g.times}: ${cut((g.focuses||[]).at(-1)||'',120)}`);
+  if(s.music?.pieces?.length){L.push('','MUSIC',`${(s.music.hours||0).toFixed(1)} h at the harp`);for(const pc of s.music.pieces.slice(-5))L.push(`- ${pc.title} (${pc.source}) ×${pc.times_played}, last slips ${pc.last_slips??'-'}`);}
   const tr=(s.practical?.trials||[]).at(-1);if(tr)L.push('','LAST CARVING',`${tr.method_id} · error ${tr.actual_error_mm} mm vs ${tr.target_error_mm} mm · ${tr.goal_met?'met':'not met'}`);
   const ar=(s.practical?.archery||[]).at(-1);if(ar)L.push('LAST ARCHERY',`${ar.on_target}/12 on target, ${ar.in_gold} gold, mean ${ar.mean_cm_from_centre} cm`);
   return L.join('\n');

@@ -34,7 +34,7 @@ def _hours(state):
 
 
 KINDS = {'read': 'looking', 'browse': 'looking', 'observe': 'looking', 'inspect': 'looking', 'talk': 'asking',
-         'craft': 'making', 'construct': 'making', 'plan': 'making', 'interact': 'making', 'garden': 'tending', 'plant_tree': 'tending'}
+         'craft': 'making', 'construct': 'making', 'plan': 'making', 'interact': 'making', 'garden': 'tending', 'plant_tree': 'tending', 'play_music': 'making'}
 
 
 def note_step(state, memory):
@@ -171,7 +171,7 @@ PHRASE = {'eat': 'Eating', 'drink': 'Drinking at the spring', 'observe': 'Watchi
           'construct': 'Building', 'plan': 'Planning things to build', 'inspect': 'Examining things closely',
           'reflect': 'Sitting and thinking', 'practise': 'Archery practice', 'use_item': 'Using my things',
           'garden': 'Working in the garden', 'move_object': 'Moving things around',
-          'interact': 'Working with objects', 'plant_tree': 'Planting trees'}
+          'interact': 'Working with objects', 'plant_tree': 'Planting trees', 'play_music': 'Playing the harp'}
 MIN_OBS = 4
 
 

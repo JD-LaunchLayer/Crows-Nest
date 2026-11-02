@@ -14,6 +14,7 @@ import interactions
 import town
 import story
 import garden
+import music
 import web
 import sys
 import world_state
@@ -42,7 +43,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.23.3'
+APP_VERSION = '0.24.0'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -70,8 +71,8 @@ def pass_time(seconds):
         own['virtual'] = (datetime.fromisoformat(own['virtual']) + timedelta(seconds=seconds)).isoformat()
 
 
-ACTIONS = {'rest': 'cabin', 'sleep': 'cabin', 'practise': 'range', 'explore': 'woods', 'craft': 'workbench', 'read': 'library', 'observe': 'woods', 'reflect': 'cabin', 'gather': 'woods', 'plan': 'workbench', 'construct': 'workbench', 'move_object': 'workbench', 'inspect': 'workbench', 'fell_tree': 'woods', 'eat':'cabin', 'drink':'cabin', 'resume_work':'cabin', 'browse':'cafe', 'trade':'shop', 'talk':'shop', 'use_item':'workbench', 'interact':'workbench', 'garden':'garden', 'plant_tree':'woods'}
-DURATIONS = {'rest': 900, 'practise': 1800, 'explore': 1200, 'craft': 2700, 'read': 900, 'observe': 600, 'reflect': 600, 'gather': 1200, 'plan': 600, 'construct': 1800, 'move_object': 300, 'inspect': 60, 'fell_tree': 5400, 'eat':300, 'drink':120, 'browse':900, 'trade':300, 'talk':600, 'use_item':300, 'interact':600, 'garden':900, 'plant_tree':1200}
+ACTIONS = {'rest': 'cabin', 'sleep': 'cabin', 'practise': 'range', 'explore': 'woods', 'craft': 'workbench', 'read': 'library', 'observe': 'woods', 'reflect': 'cabin', 'gather': 'woods', 'plan': 'workbench', 'construct': 'workbench', 'move_object': 'workbench', 'inspect': 'workbench', 'fell_tree': 'woods', 'eat':'cabin', 'drink':'cabin', 'resume_work':'cabin', 'browse':'cafe', 'trade':'shop', 'talk':'shop', 'use_item':'workbench', 'interact':'workbench', 'garden':'garden', 'plant_tree':'woods', 'play_music':'cabin'}
+DURATIONS = {'rest': 900, 'practise': 1800, 'explore': 1200, 'craft': 2700, 'read': 900, 'observe': 600, 'reflect': 600, 'gather': 1200, 'plan': 600, 'construct': 1800, 'move_object': 300, 'inspect': 60, 'fell_tree': 5400, 'eat':300, 'drink':120, 'browse':900, 'trade':300, 'talk':600, 'use_item':300, 'interact':600, 'garden':900, 'plant_tree':1200, 'play_music':1800}
 CONFIG = ROOT / 'crow-config.json'
 if CONFIG.exists():
     config = json.loads(CONFIG.read_text())
@@ -399,12 +400,12 @@ DECISION_DEFAULTS={'wish':'','wish_reason':'','object_id':'','plan_id':0,'destin
     'reading_mode':'lookup','research_question':'','next_step':'','creation_name':'','creation_shape':'orb',
     'project_id':-1,'project_title':'','project_status':'active','target_action':'rest','target_sessions':1,
     'observe_area':'woodland_edge','focus':'','trade_mode':'ask','trade_item':'','trade_quantity':1,'opening':'','hope':'','use_item':'','use_on':'','use_how':'',
-    'verb':'','other_id':'','procedure_id':'','hypothesis':'','prediction':'','bed':1,'garden_task':'look','sow_item':'','sapling':''}
+    'verb':'','other_id':'','procedure_id':'','hypothesis':'','prediction':'','bed':1,'garden_task':'look','sow_item':'','sapling':'','music_mode':'practise','title':'','notes':'','tempo':80,'piece_id':0,'songbook':'','explore_area':'woodland_edge'}
 # One neutral line per action. Details are requested only after an action is chosen.
 ACTION_MENU={'rest':'quiet rest in the cabin','sleep':'sleep (until 07:00 at night, 90 minutes by day)',
     'eat':'eat from an available food source','drink':'drink from the spring',
     'observe':'look closely at one part of the woodland or clearing and notice what is actually there','reflect':'think quietly in the cabin',
-    'explore':'walk the woodland; may pick up a little loose wood','practise':'archery practice at the range; each session counts where the arrows land',
+    'explore':'walk through a part of the woodland, noticing what is there along the way and picking up a little loose wood','practise':'archery practice at the range; each session counts where the arrows land',
     'read':'look something up on Wikipedia, or read at leisure','inspect':'examine one object, tree or plant closely',
     'gather':'carry 3 kg of wood or stone into inventory','fell_tree':'fell a standing tree with the axe; timber stays at the site',
     'craft':'carve a small piece from 1 kg wood with a measured outcome','plan':'draft a construction blueprint (builds nothing)',
@@ -416,7 +417,8 @@ ACTION_MENU={'rest':'quiet rest in the cabin','sleep':'sleep (until 07:00 at nig
     'use_item':'use something you own, in whatever way you choose',
     'interact':'work material, divide or arrange solids, place objects on surfaces, or choose a supported posture',
     'garden':'work at the garden beds beside the cabin',
-    'plant_tree':'plant a young tree you own somewhere in the woodland; it grows slowly over years'}
+    'plant_tree':'plant a young tree you own somewhere in the woodland; it grows slowly over years',
+    'play_music':'sit and play the harp you own: make up a piece, change one of yours, play one again, or learn one from sheet music you have seen'}
 # The local 4,096-token model needs a tight context; the cloud model gets roughly three times the room.
 WIDE=PROVIDER=='anthropic'
 CONTEXT_BUDGET=int(os.environ.get('CROW_CONTEXT_CHARS','16000' if WIDE else '5600'))
@@ -434,6 +436,7 @@ def available_actions():
     if not any(o.get('portable') for o in world['objects'].values()):allowed.remove('move_object')
     if not any(state.get('possessions',{}).values()):allowed.remove('use_item')
     if not any(state.get('possessions',{}).get(k) for k in world_state.SAPLINGS):allowed.remove('plant_tree')
+    if not state.get('possessions',{}).get('harp'):allowed.remove('play_music')
     return allowed
 
 
@@ -591,6 +594,19 @@ def parameter_request(d):
                  'sow_item':{'type':'string','enum':['']+owned}},
                 {'beds':garden.summary(state),'what_you_can_sow':{k:state['possessions'][k] for k in owned},
                  'spring_water_litres':round(state['provisions']['water_litres'],1)})
+    if a=='play_music':
+        m=music.ensure(state);modes=['compose']+(['practise','revise'] if m['pieces'] else [])+(['learn'] if m['songbook_seen'] else [])
+        return ('music_mode: compose a new piece (give a title, the notes and a tempo in beats a minute), revise one of yours '
+                '(piece_id, new notes, tempo), practise one you have (piece_id), or learn one from sheet music you have seen (songbook). '
+                'Write notes as NOTE+OCTAVE:BEATS separated by spaces; rests as R:BEATS. Leave unused fields empty or 0.',
+                {'music_mode':{'type':'string','enum':modes},'title':STRING,'notes':STRING,'tempo':{'type':'integer','minimum':40,'maximum':160},
+                 'piece_id':{'type':'integer','enum':[0]+[p['id'] for p in m['pieces']]},
+                 'songbook':{'type':'string','enum':['']+([t['title'] for t in music.SONGBOOK] if m['songbook_seen'] else [])}},
+                {'harp':music.context(state),'body':life.perceive(state)['sensations']})
+    if a=='explore':
+        return ('Choose which part of the woodland to walk through.',
+                {'explore_area':{'type':'string','enum':[k for k in ecology.AREAS if k!='clearing']}},
+                {'areas':ecology.area_summary(),'woods':world_state.forest_state(state)})
     if a=='plant_tree':
         owned=[k for k in world_state.SAPLINGS if state.get('possessions',{}).get(k)]
         planted=[{k:t[k] for k in ['id','x','z','height','species']} for t in world_state.ensure(state)['trees'].values() if t['stage']=='young']
@@ -833,6 +849,13 @@ def start_action(d, seconds, reading=None):
     if action=='interact':state['pending']['posture']=interactions.posture_target(state,d)
     if action=='garden':
         state['pending']['remaining']=state['pending']['duration']=garden.DURATIONS.get(d.get('garden_task'),900)
+    if action=='play_music':
+        try:
+            piece,result,note=music.session(state,d,life.fatigue(state),state['decisions'],dt.isoformat())
+            state['pending']['music']={'piece_id':piece['id'],'title':piece['title'],'tempo':piece['tempo'],
+                                       'performance':result,'note':note}
+        except ValueError as exc:
+            state['pending']['music']={'error':str(exc)};state['pending']['remaining']=state['pending']['duration']=300
     if action=='use_item' and d.get('use_item')=='whetstone' and d.get('use_on'):
         state['pending']['remaining']=state['pending']['duration']=1200
     if action=='trade' and d.get('trade_mode')=='job' and d.get('trade_item') in town.JOBS:
@@ -916,6 +939,7 @@ def finish_action(geometry=None):
         ident=d.get('object_id','')
         obj=world_state.ensure(state)['objects'].get(ident)
         lamp=bool(state.get('possessions',{}).get('lantern'))
+        if ident=='sheet_music':music.ensure(state)['songbook_seen']=True
         if ident in town.TOOLS:
             living={'success':True,'text':'Inspected the '+ident.replace('_',' ')+'. '+life.tool_feel(state,ident)}
         elif state.get('possessions',{}).get(ident):
@@ -944,7 +968,25 @@ def finish_action(geometry=None):
     elif a in ['rest','sleep']:
         description='Finished sleeping in his cabin.' if a=='sleep' else 'Finished a quiet rest in his cabin.'
     elif a=='explore':
-        result=world_state.collect(state,'wood',1);description='Explored the woodland. '+result['text']
+        # Walking through a place: a few things noticed along the way (what he has not noted yet comes first),
+        # and a little loose wood picked up. Before v0.24 it only picked up wood.
+        area=d.get('explore_area') if d.get('explore_area') in ecology.AREAS else 'woodland_edge'
+        seen=ecology.observe(state,area,'anything not yet recorded',now().timetuple().tm_yday,state.get('daylight',0),limit=3,
+                             lamp=bool(state.get('possessions',{}).get('lantern')))
+        wood=world_state.collect(state,'wood',1)
+        walk=seen['text'].replace('Observed ','Walked through ',1)
+        result={'success':True,'text':walk+' '+wood['text'],'findings':seen.get('findings',[]),'area':area,'gathered':wood.get('success')}
+        description=result['text'];new_evidence=bool(seen.get('new_details'))
+        ecology.note_gap(state,seen.get('edge'),now().isoformat(),a)
+    elif a=='play_music':
+        m=p.get('music') or {}
+        if 'error' in m:
+            result={'success':False,'text':'Sat with the harp but could not play: '+m['error']+'.'};description=result['text']
+        else:
+            piece=next(x for x in music.ensure(state)['pieces'] if x['id']==m['piece_id'])
+            music.finish(state,piece,m['performance'],p['duration'],life.fatigue(state))
+            description=music.describe(piece,m['performance'])+m.get('note','')
+            result={'success':True,'text':description,'music':{'piece_id':piece['id'],'slips':m['performance']['slips'],'timing':m['performance']['timing']}}
     elif a=='practise':
         state['skills']['archery']+=1
         result=life.archery_session(state,p['duration'],state['skills']['archery']*7919+state.get('completed',0))
@@ -1018,7 +1060,7 @@ def finish_action(geometry=None):
     if result:details['world_result']=result
     if a in ('read','browse'):details.update(source=copy.deepcopy(p['reading']),research_question=d.get('research_question','')[:240])
     details['body_after']=life.perceive(state)['sensations']
-    if a=='observe':details['new_evidence']=new_evidence
+    if a in ('observe','explore'):details['new_evidence']=new_evidence
     m=event(description,d['reason'],**details)
     if a=='interact':interactions.record(state,d,result,m)
     story.note_step(state,m);story.settle(state,m);story.age(state)
@@ -1471,7 +1513,7 @@ class Handler(BaseHTTPRequestHandler):
         owner=self.authorised()
         if self.path.startswith('/api/') and not owner and not PUBLIC:
             return self.send(401,b'Open the full phone access link from the terminal.','text/plain')
-        static={'/':('index.html','text/html; charset=utf-8'),'/world.js':('world.js','application/javascript'),'/life_view.js':('life_view.js','application/javascript'),'/diary_view.js':('diary_view.js','application/javascript'),'/journal.js':('journal.js','application/javascript'),'/mobile_controls.js':('mobile_controls.js','application/javascript'),'/sky.js':('sky.js','application/javascript'),'/village.js':('village.js','application/javascript'),'/vendor/astronomy.browser.min.js':('vendor/astronomy.browser.min.js','application/javascript'),'/vendor/three.module.js':('vendor/three.module.js','application/javascript')}
+        static={'/':('index.html','text/html; charset=utf-8'),'/world.js':('world.js','application/javascript'),'/life_view.js':('life_view.js','application/javascript'),'/diary_view.js':('diary_view.js','application/javascript'),'/journal.js':('journal.js','application/javascript'),'/mobile_controls.js':('mobile_controls.js','application/javascript'),'/sky.js':('sky.js','application/javascript'),'/village.js':('village.js','application/javascript'),'/music_player.js':('music_player.js','application/javascript'),'/vendor/astronomy.browser.min.js':('vendor/astronomy.browser.min.js','application/javascript'),'/vendor/three.module.js':('vendor/three.module.js','application/javascript')}
         if self.path in static:
             name,kind=static[self.path];return self.send(200,(ROOT/name).read_bytes(),kind)
         if self.path=='/api/state':

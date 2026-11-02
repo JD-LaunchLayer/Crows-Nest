@@ -61,7 +61,7 @@ def main():
                            model_usage={})
 
     static = {'/': 'index.html', '/world.js': 'world.js', '/life_view.js': 'life_view.js', '/diary_view.js': 'diary_view.js', '/journal.js': 'journal.js',
-              '/mobile_controls.js': 'mobile_controls.js', '/sky.js': 'sky.js', '/village.js': 'village.js',
+              '/mobile_controls.js': 'mobile_controls.js', '/sky.js': 'sky.js', '/village.js': 'village.js', '/music_player.js': 'music_player.js',
               '/vendor/astronomy.browser.min.js': 'vendor/astronomy.browser.min.js',
               '/vendor/three.module.js': 'vendor/three.module.js'}
 
