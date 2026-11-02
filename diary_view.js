@@ -37,6 +37,7 @@ export function createDiary({document}){
   return parts.join(' ');
  }
  function update(s){
+  latest=s;
   if(!$('diary'))return;
   const key=JSON.stringify([s.beliefs&&s.beliefs.length,s.beliefs&&s.beliefs.at(-1),s.stories&&s.stories.length,s.stories&&s.stories.at(-1)&&s.stories.at(-1).count,s.threads,s.promises,s.keeper,s.trading,s.world_gaps,s.possessions,s.decisions,s.pending&&s.pending.start,(s.diary||[]).length,s.interests,s.interest_history,(s.personality_notes||[]).length,s.affect,s.current_intention,s.clock&&s.clock.date]);
   if(key===last)return;last=key;
@@ -107,7 +108,44 @@ export function createDiary({document}){
   for(const n of (s.personality_notes||[]).slice(-6).reverse())self.append(el('p','“'+n.text+'”','thought'));
   if(!(s.personality_notes||[]).length)self.append(el('p','He has not described himself yet.','muted'));
  }
+ // A compact plain-text report of his recent life: the parts that change, without the long history sections.
+ function report(s){
+  const L=[],cut=(t,n=170)=>{t=String(t||'').replace(/\s+/g,' ').trim();return t.length>n?t.slice(0,n-1)+'…':t};
+  const v=document.querySelector?.('meta[name="crow-version"]')?.content||'';
+  L.push(`CROW REPORT · v${v} · ${s.clock?.date||''} ${s.clock?.time||''}${s.crow_clock?' (his own time)':''}`);
+  L.push('','HOW HE IS',summary(s));
+  const p=s.provisions||{};L.push(`Food: pantry ${(p.pantry??0).toFixed(1)} · fruit ${(p.berries??0).toFixed(1)} · water ${(p.water_litres??0).toFixed(1)} L · credit ${s.trading?.credit??0} · owns: ${Object.entries(s.possessions||{}).filter(([,n])=>n).map(([k,n])=>n>1?k+'×'+n:k).join(', ')||'nothing'}`);
+  const trees=Object.values(s.built_world?.trees||{}),standing=trees.filter(t=>t.stage==='standing'),near=standing.map(t=>Math.hypot(t.x,t.z)).sort((a,b)=>a-b)[0];
+  L.push(`Woods: ${standing.length} standing · ${trees.filter(t=>t.stage==='felled').length} stumps · ${trees.filter(t=>t.stage==='young').length} planted · nearest tree ${near?Math.round(near):'-'} m from centre · fallen timber ${s.built_world?.sources?.wood?.stock??'-'} kg · wood carried ${s.materials??0} kg`);
+  if(s.model_spend)L.push(`Model: spend today $${(s.model_spend.usd||0).toFixed(3)} · ${s.model_spend.calls||0} calls · ${s.model_spend.fallbacks||0} fallbacks${s.model_spend.last_fallback?' · last fallback: '+cut(s.model_spend.last_fallback,140):''}`);
+  const started=(s.memories||[]).filter(m=>m.kind==='started').slice(-30),counts={};for(const m of started)counts[m.action]=(counts[m.action]||0)+1;
+  L.push('Last 30 choices: '+Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([a,n])=>`${a} ${n}`).join(', '));
+  L.push('','RECENT EVENTS (newest last)');
+  for(const m of (s.memories||[]).filter(m=>m.kind==='experience').slice(-15))L.push(`- ${(m.at||'').slice(5,16).replace('T',' ')} ${m.action}: ${cut(m.event,190)}${m.reason?' | why: '+cut(m.reason,120):''}`);
+  L.push('','RECENT THOUGHTS');for(const d of (s.diary||[]).slice(-8))L.push(`- ${(d.at||'').slice(5,16).replace('T',' ')} ${cut(d.text,160)}`);
+  L.push('','STORIES');for(const st of (s.stories||[]).filter(x=>x.count>1&&x.stage!=='left').sort((a,b)=>(b.updated_hours||0)-(a.updated_hours||0)).slice(0,5))L.push(`- [${st.stage}, ${st.count} steps, ${st.feel?.last||'-'}] ${cut(st.title,140)}`);
+  L.push('','LEFT OPEN');for(const t of (s.threads||[]).filter(t=>t.status==='open').slice(-5))L.push('- '+cut(t.text,160));
+  for(const pr of (s.promises||[]).filter(p=>p.status==='open'))L.push(`- promised ${pr.to}: ${cut(pr.text,140)}`);
+  L.push('','PATTERNS');for(const b of (s.beliefs||[]).filter(b=>b.status!=='revised').slice(-8))L.push(`- ${b.statement} (${b.status}, ${b.observations})`);
+  L.push('','WISHES (most mentioned)');for(const x of [...(s.wishes||[])].filter(x=>x.status!=='withdrawn').sort((a,b)=>b.mentions-a.mentions).slice(0,5))L.push(`- ${cut(x.text,140)} ×${x.mentions}`);
+  L.push('','SELF-NOTES');for(const n of (s.personality_notes||[]).slice(-4))L.push('- '+cut(n.text,160));
+  const k=s.keeper;L.push('','EDDA & TRADE',`Talked ${k?.talks||0} times · warmth ${(k?.warmth||0).toFixed(2)} · last ledger: ${cut((s.trading?.ledger||[]).at(-1)?.text||'none',120)}`);
+  const lastTalk=[...(s.memories||[])].reverse().find(m=>m.world_result&&m.world_result.conversation);if(lastTalk)L.push('Last talk: '+cut(lastTalk.world_result.conversation.map(c=>c.who+': '+c.text).join(' / '),400));
+  L.push('','GARDEN');for(const b of (s.garden?.beds||[]))L.push(`- bed ${b.n}: ${b.crop||'empty'}${b.item?' ('+b.item+')':''} growth ${Math.round((b.growth||0)*100)}% health ${Math.round((b.health??1)*100)}%`);
+  L.push('','WHERE THE WORLD RAN OUT (top)');for(const g of [...(s.world_gaps||[])].sort((a,b)=>b.times-a.times).slice(0,8))L.push(`- ${g.kind} ${g.target||''} ×${g.times}: ${cut((g.focuses||[]).at(-1)||'',120)}`);
+  const tr=(s.practical?.trials||[]).at(-1);if(tr)L.push('','LAST CARVING',`${tr.method_id} · error ${tr.actual_error_mm} mm vs ${tr.target_error_mm} mm · ${tr.goal_met?'met':'not met'}`);
+  const ar=(s.practical?.archery||[]).at(-1);if(ar)L.push('LAST ARCHERY',`${ar.on_target}/12 on target, ${ar.in_gold} gold, mean ${ar.mean_cm_from_centre} cm`);
+  return L.join('\n');
+ }
+ let latest=null;
+ async function copyReport(){
+  if(!latest)return;const text=report(latest),b=$('diaryCopy');
+  try{await navigator.clipboard.writeText(text);}
+  catch(e){const t=document.createElement('textarea');t.value=text;document.body.append(t);t.select();try{document.execCommand('copy')}finally{t.remove()}}
+  if(b){b.textContent='Copied';setTimeout(()=>{b.textContent='Copy report'},1600);}
+ }
+ if($('diaryCopy'))$('diaryCopy').onclick=copyReport;
  function open(show){const d=$('diary');if(!d)return;d.hidden=!show;if(show&&document.pointerLockElement)document.exitPointerLock?.();}
  function toggle(){open($('diary').hidden);}
- return {update,open,toggle};
+ return {update,open,toggle,report};
 }

@@ -35,4 +35,15 @@ with tempfile.TemporaryDirectory() as td:
     app.state['pending']=None
     app.start_action({**base,'wish':'Find a plant at the edge I have not yet recorded.','wish_reason':'x'},1)
     assert len(st['wishes'])==n+1 and st['wishes'][-1]['mentions']==2
-print('PASS v0.23.1: "not" lists respected; places by coordinates; unrecorded-first looking with an honest end; plant close-ups; markup stripped; reworded wishes merged.')
+    # v0.23.2: looking for an unrecorded kind of thing ("a shrub, not a tree, fern or bramble") finds that kind,
+    # never what he steered away from, and says plainly when every one of that kind has been seen.
+    eco['seen'].clear()
+    f='an unrecorded shrub at the woodland edge, not a tree, fern, bramble, or the spring'
+    first=ecology.observe(st,'woodland_edge',f,314,1.)
+    assert 'bramble' not in first['findings'][0]['text'].lower() and not first['findings'][0]['about'].startswith('tree-'), first['findings'][0]
+    for i in range(6):
+        r=ecology.observe(st,'woodland_edge',f,314,1.)
+        if r['edge']:break
+    assert r['edge']['kind']=='seen_all' and 'Every shrub' in r['text'], r['text']
+    assert ecology.observe(st,'grove','an unrecorded fungus',314,1.)['edge']['kind']=='not_found'
+print('PASS v0.23.1: "not" lists respected; places by coordinates; unrecorded-first looking with an honest end; plant close-ups; markup stripped; reworded wishes merged; kinds he seeks and avoids respected.')

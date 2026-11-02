@@ -326,9 +326,18 @@ def in_area(area, x, z):
 RELATION_WORDS = ('climbs', 'beneath', 'under', 'twist', 'feeding', 'near', 'light', 'shade', 'damp', 'north-facing', 'stump')
 
 
+# What kind of thing each species is, in plain words he might use when looking for one (v0.23.2).
+PLANT_KIND = {'bramble': 'shrub bush', 'holly seedlings': 'shrub bush seedling', 'honeysuckle': 'shrub climber vine',
+              'ivy': 'climber vine', 'bracken': 'fern', 'male fern': 'fern', 'fly agaric': 'fungus mushroom toadstool',
+              'bluebell': 'flower bulb', 'wood anemone': 'flower', 'nettles': 'herb weed', 'moss': 'moss',
+              'grass': 'grass'}
+KIND_WORDS = {'shrub', 'bush', 'tree', 'fern', 'flower', 'fungus', 'fungi', 'mushroom', 'toadstool', 'climber',
+              'vine', 'moss', 'grass', 'herb', 'weed', 'seedling', 'bulb'}
+
+
 def _tags(kind, text):
     """Plain descriptive words used only to match what he says he is looking for."""
-    tags = kind + (' tree leaves season' if kind in LEAVES else ' plant')
+    tags = kind + (' tree leaves season' if kind in LEAVES else ' plant ' + PLANT_KIND.get(kind, ''))
     if any(w in text for w in RELATION_WORDS):
         tags += ' interaction relationship between species growing together conditions'
     return tags
@@ -373,7 +382,13 @@ def observe(state, area, focus, doy, daylight, limit=5, lamp=False):
     if daylight < .12:
         limit = 2  # a lantern's small circle of light
     facts = visible_facts(state, area, doy, daylight)
-    want = _terms(focus)
+    # What he is looking for, without the things he is steering away from ("a shrub, not a tree or fern").
+    positive = NEW_WORDS.sub(' ', str(focus).lower())
+    positive = re.sub(NEGATIONS.pattern + r'[^.;:!?]*', ' ', positive)
+    want = _terms(positive)
+    want_kinds = want & {w for k in KIND_WORDS for w in _terms(k)}
+    steering_away = ' '.join(m.group() for m in re.finditer(NEGATIONS.pattern + r'[^.;:!?]*', NEW_WORDS.sub(' ', str(focus).lower())))
+    avoid = _terms(steering_away) - want - _terms('plant leaves season edge woodland clearing grove')
     eco['observations'] += 1
     # Deterministic per observation so results are reproducible, but not the same every visit.
     # A focus that names something (tree-65) means looking at that thing: everything visible
@@ -392,12 +407,18 @@ def observe(state, area, focus, doy, daylight, limit=5, lamp=False):
             near += [t['id'] for t in state['built_world']['trees'].values() if math.hypot(t['x'] - x, t['z'] - z) < 1.5]
             named.update(near[:2])
     seeking_new = not named and bool(NEW_WORDS.search(lowered))
+    def avoided(fact):
+        return bool(avoid & _terms(fact[2]))
+    def of_kind(fact):
+        return not avoided(fact) and (not want_kinds or bool(want_kinds & _terms(fact[2])))
     def about_named(fact):
         return fact[0] in named or any(re.search(r'\b' + re.escape(n) + r'\b', fact[1].lower()) for n in named)
     def order(fact):
         if about_named(fact):
             return -100 - len(want & _terms(fact[1]))
-        if seeking_new and _key(fact[1]) not in eco['seen']:
+        if avoided(fact):
+            return 100  # what he said he is not looking for comes last
+        if seeking_new and _key(fact[1]) not in eco['seen'] and of_kind(fact):
             return -50 - len(want & _terms(fact[1] + ' ' + fact[2]))  # looking for what he has not noted yet
         overlap = len(want & _terms(fact[1] + ' ' + fact[2]))
         seen = eco['seen'].get(_key(fact[1]), 0)
@@ -425,8 +446,8 @@ def observe(state, area, focus, doy, daylight, limit=5, lamp=False):
         k = _key(text)
         findings.append({'about': about, 'text': text, 'new': k not in eco['seen']})
         eco['seen'][k] = eco['seen'].get(k, 0) + 1
-    if len(eco['seen']) > 600:
-        for k in list(eco['seen'])[:100]:
+    if len(eco['seen']) > 6000:  # was 600, which made old sights count as new again once the woods grew
+        for k in list(eco['seen'])[:500]:
             del eco['seen'][k]
     new = sum(f['new'] for f in findings)
     # The honest edge of what can be seen (v0.21.6). Stated plainly, with no suggestion of what to do.
@@ -439,6 +460,14 @@ def observe(state, area, focus, doy, daylight, limit=5, lamp=False):
         edge = {'kind': 'seen_all', 'target': target, 'place': area, 'focus': focus[:160]}
         edge_text = (f' Everything that can be made out about {target} by eye has been seen before;'
                      f' nothing about it has changed since.')
+    elif seeking_new and want_kinds and not any(of_kind(f) for f in facts):
+        kind = ' or '.join(sorted(want_kinds))
+        edge = {'kind': 'not_found', 'target': kind, 'place': area, 'focus': focus[:160]}
+        edge_text = f' No {kind} can be made out in {a["name"]}.'
+    elif seeking_new and want_kinds and not any(f['new'] and of_kind(next(x for x in chosen if x[1] == f['text'])) for f in findings):
+        kind = ' or '.join(sorted(want_kinds))
+        edge = {'kind': 'seen_all', 'target': f'{kind} in {area}', 'place': area, 'focus': focus[:160]}
+        edge_text = f' Every {kind} that can be made out in {a["name"]} at the moment has been seen before.'
     elif seeking_new and findings and not new:
         edge = {'kind': 'seen_all', 'target': area, 'place': area, 'focus': focus[:160]}
         edge_text = f' Everything that can be made out in {a["name"]} at the moment has been seen before.'

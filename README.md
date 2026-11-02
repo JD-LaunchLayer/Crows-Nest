@@ -1019,3 +1019,17 @@ garden. Scenery only; Crow's world is unchanged.
   noted first; when nothing in that place is new, he is told so plainly.
 - Tool markup that a cloud answer occasionally leaks into a text field is cut off.
 - The same wish in new words counts as another mention, not a new wish.
+
+## v0.23.2 — looking for a kind of thing, and a Copy report button
+
+- Looking for "an unrecorded shrub, not a tree, fern or bramble" now looks for
+  shrubs he has not noted and puts what he is steering away from last. Plants carry
+  plain kind words (shrub, fern, flower, fungus, climber…). When every one of that
+  kind in the place has been seen he is told so ("Every shrub that can be made out
+  at the woodland edge at the moment has been seen before"); when there is none,
+  that too. Before, he walked through unrecorded trees one by one instead.
+- What he has seen is no longer forgotten after 600 sights; the larger woods would
+  have made old sights count as new again.
+- **Copy report** in the journal copies a compact text report (state, last events,
+  thoughts, stories, open threads, patterns, wishes, Edda and trade, garden, woods,
+  where the world ran out) for pasting into a chat.
