@@ -1085,3 +1085,13 @@ changes, and Copy report is unchanged.
 - **Fed and Rested** replace the single Energy bar in the side panel: Fed is his
   food reserve (only eating refills it), Rested is sleepiness and tired muscles
   (sleep and rest restore it). Display only.
+
+## v0.24.3 — the same wish once
+
+Before v0.23.1 a reworded wish was stored as a new wish, so by now about thirty
+near-copies of "find an unrecorded shrub" existed, and his decisions saw eight of them
+at once, every time. Wishes are now shown grouped: each aim once, in its newest
+wording, with how many times he has expressed it. Open threads that ask the same
+question are shown once with how many times he noted it. His stored wishes and
+threads are unchanged. "No bush can be made out in …" now reads "There is no bush
+anywhere in …", which he had taken for one unexplained spot.

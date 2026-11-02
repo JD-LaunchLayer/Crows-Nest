@@ -464,7 +464,7 @@ def observe(state, area, focus, doy, daylight, limit=5, lamp=False):
     elif seeking_new and want_kinds and not any(of_kind(f) for f in facts):
         kind = ' or '.join(sorted(want_kinds))
         edge = {'kind': 'not_found', 'target': kind, 'place': area, 'focus': focus[:160]}
-        edge_text = f' No {kind} can be made out in {a["name"]}.'
+        edge_text = f' There is no {kind} anywhere in {a["name"]}.'
     elif seeking_new and want_kinds and not any(f['new'] and of_kind(next(x for x in chosen if x[1] == f['text'])) for f in findings):
         kind = ' or '.join(sorted(want_kinds))
         edge = {'kind': 'seen_all', 'target': f'{kind} in {area}', 'place': area, 'focus': focus[:160]}

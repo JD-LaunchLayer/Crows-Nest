@@ -43,7 +43,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.24.2'
+APP_VERSION = '0.24.3'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -458,6 +458,34 @@ def fit(context,budget,trim_order):
     return context
 
 
+def same_wish(a,b,shared=2,overlap=.34):
+    """Rewordings of the same aim share their key words (shrub, edge, record...), even when the phrasing differs."""
+    x,y=memory_recall.words(a),memory_recall.words(b)
+    common=len(x&y)
+    return bool(x and y) and common>=shared and common/min(len(x),len(y))>=overlap
+
+
+def grouped_wishes(limit):
+    """Each wish once, however many times it was reworded, with how often he has expressed it (v0.24.3).
+    Before v0.23.1 rewordings were stored as separate wishes, so the same wish filled the list. Stored wishes are unchanged."""
+    groups=[]
+    for w in reversed([w for w in state['wishes'] if w.get('status')!='withdrawn']):
+        g=next((g for g in groups if same_wish(g['wish'],w['text'])),None)
+        if g:g['times_expressed']+=w.get('mentions',1)
+        else:groups.append({'wish':w['text'],'times_expressed':w.get('mentions',1)})
+    return groups[:limit]
+
+
+def grouped_open_items():
+    """Open threads shown once per question, newest wording, with how many times it was noted. Stored threads are unchanged."""
+    items=story.open_items(state);out=[]
+    for t in reversed(items['threads']):
+        g=next((g for g in out if same_wish(g['text'],t['text'],3,.4)),None)
+        if g:g['times_noted']=g.get('times_noted',1)+1
+        else:out.append(dict(t))
+    return {'threads':list(reversed(out)),'promises':items['promises']}
+
+
 def decision_context():
     """Stage-one evidence: body, continuity and memory first; world detail is summarised."""
     clock();world=world_state.ensure(state)
@@ -470,7 +498,7 @@ def decision_context():
         'intention':state['current_intention'],'next_step':state['next_step'],
         'recent_events':[{k:m.get(k) for k in ['id','time','event']} for m in recent],
         'held_most_strongly':consolidation.strongest(state,8 if WIDE else 3),
-        'your_ongoing_stories':story.context(state,10 if WIDE else 4),'left_open':story.open_items(state),
+        'your_ongoing_stories':story.context(state,10 if WIDE else 4),'left_open':grouped_open_items(),
         'patterns_in_your_record':story.belief_context(state,8 if WIDE else 4),
         'relevant_memories':memory,'recent_pattern':memory_recall.recent_pattern(state),
         'paused_work':[{'id':w['id'],'action':w['pending']['decision']['action'],'intention':w['pending']['decision']['intention'],
@@ -479,7 +507,7 @@ def decision_context():
                     if p.get('status') in ['active','paused']][-(6 if WIDE else 3):],
         'research':reading_journal.research_context(state),
         'self_notes':[n['text'] for n in state['personality_notes'][-(6 if WIDE else 3):]],
-        'wishes':[w['text'] for w in state['wishes'][-(8 if WIDE else 4):]],
+        'wishes':grouped_wishes(8 if WIDE else 4),
         'interests':experience.summary(state,4 if WIDE else 2),
         'inventory_kg':near['inventory_kg'],'supplies':life.perceive(state)['supplies'],
         'trade_credit':state.get('trading',{}).get('credit',0),'possessions':state.get('possessions',{}),

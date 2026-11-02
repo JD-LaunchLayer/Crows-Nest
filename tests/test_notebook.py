@@ -19,4 +19,8 @@ with tempfile.TemporaryDirectory() as td:
          'memories':[{'kind':'experience','event':f"Observed it. A bramble thicket at ({br[1]['x']:.0f}, {br[1]['z']:.0f}) with arching thorny stems. tree-3 is an oak."}]}
     ecology.backfill_recorded(st2);assert br[1]['id'] in st2['ecology']['recorded'] and 'tree-3' in st2['ecology']['recorded']
     assert 'your_field_notebook' in app.decision_context()
+    # v0.24.3: reworded wishes and repeated open questions are shown once, with how often; stored records unchanged.
+    texts=['Find one edge shrub detail I have not recorded before.','Get a clear daylight look at a new edge shrub.','Find one shrub at the edge that nobody has logged yet.','Learn to carve a bowl that holds water']
+    app.state['wishes']=[{'id':i,'text':t,'mentions':2,'status':'expressed'} for i,t in enumerate(texts)]
+    g=app.grouped_wishes(8);assert len(g)==2 and g[1]['times_expressed']==6 and len(app.state['wishes'])==4
 print('PASS v0.24.2: field notebook of his own records only, by place and kind; rebuilt from his memories.')
