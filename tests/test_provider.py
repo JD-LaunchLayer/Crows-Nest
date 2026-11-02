@@ -54,3 +54,12 @@ with tempfile.TemporaryDirectory() as td:
     data,_=app.model_call('Answer.',schema,100,'test')
     assert data=={'answer':'complete'} and sent[-1][1]['options']['num_predict']==200 and app.runtime['model_usage']['test']['retried']
 print('PASS: cloud slips fitted or fallen back; cut-off local replies retried; Haiku via forced structured tool call; real token cost ledger; outage and over-budget fall back to local; daily reset; key never saved in his life.')
+
+# v0.21.2: a whole-number field given as 3.5 is rounded; a missing reading status is "not applicable";
+# a failure names the field that did not fit.
+_c=app
+form=_c.fields_schema({'enjoyment':{'type':'integer'},'answer_status':{'type':'string','enum':['answered','partial','not_answered','not_applicable']},
+                       'valence':{'type':'number','minimum':-1,'maximum':1}})
+assert _c.conform({'enjoyment':3.5,'valence':.2},form)=={'enjoyment':4,'answer_status':'not_applicable','valence':.2}
+assert _c.conform({'enjoyment':1,'valence':'warm'},form) is _c.MISSING and _c.CONFORM_FAILURE.startswith('valence=')
+print('PASS v0.21.2 cloud answers: rounding, neutral reading status, named failures.')

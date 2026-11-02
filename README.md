@@ -881,3 +881,12 @@ Archery practice was a leftover action with no outcome. Each session now shoots
 12 arrows at the 18 m target and reports hits, golds and distance from centre.
 Accuracy improves with hours practised (earlier unmeasured sessions count as
 practice), and worsens when tired or in the dark.
+
+## v0.21.2 — fewer cloud fallbacks
+
+About a third of Haiku's answers were being rejected as not fitting the form,
+mostly his after-activity reflection, so the small local model stood in. Now a
+fractional answer for a whole number is rounded, a missing reading status counts
+as "not applicable", and an answer cut off for length is asked again once with
+more room (the cut-off attempt still counts toward the daily cap). When an answer
+still does not fit, `last_fallback` names the field and what was given.

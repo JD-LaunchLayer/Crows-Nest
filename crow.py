@@ -38,7 +38,7 @@ ACCESS_TOKEN = None
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.21.1'
+APP_VERSION = '0.21.2'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -229,12 +229,16 @@ def ollama_call(prompt, schema, limit, purpose, system=None):
 MISSING = object()
 
 
+CONFORM_FAILURE = ''
+
+
 def conform(value, schema):
     """Fit a cloud answer to the requested structure, or return MISSING.
 
     The local model is grammar-constrained; the cloud model's tool input is not, so it can
     return a null number or an out-of-list choice. Small slips get neutral values (empty
     text, no project, an empty list); anything that cannot be fitted makes the call fall back."""
+    global CONFORM_FAILURE
     kind = schema.get('type')
     if kind == 'object':
         if not isinstance(value, dict):
@@ -242,6 +246,8 @@ def conform(value, schema):
         out = {}
         for key, sub in schema.get('properties', {}).items():
             fitted = conform(value[key], sub) if key in value else MISSING
+            if fitted is MISSING:
+                CONFORM_FAILURE = f"{key}={json.dumps(value.get(key, '(absent)'), ensure_ascii=False)[:80]}"
             if fitted is MISSING and key in schema.get('required', []):
                 options = sub.get('enum', [])
                 if sub.get('type') == 'string' and not options:
@@ -250,6 +256,8 @@ def conform(value, schema):
                     fitted = []
                 elif 'none' in options:
                     fitted = 'none'
+                elif 'not_applicable' in options:
+                    fitted = 'not_applicable'
                 elif 0 in options and sub.get('type') == 'integer':
                     fitted = 0
                 else:
@@ -275,9 +283,7 @@ def conform(value, schema):
         if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
             return MISSING
         if kind == 'integer':
-            if value != int(value):
-                return MISSING
-            value = int(value)
+            value = int(round(value))
         value = max(schema.get('minimum', value), min(schema.get('maximum', value), value))
     elif kind == 'string':
         if not isinstance(value, str):
@@ -312,8 +318,15 @@ def anthropic_call(prompt, schema, limit, purpose, system=None):
     if block is None or not isinstance(block.get('input'), dict):
         raise ValueError('The cloud model returned no structured answer')
     fitted = conform(block['input'], schema)
+    if fitted is MISSING and result.get('stop_reason') == 'max_tokens' and limit < 2400:
+        used = result.get('usage', {})  # the cut-off attempt was still paid for
+        wasted = int(used.get('input_tokens', 0)) / 1e6 * PRICE['input'] + int(used.get('output_tokens', 0)) / 1e6 * PRICE['output']
+        with LOCK:
+            ledger = spend();ledger['usd'] = round(ledger['usd'] + wasted, 6);ledger['total_usd'] = round(ledger['total_usd'] + wasted, 6)
+        return anthropic_call(prompt, schema, max(limit, 400) * 2, purpose, system)
     if fitted is MISSING:
-        raise ValueError('The cloud answer did not fit the requested structure')
+        cut = ' (answer was cut off)' if result.get('stop_reason') == 'max_tokens' else ''
+        raise ValueError(f'The cloud answer did not fit the requested structure{cut}: {CONFORM_FAILURE}')
     block['input'] = fitted
     used = result.get('usage', {})
     tokens_in, tokens_out = int(used.get('input_tokens', 0)), int(used.get('output_tokens', 0))
