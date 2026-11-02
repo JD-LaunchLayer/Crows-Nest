@@ -1074,3 +1074,14 @@ music, gardening, being told there was nothing new), his latest thought, and wha
 is worth knowing (food, credit, Edda, where the world ran out). "Show the full
 journal" opens everything as before. Display only: nothing of his history or memory
 changes, and Copy report is unchanged.
+
+## v0.24.2 — his field notebook; Fed and Rested
+
+- **Field notebook.** His decisions now see a compact notebook of what he has
+  recorded: per place, plants by kind with where they are (shrubs: bramble at
+  (2, -22), …), and trees by species. Only things he has actually seen; nothing
+  about what is left to find. Built once from his remembered events, then kept up as
+  he looks. He had been planning to "check the log" without having one.
+- **Fed and Rested** replace the single Energy bar in the side panel: Fed is his
+  food reserve (only eating refills it), Rested is sleepiness and tired muscles
+  (sleep and rest restore it). Display only.

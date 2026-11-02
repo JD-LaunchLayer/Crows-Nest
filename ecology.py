@@ -446,6 +446,7 @@ def observe(state, area, focus, doy, daylight, limit=5, lamp=False):
         k = _key(text)
         findings.append({'about': about, 'text': text, 'new': k not in eco['seen']})
         eco['seen'][k] = eco['seen'].get(k, 0) + 1
+        record(state, about)
     if len(eco['seen']) > 6000:  # was 600, which made old sights count as new again once the woods grew
         for k in list(eco['seen'])[:500]:
             del eco['seen'][k]
@@ -501,8 +502,9 @@ def inspect(state, ident, doy, daylight, lamp=False):
         x, z = plant['x'], plant['z']
         if not facts:
             facts = [(ident, f'Nothing of {plant["species"]} is visible above ground at ({x:.0f}, {z:.0f}) at this time of year.')]
-    for _, f in facts:
+    for about, f in facts:
         eco['seen'][_key(f)] = eco['seen'].get(_key(f), 0) + 1
+        record(state, about)
     text = f'Inspected {ident} at ({x:.0f}, {z:.0f}); ground light {round(ground_light(state, x, z, doy) * 100)}% of open sky. ' + \
         ' '.join(f for _, f in facts)
     return {'success': True, 'text': text, 'findings': [{'about': a, 'text': f} for a, f in facts],
@@ -548,3 +550,67 @@ def view(state, doy):
 
 def area_summary():
     return {k: v['name'] for k, v in AREAS.items()}
+
+
+# ---- His field notebook (v0.24.2): what he has recorded, by place and kind. Only what he has seen. ----
+
+def _place_of_tree(t):
+    if in_area('grove', t['x'], t['z']):
+        return 'grove'
+    for area in ('woodland_edge', 'deeper_woods', 'spring_side', 'clearing'):
+        if in_area(area, t['x'], t['z']):
+            return area
+    return 'woodland_edge'
+
+
+def record(state, about):
+    eco = state['ecology']
+    eco.setdefault('recorded', {}).setdefault(about, True)
+
+
+def backfill_recorded(state):
+    """Once: rebuild what he has recorded from his own remembered events (ids and places named in them)."""
+    eco = ensure(state)
+    if eco.get('recorded_backfilled'):
+        return
+    rec = eco.setdefault('recorded', {})
+    texts = ' '.join(str(m.get('event', '')) for m in state.get('memories', []) if m.get('kind') == 'experience')
+    for ident in state['built_world']['trees']:
+        if re.search(r'\b' + re.escape(ident) + r'\b', texts):
+            rec.setdefault(ident, True)
+    for p in eco['plants']:
+        at = f"({p['x']:.0f}, {p['z']:.0f})"
+        host = p.get('host')
+        if at in texts or (host and re.search(re.escape(p['species'].split()[0]) + r'[^.]*\b' + re.escape(host) + r'\b', texts, re.I)):
+            rec.setdefault(p['id'], True)
+    eco['recorded_backfilled'] = True
+
+
+def notebook(state):
+    """His own records, compactly: per place, plants by kind with where they are, trees by species."""
+    eco = ensure(state)
+    rec = eco.get('recorded', {})
+    trees = state['built_world']['trees']
+    out = {}
+    for p in eco['plants']:
+        if p['id'] not in rec:
+            continue
+        kind = (PLANT_KIND.get(p['species'], 'plant').split() or ['plant'])[0]
+        where = f"on {p['host']}" if p.get('host') else f"({p['x']:.0f}, {p['z']:.0f})"
+        out.setdefault(p['area'], {}).setdefault(kind if kind in ('moss', 'grass') else kind + 's', {}).setdefault(p['species'], []).append(where)
+    for ident, t in trees.items():
+        if ident not in rec:
+            continue
+        sp = eco['tree_species'].get(ident, 'tree')
+        bucket = out.setdefault(_place_of_tree(t), {}).setdefault('trees', {})
+        bucket[sp] = bucket.get(sp, 0) + 1
+    book = {}
+    for place, kinds in out.items():
+        lines = []
+        for kind, items in sorted(kinds.items()):
+            if kind == 'trees':
+                lines.append('trees: ' + ', '.join(f'{sp} {n}' for sp, n in sorted(items.items())))
+            else:
+                lines.append(f'{kind}: ' + '; '.join(f'{sp} ' + ', '.join(w[:12] for w in ws[:6]) for sp, ws in sorted(items.items())))
+        book[AREAS.get(place, {}).get('name', place)] = lines
+    return book

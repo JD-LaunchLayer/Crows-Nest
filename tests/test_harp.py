@@ -12,6 +12,8 @@ with tempfile.TemporaryDirectory() as td:
     shutil.copy(ROOT/'crow.py',Path(td)/'crow.py')
     spec=importlib.util.spec_from_file_location('crow_harp',Path(td)/'crow.py');app=importlib.util.module_from_spec(spec)
     with contextlib.redirect_stdout(io.StringIO()):spec.loader.exec_module(app)
+    from datetime import datetime
+    app.CLOCK_OVERRIDE=lambda:datetime(2026,11,11,12,0,tzinfo=app.TZ)  # daylight, whatever the real time
     st=app.state;app.state['paused']=False
     assert st['trading']['stock']['harp']['price']==12 and 'sheet_music' in st['built_world']['objects']
     assert 'play_music' not in app.available_actions()

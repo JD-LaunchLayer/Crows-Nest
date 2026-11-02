@@ -43,7 +43,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.24.1'
+APP_VERSION = '0.24.2'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -144,6 +144,7 @@ world_state.ensure(state)
 life.ensure(state)
 life.annotate_overridden_trials(state)  # v0.21.1: labels, never rewrites, past trials
 ecology.ensure(state)
+ecology.backfill_recorded(state)  # v0.24.2: his field notebook, from what he already recorded
 consolidation.ensure(state)
 town.ensure(state)
 interactions.ensure(state)
@@ -483,6 +484,7 @@ def decision_context():
         'inventory_kg':near['inventory_kg'],'supplies':life.perceive(state)['supplies'],
         'trade_credit':state.get('trading',{}).get('credit',0),'possessions':state.get('possessions',{}),
         'garden_beds':garden.summary(state),'woods':world_state.forest_state(state),
+        'your_field_notebook':ecology.notebook(state),
         'people':[{'name':'Edda Thorne','where':'trading post','times_talked':town.keeper(state)['talks'],
                    'open_favours':[f['id']+': '+f['task'] for f in town.keeper(state)['favours']]}],
         'nearby':[o['id']+' ('+o['name']+')' for o in near['objects']]+[t['id']+' '+t['stage'] for t in near['trees'][:2]]}
@@ -490,7 +492,7 @@ def decision_context():
     # Recent events are what just happened to him: give them room (180 characters cut most observations
     # to their first finding and hid any closing statement). The budget below still trims if needed.
     context['recent_events']=[{k:m.get(k) for k in ['id','time']}|{'event':str(m.get('event',''))[:700 if WIDE else 320]} for m in recent]
-    return fit(context,CONTEXT_BUDGET,['nearby','interests','wishes','self_notes','research','projects','paused_work','patterns_in_your_record','left_open','held_most_strongly','your_ongoing_stories','recent_events','relevant_memories'])
+    return fit(context,CONTEXT_BUDGET,['nearby','your_field_notebook','interests','wishes','self_notes','research','projects','paused_work','patterns_in_your_record','left_open','held_most_strongly','your_ongoing_stories','recent_events','relevant_memories'])
 
 
 def choose_action():
