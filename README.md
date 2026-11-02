@@ -819,3 +819,13 @@ A pattern needs at least four occasions ("forming"); with six or more it is
 the old statement is marked "revised" and kept, and the new one begins. The
 patterns reach his decisions as "patterns in your record", and the journal
 lists them, including what they used to be.
+
+## v0.19.0 — how his work feels
+
+Each session he appraises is tagged, by rule, as **pull** (appraised positively),
+**grind** (flat or negative effortful work), **doubt** (a missed criterion, an
+unanswered question or a failed result) or neutral. Running tallies decay
+gently, so recent sessions count most. They attach to the story the session
+belonged to and, when it counted towards one, to the project. His decisions see
+how each project has mostly felt lately; the journal shows pull, grind and
+doubt per project and the latest feel per story.

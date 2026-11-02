@@ -41,6 +41,15 @@ story.update_beliefs(b,'t2')
 assert any(x['status']=='revised' and 'leave me low' in x['statement'] for x in b['beliefs'])
 assert any(x['statement']=='Searching the web at the café tends to lift me.' and x['status']=='held' for x in b['beliefs'])
 
+# How work feels: pull, grind, doubt from his appraisals; attached to the story and the project it served.
+f={'stories':[{'id':1}],'projects':[{'id':5}]}
+carve={'action':'craft','story_id':1,'project_id':5,'world_result':{'trial':{'goal_met':False}}}
+assert story.record_feel(f,carve,.5)=='doubt', 'a missed criterion is doubt whatever the mood'
+ok={'action':'craft','story_id':1,'project_id':5,'world_result':{'trial':{'goal_met':True}}}
+assert story.record_feel(f,ok,.4)=='pull' and story.record_feel(f,ok,0)=='grind' and story.record_feel(f,ok,-.3)=='grind'
+assert f['projects'][0]['feel']['sessions']==4 and f['projects'][0]['feel']['mostly']=='grind' and f['stories'][0]['feel']['last']=='grind'
+assert story.felt({'action':'rest'},0)=='neutral'
+
 # In his life: steps join stories as activities finish; reflections can leave threads open and follow them up.
 with tempfile.TemporaryDirectory() as td:
     shutil.copy(ROOT/'crow.py',Path(td)/'crow.py')
@@ -63,5 +72,5 @@ with tempfile.TemporaryDirectory() as td:
     assert app.state['threads'][0]['status']=='followed' and app.state['threads'][0]['place']=='woodland_edge'
     assert 'left_open' in seen['reflect']['properties']
     ctx=app.decision_context();assert ctx['your_ongoing_stories'][0]['story'].startswith('Watch which insects')
-print('PASS: patterns form, hold and are revised from his record; matching intentions continue one story; single steps are not stories; dormant and answered only by time or evidence; '
+print('PASS: pull, grind and doubt per story and project; patterns form, hold and are revised from his record; matching intentions continue one story; single steps are not stories; dormant and answered only by time or evidence; '
       'threads deduped and followed; promises kept by his account; stories reach his decisions.')

@@ -37,7 +37,7 @@ ACCESS_TOKEN = None
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.18.0'
+APP_VERSION = '0.19.0'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -437,7 +437,7 @@ def decision_context():
         'relevant_memories':memory,'recent_pattern':memory_recall.recent_pattern(state),
         'paused_work':[{'id':w['id'],'action':w['pending']['decision']['action'],'intention':w['pending']['decision']['intention'],
             'minutes_left':round(w['pending']['remaining']/60,1)} for w in state['suspended_work'][-3:]],
-        'projects':[{k:p.get(k) for k in ['id','title','status','progress','target']} for p in state['projects']
+        'projects':[{**{k:p.get(k) for k in ['id','title','status','progress','target']},'felt_lately':(p.get('feel') or {}).get('mostly')} for p in state['projects']
                     if p.get('status') in ['active','paused']][-(6 if WIDE else 3):],
         'research':reading_journal.research_context(state),
         'self_notes':[n['text'] for n in state['personality_notes'][-(6 if WIDE else 3):]],
@@ -935,7 +935,7 @@ def finish_action(geometry=None):
                 project['status']='milestone_reached';project['milestone_done']=True
                 description+=' Reached a session milestone for '+project['title']+'; the larger goal is not verified complete.'
     world_state.ensure(state)
-    details={'action':a,'intention':d.get('intention','')[:300],'next_step':state['next_step'],
+    details={'action':a,'intention':d.get('intention','')[:300],'next_step':state['next_step'],'project_id':p.get('project_id'),
              'session':{'started':p['start'],'seconds':p['duration']}}
     if p.get('choice_id') is not None:details['choice_id']=p['choice_id']
     if a=='interact':details.update(verb=d['verb'],hypothesis=d.get('hypothesis',''),prediction=d.get('prediction',''),
@@ -1038,6 +1038,7 @@ def reflect(memory):
             reading_journal.appraise(state,memory,result,ROOT)
         story.settle(state,memory,result.get('answer_status'))
         story.update_beliefs(state,appraisal['at'])
+        story.record_feel(state,memory,signal['valence'],result.get('answer_status'))
         place=memory.get('world_result',{}).get('area') if isinstance(memory.get('world_result'),dict) else None
         if str(result.get('left_open','')).strip():
             story.add_thread(state,result['left_open'],place or ACTIONS.get(memory.get('action'),'the clearing'),memory['id'],appraisal['at'])

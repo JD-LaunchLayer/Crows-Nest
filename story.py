@@ -235,3 +235,44 @@ def update_beliefs(state, at):
 def belief_context(state, limit=6):
     return [{'pattern': b['statement'], 'status': b['status'], 'seen': b['observations']}
             for b in state.get('beliefs', []) if b['status'] in ('held', 'doubted', 'forming')][-limit:]
+
+
+# ---- How work feels: pull, grind and doubt, from his own appraisals of each session ----
+
+EFFORTFUL = {'craft', 'construct', 'gather', 'fell_tree', 'trade', 'garden', 'practise', 'explore', 'move_object'}
+
+
+def felt(memory, valence, answer_status=None):
+    result = memory.get('world_result') if isinstance(memory.get('world_result'), dict) else {}
+    trial = result.get('trial') or {}
+    if (trial and trial.get('goal_met') is False) or answer_status == 'not_answered' or result.get('success') is False:
+        return 'doubt'
+    if valence > .15:
+        return 'pull'
+    if valence <= .05 and memory.get('action') in EFFORTFUL:
+        return 'grind'
+    return 'neutral'
+
+
+def _add_feel(record, kind):
+    feel = record.setdefault('feel', {'pull': 0., 'grind': 0., 'doubt': 0., 'sessions': 0, 'last': None})
+    for k in ('pull', 'grind', 'doubt'):
+        feel[k] = round(feel[k] * .85, 3)
+    if kind in ('pull', 'grind', 'doubt'):
+        feel[kind] = round(feel[kind] + 1, 3)
+    feel['sessions'] += 1
+    feel['last'] = kind
+    strongest = max(('pull', 'grind', 'doubt'), key=lambda k: feel[k])
+    feel['mostly'] = strongest if feel[strongest] >= 1 else None
+
+
+def record_feel(state, memory, valence, answer_status=None):
+    """Attach how this session felt to its story and, if it counted towards one, its project."""
+    kind = felt(memory, valence, answer_status)
+    for s in state.get('stories', []):
+        if s['id'] == memory.get('story_id'):
+            _add_feel(s, kind)
+    for p in state.get('projects', []):
+        if p['id'] == memory.get('project_id'):
+            _add_feel(p, kind)
+    return kind
