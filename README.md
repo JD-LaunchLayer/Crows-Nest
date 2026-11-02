@@ -1095,3 +1095,13 @@ wording, with how many times he has expressed it. Open threads that ask the same
 question are shown once with how many times he noted it. His stored wishes and
 threads are unchanged. "No bush can be made out in …" now reads "There is no bush
 anywhere in …", which he had taken for one unexplained spot.
+
+## v0.24.4 — goods go somewhere
+
+Everything Crow sells to the trading post now goes on its shelves instead of
+vanishing, and can be bought back at the post's price, which is always more than it
+paid: wood (bought at 1 credit per 3 kg, sold on at 0.5 credit a kg), stone (1 per
+5 kg, sold on at 0.3 a kg), carvings (sold on for about half as much again; buying one
+back returns it to his world), and now anything he owns (the post pays about half
+its board price and sells it on at the board price). Edda's own deals move goods
+the same way. Her weekly delivery still only tops up her usual lines.

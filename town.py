@@ -241,6 +241,70 @@ def proposal_schema():
                            'minutes': {'type': 'integer', 'minimum': 0, 'maximum': 180}, 'task': {'type': 'string'}}}
 
 
+# What the post asks when it sells on what it bought from Crow (v0.24.4): always more than it paid.
+RESALE = {'wood': {'name': 'Seasoned wood, by the kg', 'price': .5, 'effect': 'materials:1'},
+          'stone': {'name': 'Building stone, by the kg', 'price': .3, 'effect': 'stone:1'}}
+
+
+def _board_price(post, item):
+    return (post['stock'].get(item) or STARTING_STOCK.get(item) or {}).get('price')
+
+
+def _stock_in(post, key, name, price, qty, effect, **extra):
+    """Goods the post has taken in go on its shelves, at its own selling price."""
+    line = post['stock'].setdefault(key, {'name': name, 'price': price, 'qty': 0, 'effect': effect, **extra})
+    line['qty'] = round(line['qty'] + qty, 2)
+    line.update(extra)
+
+
+def _give(state, stock, quantity):
+    """Hand bought goods to Crow according to what they are."""
+    kind, _, value = stock['effect'].partition(':')
+    if kind == 'pantry':
+        state['provisions']['pantry'] = round(state['provisions']['pantry'] + float(value) * quantity, 2)
+    elif kind == 'materials':
+        state['materials'] = round(state.get('materials', 0) + float(value) * quantity, 2)
+    elif kind == 'stone':
+        state['stone'] = round(state.get('stone', 0) + float(value) * quantity, 2)
+    elif kind == 'object':
+        obj = dict(stock['object'])
+        world = state['built_world']
+        world['objects'][obj['id']] = obj
+        world['revision'] += 1
+        for c in state.get('creations', []):
+            if 'carving-' + str(c['id']) == obj['id']:
+                c.pop('sold', None)
+                c['bought_back'] = True
+    else:
+        state['possessions'][value] = state['possessions'].get(value, 0) + quantity
+
+
+def _take(state, item, quantity, at):
+    """Crow hands goods to the post: they leave him and go on its shelves. Returns (what, credit) or (None, reason)."""
+    post = ensure(state)
+    if item in SELL_RATES:
+        key = 'materials' if item == 'wood' else 'stone'
+        state[key] = round(state[key] - quantity, 2)
+        r = RESALE[item]
+        _stock_in(post, item, r['name'], r['price'], quantity, r['effect'])
+        return f'{quantity:g} kg of {item}'
+    obj = state['built_world']['objects'].get(item)
+    if obj and obj.get('kind') == 'carving':
+        paid = _goods_value(state, item, 1) or 2
+        state['built_world']['objects'].pop(item)
+        state['built_world']['revision'] += 1
+        for c in state.get('creations', []):
+            if 'carving-' + str(c['id']) == item:
+                c['sold'] = at
+        _stock_in(post, item, obj['name'] + ' (a carving)', round(paid * 1.5 + .5), 1, 'object:' + item, object=obj)
+        return obj['name']
+    state['possessions'][item] -= quantity
+    price = _board_price(post, item) or 2
+    name = (post['stock'].get(item) or STARTING_STOCK.get(item) or {}).get('name', item.replace('_', ' '))
+    _stock_in(post, item, name, price, quantity, 'possession:' + item)
+    return f'{quantity} × {name}'
+
+
 def _goods_value(state, item, quantity):
     """Posted value of goods Crow could hand over, or None if he does not have them."""
     if item in SELL_RATES:
@@ -248,6 +312,10 @@ def _goods_value(state, item, quantity):
         if state.get(key, 0) + 1e-9 < quantity:
             return None
         return quantity / SELL_RATES[item]['kg_per_credit']
+    if state.get('possessions', {}).get(item, 0) >= quantity > 0:  # something he owns: about half its board price
+        post = state.get('trading', {})
+        price = (post.get('stock', {}).get(item) or STARTING_STOCK.get(item) or {}).get('price', 2)
+        return max(.5, round(price / 2 * 2) / 2) * quantity
     obj = state['built_world']['objects'].get(item)
     if not obj or not obj.get('parts') or obj.get('kind') != 'carving':
         return None
@@ -306,25 +374,11 @@ def apply_proposal(state, p, at, day):
     if kind == 'sell_item':
         stock = post['stock'][p['item']]
         post['credit'] = round(post['credit'] - p['credit'], 2)
-        stock['qty'] -= p['quantity']
-        effect, _, value = stock['effect'].partition(':')
-        if effect == 'pantry':
-            state['provisions']['pantry'] = round(state['provisions']['pantry'] + float(value) * p['quantity'], 2)
-        else:
-            state['possessions'][value] = state['possessions'].get(value, 0) + p['quantity']
+        stock['qty'] = round(stock['qty'] - p['quantity'], 2)
+        _give(state, stock, p['quantity'])
         text = f'Bought {p["quantity"]} × {stock["name"]} from Edda for {p["credit"]:g} credit (board price {stock["price"] * p["quantity"]:g}).'
     elif kind == 'buy_goods':
-        if p['item'] in SELL_RATES:
-            key = 'materials' if p['item'] == 'wood' else 'stone'
-            state[key] = round(state[key] - p['quantity'], 2)
-            what = f'{p["quantity"]:g} kg of {p["item"]}'
-        else:
-            obj = state['built_world']['objects'].pop(p['item'])
-            state['built_world']['revision'] += 1
-            what = obj['name']
-            for c in state.get('creations', []):
-                if 'carving-' + str(c['id']) == p['item']:
-                    c['sold'] = at
+        what = _take(state, p['item'], p['quantity'], at)
         post['credit'] = round(post['credit'] + p['credit'], 2)
         text = f'Edda took {what} for {p["credit"]:g} credit.'
     elif kind == 'favour':
@@ -358,7 +412,9 @@ def board(state):
     return {'your_credit': post['credit'],
             'for_sale': {k: {'name': v['name'], 'price': v['price'], 'left': v['qty']} for k, v in post['stock'].items() if v['qty'] > 0},
             'we_buy': {'wood': '1 credit per 3 kg', 'stone': '1 credit per 5 kg',
-                       'carving': '1–3 credit for a carving you made, by how well it turned out'},
+                       'carving': '1–3 credit for a carving you made, by how well it turned out',
+                       'things you own': 'about half what the post sells them for'},
+            'note': 'What the post buys goes on its shelves and is sold on at the posted price.',
             'jobs': {**{k: {'name': v['name'], 'minutes': v['minutes'], 'pays': v['credit']} for k, v in JOBS.items()},
                      **{f['id']: {'name': 'Favour for Edda: ' + f['task'], 'minutes': f['minutes'], 'pays': f['credit']}
                         for f in keeper(state)['favours']}}}
@@ -381,13 +437,10 @@ def trade(state, mode, item, quantity, at):
         if post['credit'] + 1e-9 < cost:
             return {'success': False, 'text': f'Not enough trade credit: {stock["name"]} costs {cost:g} and he has {post["credit"]:g}.'}
         post['credit'] = round(post['credit'] - cost, 2)
-        stock['qty'] -= quantity
-        kind, _, value = stock['effect'].partition(':')
-        if kind == 'pantry':
-            state['provisions']['pantry'] = round(state['provisions']['pantry'] + float(value) * quantity, 2)
-        else:
-            state['possessions'][value] = state['possessions'].get(value, 0) + quantity
-        text = f'Bought {quantity} × {stock["name"]} for {cost:g} credit. Credit left: {post["credit"]:g}.'
+        stock['qty'] = round(stock['qty'] - quantity, 2)
+        _give(state, stock, quantity)
+        unit = ' kg' if stock['effect'].split(':')[0] in ('materials', 'stone') else ''
+        text = f'Bought {quantity}{unit} × {stock["name"]} for {cost:g} credit. Credit left: {post["credit"]:g}.'
     elif mode == 'sell':
         if item in SELL_RATES:
             key = 'materials' if item == 'wood' else 'stone'
@@ -396,21 +449,22 @@ def trade(state, mode, item, quantity, at):
             credits = int(kg // per)
             if credits < 1:
                 return {'success': False, 'text': f'Not enough {item} to sell: {per} kg are needed per credit.'}
-            state[key] = round(state[key] - credits * per, 2)
+            what = _take(state, item, credits * per, at)
             post['credit'] = round(post['credit'] + credits, 2)
-            text = f'Sold {credits * per:g} kg of {item} for {credits} credit. Credit now: {post["credit"]:g}.'
+            text = f'Sold {what} for {credits} credit; it is on the post\'s shelves now. Credit now: {post["credit"]:g}.'
         else:
-            obj = state['built_world']['objects'].get(item)
-            if not obj or not obj.get('parts') or obj.get('kind') != 'carving':
-                return {'success': False, 'text': 'The trading post only buys wood, stone or carvings he made.'}
-            creation = next((c for c in state.get('creations', []) if 'carving-' + str(c['id']) == item), {})
-            quality = creation.get('quality', 5)
-            credits = 1 if quality < 5 else 2 if quality < 8 else 3
-            del state['built_world']['objects'][item]
-            state['built_world']['revision'] += 1
-            creation['sold'] = at
+            owned = state.get('possessions', {}).get(item, 0)
+            if owned:
+                quantity = min(quantity, owned)
+                credits = _goods_value(state, item, quantity)
+            else:
+                credits = _goods_value(state, item, 1)
+                quantity = 1
+            if credits is None:
+                return {'success': False, 'text': 'The trading post buys wood, stone, carvings he made, or things he owns; he has none of that.'}
+            what = _take(state, item, quantity, at)
             post['credit'] = round(post['credit'] + credits, 2)
-            text = f'Sold {obj["name"]} for {credits} credit. It now belongs to the trading post. Credit now: {post["credit"]:g}.'
+            text = f'Sold {what} for {credits:g} credit; it belongs to the trading post now. Credit now: {post["credit"]:g}.'
     elif mode == 'job':
         job = JOBS.get(item)
         favour = next((f for f in keeper(state)['favours'] if f['id'] == item), None)
