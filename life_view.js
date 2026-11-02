@@ -43,6 +43,7 @@ export function createLifeView({document}){
    const div=card(trials,`${t.intention||'Practical attempt'} · ${t.goal_met?'Criterion met':'Criterion not met'}`);
    if(t.hypothesis)line(div,'His hypothesis: '+t.hypothesis);
    line(div,'Method: '+Object.entries(t.parameters).map(([k,v])=>`${k}: ${v}`).join(' · '));
+   if(t.note)line(div,'Note (added later): '+t.note,'muted');
    line(div,t.predicted_success===null?'No success prediction recorded.':`He predicted: ${t.predicted_success?'success':'the criterion would not be met'}.`);
    if(t.expected_error_mm!==null)line(div,`Expected width error: ${t.expected_error_mm} mm.`);
    line(div,`Measured width error: ${t.actual_error_mm} mm · His tolerance: ${t.target_error_mm} mm.`);

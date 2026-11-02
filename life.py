@@ -5,6 +5,8 @@ elapsed time advances them. This module never chooses Crow's intentions.
 """
 import copy
 import math
+import random
+import re
 
 
 def clamp(value, low=0, high=100):
@@ -170,9 +172,10 @@ def method_parameters(state, decision):
     practical=state['practical'];saved=next((m for m in practical['methods'] if m['id']==decision.get('method_id')),None)
     if decision.get('method_id') and saved is None:raise ValueError('That saved method does not exist')
     raw=decision.get('attempt') or {}
-    parameters=copy.deepcopy(saved['parameters']) if saved else {
-        'support':raw.get('support','bench'),'passes':raw.get('passes','light'),
-        'direction':raw.get('direction','along')}
+    # A reused method is only a starting point: any setting he states for this attempt replaces it.
+    # (Before v0.21.1 a reused method silently overrode his stated settings.)
+    base=copy.deepcopy(saved['parameters']) if saved else {'support':'bench','passes':'light','direction':'along'}
+    parameters={k:raw.get(k) or base[k] for k in ['support','passes','direction']}
     if parameters['support'] not in ['hand','bench'] or parameters['passes'] not in ['light','deep'] or parameters['direction'] not in ['along','across']:
         raise ValueError('Unsupported working method')
     return parameters
@@ -269,8 +272,72 @@ def learning_context(state):
     return {'methods':[{'id':m['id'],'parameters':m['parameters'],'tested_shapes':m['shapes'],
                         'attempts':m['attempts'],'successes':m['successes'],'best_error_mm':m['best_error_mm']}
                        for m in sorted(p['methods'],key=lambda m:m['evidence'][-1] if m['evidence'] else 0)[-3:]],
-            'recent_trials':[{k:t[k] for k in ['id','hypothesis','method_id','actual_error_mm','target_error_mm','goal_met','adjustment']}
-                             for t in p['trials'][-2:]]}
+            'recent_trials':[{**{k:t[k] for k in ['id','hypothesis','method_id','actual_error_mm','target_error_mm','goal_met','adjustment']},
+                              **({'note':t['note']} if t.get('note') else {})}
+                             for t in p['trials'][-2:]],
+            'trials_whose_method_may_differ_from_the_hypothesis':[{'id':t['id'],'method_used':t['method_id'],'note':t['note']}
+                             for t in p['trials'] if t.get('note')][-6:]}
+
+
+_ASKED = re.compile(r'\b(?:to|with) (hand|bench|light|deep|along|across)\b|\b(hand|bench) support\b|\b(light|deep) passes\b', re.I)
+_GROUP = {'hand': 'support', 'bench': 'support', 'light': 'passes', 'deep': 'passes', 'along': 'direction', 'across': 'direction'}
+
+
+def annotate_overridden_trials(state):
+    """Once: mark past carving trials whose hypothesis names a setting that was not the one used.
+
+    Before v0.21.1, reusing a saved method silently replaced the settings he stated. His
+    requested settings were not stored, so this is an inference from his own wording and
+    is labelled as uncertain; measured results are left exactly as they were."""
+    ensure(state)
+    p = state['practical']
+    if p.get('override_annotated'):
+        return 0
+    marked = 0
+    for t in p['trials']:
+        text = str(t.get('hypothesis', ''))
+        named = {}
+        for m in _ASKED.finditer(text):
+            word = next(g for g in m.groups() if g).lower()
+            named.setdefault(_GROUP[word], set()).add(word)
+        used = t.get('parameters') or {}
+        differ = [f'{g}: {", ".join(sorted(v))} named, {used.get(g)} used' for g, v in named.items()
+                  if used.get(g) and used.get(g) not in v]
+        if differ:
+            t['note'] = ('Possibly not the method he meant to test (' + '; '.join(differ) + '). A reused saved method '
+                         'overrode stated settings until v0.21.1. The measured error is real for the method used.')
+            marked += 1
+    p['override_annotated'] = True
+    return marked
+
+
+def archery_session(state, seconds, seed):
+    """Twelve arrows at the range's target, 18 m away. Results are measured, not judged.
+
+    Spread shrinks with hours of practice (earlier unmeasured sessions count as practice too),
+    and grows with fatigue and darkness. The target face is 122 cm across in ten rings."""
+    ensure(state)
+    p = state['practical']
+    if 'archery_hours' not in p:
+        p['archery_hours'] = round(.5 * state.get('skills', {}).get('archery', 0), 3)
+    rng = random.Random(seed)
+    spread = 40 / (1 + math.sqrt(p['archery_hours'])) * (1 + fatigue(state) * .6)
+    dark = state.get('daylight', 1) < .12
+    if dark:
+        spread *= 1.6 if state.get('possessions', {}).get('lantern') else 2.6
+    dists = sorted(round(math.hypot(rng.gauss(0, spread), rng.gauss(0, spread)), 1) for _ in range(12))
+    on_face = [d for d in dists if d <= 61]
+    gold = sum(d <= 12.2 for d in dists)
+    p['archery_hours'] = round(p['archery_hours'] + max(0, seconds) / 3600 / (1 + fatigue(state)), 3)
+    record = {'arrows': 12, 'on_target': len(on_face), 'in_gold': gold,
+              'mean_cm_from_centre': round(sum(on_face) / len(on_face), 1) if on_face else None,
+              'closest_cm': dists[0], 'dark': dark}
+    p.setdefault('archery', []).append(record)
+    p['archery'] = p['archery'][-40:]
+    text = (f'Shot 12 arrows at the target 18 m away{" in the dark" if dark else ""}. {len(on_face)} hit the face, '
+            f'{gold} in the gold.' + (f' Hits averaged {record["mean_cm_from_centre"]} cm from the centre; the closest was '
+            f'{dists[0]} cm.' if on_face else ' None landed on the face.'))
+    return {'success': True, 'text': text, 'archery': record}
 
 
 # Building craft. Every shape can be attempted from the start; how true it comes out depends on

@@ -38,7 +38,7 @@ ACCESS_TOKEN = None
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.21.0'
+APP_VERSION = '0.21.1'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -137,6 +137,7 @@ if state['pending']:
 reading_journal.ensure(state, ROOT)
 world_state.ensure(state)
 life.ensure(state)
+life.annotate_overridden_trials(state)  # v0.21.1: labels, never rewrites, past trials
 ecology.ensure(state)
 consolidation.ensure(state)
 town.ensure(state)
@@ -375,7 +376,7 @@ DECISION_DEFAULTS={'wish':'','wish_reason':'','object_id':'','plan_id':0,'destin
 ACTION_MENU={'rest':'quiet rest in the cabin','sleep':'sleep (until 07:00 at night, 90 minutes by day)',
     'eat':'eat from an available food source','drink':'drink from the spring',
     'observe':'look closely at one part of the woodland or clearing and notice what is actually there','reflect':'think quietly in the cabin',
-    'explore':'walk the woodland; may pick up a little loose wood','practise':'archery practice (no measured accuracy yet)',
+    'explore':'walk the woodland; may pick up a little loose wood','practise':'archery practice at the range; each session counts where the arrows land',
     'read':'look something up on Wikipedia, or read at leisure','inspect':'examine one object, tree or plant closely',
     'gather':'carry 3 kg of wood or stone into inventory','fell_tree':'fell a standing tree with the axe; timber stays at the site',
     'craft':'carve a small piece from 1 kg wood with a measured outcome','plan':'draft a construction blueprint (builds nothing)',
@@ -586,7 +587,7 @@ def parameter_request(d):
         return ('Carve one small piece from 1 kg wood; target width 140 mm, error is measured from the result. '
                 'Before working, record a hypothesis, predicted success, expected error and your own tolerance (0.5–50 mm). '
                 'support hand/bench, passes light/deep, direction along/across affect error. method_id may reuse a tested method '
-                'or be empty. A missed tolerance still leaves the paid workpiece. No method is a preference by default.',
+                'as a starting point or be empty; any support, passes or direction you set here is what is actually used. A missed tolerance still leaves the paid workpiece. No method is a preference by default.',
                 {'creation_name':STRING,'creation_shape':{'type':'string','enum':SHAPES},'method_id':{'type':'string','enum':['']+methods},
                  'hypothesis':STRING,'predicted_success':{'type':'boolean'},
                  'expected_error_mm':{'type':'number','minimum':.5,'maximum':50},'target_error_mm':{'type':'number','minimum':.5,'maximum':50},
@@ -891,7 +892,8 @@ def finish_action(geometry=None):
         result=world_state.collect(state,'wood',1);description='Explored the woodland. '+result['text']
     elif a=='practise':
         state['skills']['archery']+=1
-        description=f"Finished archery practice session {state['skills']['archery']}. No measured accuracy result is available for this legacy action."
+        result=life.archery_session(state,p['duration'],state['skills']['archery']*7919+state.get('completed',0))
+        description=f"Archery practice session {state['skills']['archery']}. "+result['text']
     elif a=='craft':
         if state['materials']<1: raise ValueError('No wood available; crafting cannot finish')
         trial=life.practical_attempt(state,d,p['duration'])
@@ -902,7 +904,8 @@ def finish_action(geometry=None):
         artifact=state['built_world']['objects']['carving-'+str(state['skills']['craft'])]
         trial['actual_error_mm']=round(abs(artifact['parts'][0]['width']-.14)*1000,2)
         trial['object_id']=artifact['id']
-        description=f'Made {name} from 1 kg wood. Measured width error {trial["actual_error_mm"]:g} mm; chosen tolerance {trial["target_error_mm"]:g} mm. '+('Met that criterion.' if trial['goal_met'] else 'The rough workpiece exists, but did not meet that criterion.')
+        used=trial['parameters']
+        description=f'Made {name} from 1 kg wood, worked {"on the bench" if used["support"]=="bench" else "in the hand"} with {used["passes"]} passes {used["direction"]} the grain. Measured width error {trial["actual_error_mm"]:g} mm; chosen tolerance {trial["target_error_mm"]:g} mm. '+('Met that criterion.' if trial['goal_met'] else 'The rough workpiece exists, but did not meet that criterion.')
         result={'success':trial['goal_met'],'made':True,'trial':trial,'text':description}
     elif a=='read':
         reading=p.get('reading')

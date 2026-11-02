@@ -865,3 +865,19 @@ to his world.
   cloud model, 4 locally), in the order they began, including dormant ones, with
   how long since each was last touched. The latest step's text is no longer shown,
   so the story he is in the middle of gets no extra prominence.
+
+## v0.21.1 — his carving experiments now test what he asks
+
+A bug: when he reused a saved carving method and also stated a setting (say,
+deep passes instead of light), the saved method silently won. Several of his
+"change only pass depth" trials were therefore run with the old settings, and
+he drew conclusions from experiments he never actually ran. Now a reused method
+is only a starting point and any setting he states is used; the result text
+says exactly how the piece was worked. Past trials whose hypothesis names a
+different setting from the one used carry a labelled note (an inference from
+his own wording); measured results are not changed.
+
+Archery practice was a leftover action with no outcome. Each session now shoots
+12 arrows at the 18 m target and reports hits, golds and distance from centre.
+Accuracy improves with hours practised (earlier unmeasured sessions count as
+practice), and worsens when tired or in the dark.
