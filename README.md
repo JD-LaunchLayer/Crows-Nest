@@ -981,3 +981,27 @@ Place names were sprites that turned to face the viewer and showed through walls
 They are now fixed, two-sided boards: over the doors of the cabin, reading cabin,
 trading post and café, and on posts at the archery range, workbench, woodland and
 garden. Scenery only; Crow's world is unchanged.
+
+## v0.23.0 — living off the land, on his own calendar
+
+- **Wild fruit follows the seasons.** The bushes bear from mid-July to mid-October;
+  nothing grows on them the rest of the year, and from November what is left goes
+  over (about a tenth a day). Eating from bare bushes says so plainly.
+- **Real crops** (`garden.CROPS`): mixed vegetables, salad, radishes, seed potatoes,
+  broad beans, garlic and onion sets, each with UK growing times. Tender crops grow
+  only in the warm months (about mid-April to late October) and are killed by winter
+  frost; hardy ones sit through winter and finish the next summer. Winter rain keeps
+  beds damp; summer dries them fast. All on Crow's clock.
+- **Edda's weekly delivery** (every 7 days of Crow's time) tops the standard lines
+  back up, now including seeds, seed potatoes, garlic, onion sets and young hazel,
+  birch and oak trees. Lines you add with `tools/stock_shop.py` are left as they are.
+  Edda knows the practical basics of when to sow and how long things take; for
+  anything deeper she points to the reading cabin and the café. Crow only learns
+  this by asking her, reading or searching.
+- **A finite forest.** About 150 more trees stand in the deeper woods beyond the edge
+  (a new observable area). Fallen timber and trees never come back by themselves.
+  His decisions see how many trees stand, how many stumps there are and how far off
+  the nearest trees now are. He can plant young trees he owns (`plant_tree`); they
+  grow by season and become fellable at 4 m: hazel and birch in about 6-7 years,
+  oak in a dozen or more, at his 24× pace roughly 3-6 real months.
+- The cabin's name board now sits under the eave.

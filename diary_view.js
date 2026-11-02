@@ -19,7 +19,7 @@ export function createDiary({document}){
  }
  const VERB={rest:'resting',sleep:'asleep',eat:'eating',drink:'drinking',observe:'watching the woodland',reflect:'thinking quietly',
   explore:'exploring',practise:'practising archery',read:'reading',inspect:'examining something',gather:'gathering materials',
-  fell_tree:'felling a tree',craft:'carving',plan:'drafting a plan',construct:'building',move_object:'carrying something',resume_work:'returning to his work',interact:'working with an object',browse:'browsing the web',talk:'talking with Edda',trade:'at the trading post',use_item:'using something'};
+  fell_tree:'felling a tree',craft:'carving',plan:'drafting a plan',construct:'building',move_object:'carrying something',resume_work:'returning to his work',interact:'working with an object',browse:'browsing the web',talk:'talking with Edda',trade:'at the trading post',use_item:'using something',garden:'gardening',plant_tree:'planting a tree'};
  function summary(s){
   const parts=[];const twin=s.twin;
   parts.push(s.pending?`He is ${VERB[s.action]||s.action}.`:'He is between activities.');

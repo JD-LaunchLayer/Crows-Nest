@@ -81,8 +81,8 @@ mesh(new T.SphereGeometry(.075,8,6),'#fff0c2',-8.15,1.38,9.3);
 const rug=box(2.2,.015,2.2,'#766f52',-9.1,.09,9.2);rug.castShadow=false;
 const pond=mesh(new T.CylinderGeometry(3,3,.06,13),'#789a91',-18,.01,3);pond.castShadow=false;
 const treeMeshes=new Map();let treeNumber=0;
-function tree(x,z,h=5){
- const id='tree-'+treeNumber++,group=new T.Group();group.position.set(x,0,z);scene.add(group);
+function tree(x,z,h=5,given=null){
+ const id=given||'tree-'+treeNumber++,group=new T.Group();group.position.set(x,0,z);scene.add(group);
  box(.35,h*.5,.35,'#655b40',0,h*.25,0,group);const crowns=[mesh(new T.ConeGeometry(h*.32,h*.75,5),'#455b3f',0,h*.7,0,group),mesh(new T.ConeGeometry(h*.26,h*.65,5),'#536a47',0,h*.99,0,group)];
  block(x,z,.5,.5);treeMeshes.set(id,{group,crowns,stump:null,log:null,x,z,h});
 }
@@ -111,8 +111,12 @@ function syncGarden(g){
 }
 function syncTrees(world){
  for(const [id,t]of Object.entries(world.trees||{})){
-  const visual=treeMeshes.get(id);if(!visual)continue;
-  visual.group.visible=t.stage==='standing';
+  let visual=treeMeshes.get(id);
+  // Trees beyond the original ring (the deeper woods) and ones he planted are built from his world as they appear;
+  // a planted tree is rebuilt as it grows.
+  if(visual&&t.stage==='young'&&Math.abs(visual.h-t.height)>.2){scene.remove(visual.group);treeMeshes.delete(id);visual=null;}
+  if(!visual){tree(t.x,t.z,Math.max(.4,t.height),id);visual=treeMeshes.get(id);ecologyKey='';}
+  visual.group.visible=t.stage==='standing'||t.stage==='young';
   if(t.stage==='felled'&&!visual.stump){visual.stump=mesh(new T.CylinderGeometry(.2,.25,.4,6),'#8a7350',visual.x,.2,visual.z);visual.log=mesh(new T.CylinderGeometry(.16,.20,visual.h*.65,6),'#856a43',visual.x+.7,.22,visual.z);visual.log.rotation.z=Math.PI/2;}
   if(visual.log){visual.log.visible=t.stock>0;visual.log.scale.y=Math.max(.02,t.stock/t.timber_kg)}
  }
@@ -137,7 +141,7 @@ function sign(text,x,y,z,face,{w=2.6,h=.46,post=false}={}){
  if(post)for(const px of [-w/2+.12,w/2-.12])box(.1,y,.1,'#5b4a33',px,-y/2,0,g);
  return g;
 }
-sign('THE CABIN',-10,2.72,-7.38,[-10,0],{w:2.4});
+sign('THE CABIN',-10,2.3,-6.75,[-10,0],{w:2.2,h:.42});
 sign('READING CABIN',-11,2.75,6.84,[-11,0],{w:2.8});
 sign('TRADING POST',-3,2.56,-14.78,[-3,0],{w:3.2});
 sign('INTERNET CAFÉ',9,2.56,-14.78,[9,0],{w:3.2});
@@ -213,7 +217,7 @@ function readingPlan(){
 // His bed in the cabin: sleeping lies him down under a blanket; resting sits him on its edge.
 const BEDSIDE=new T.Vector3(-10.2,0,-10.1);
 // Where an activity actually happens: the chosen area, tree, plant or object, when the decision names one.
-const AREA_SPOTS={grove:[15.5,8.5],spring_side:[-15.6,-1.5],clearing:[1.5,2.5]};
+const AREA_SPOTS={grove:[15.5,8.5],spring_side:[-15.6,-1.5],clearing:[1.5,2.5],deeper_woods:[27,13]};
 // Inside the buildings: at the trading post counter, or on the café terminal stool.
 const INSIDE={trade:[-3,-16.4],talk:[-3,-16.4],browse:[10.3,-17.6]};
 function targetFor(d){
@@ -238,6 +242,7 @@ function beginDesired(){
  const pose=d.pending&&d.action==='interact'&&d.posture?(d.posture.verb==='sit'?'objectSit':'objectLie'):(d.pending?d.action:'idle');
  let place=stations[d.location]||stations.cabin;
  if(d.pending&&['eat','drink'].includes(d.action)){const target=s.built_world?.objects[d.objectId||(d.action==='eat'?'food_store':'spring')];if(target)place=new T.Vector3(target.x,0,target.z-1);}
+ if(d.pending&&d.action==='plant_tree'&&d.dest&&isFinite(d.dest[0])){place=new T.Vector3(d.dest[0]-.8,0,d.dest[1]);}
  if(d.pending&&d.action==='fell_tree'){const tree=s.built_world?.trees[d.objectId];if(tree)place=new T.Vector3(tree.x-.9,0,tree.z);}
  place=targetFor(d)||place;
  const toBed=d.pending&&['sleep','rest'].includes(d.action);if(toBed)place=BEDSIDE.clone();
@@ -249,7 +254,7 @@ function beginDesired(){
 }
 function setActivity(data){
  const key=`${data.decisions}:${Boolean(data.pending)}`;if(key===anim.key)return;
- anim.key=key;anim.desired={action:data.action,location:data.location,pending:Boolean(data.pending),spot:data.pending?.decision?.reading_spot||'standing',objectId:data.pending?.decision?.object_id||'',area:data.pending?.decision?.observe_area||'',twin:Boolean(data.twin),posture:data.pending?.posture||null,verb:data.pending?.decision?.verb||''};
+ anim.key=key;anim.desired={action:data.action,location:data.location,pending:Boolean(data.pending),spot:data.pending?.decision?.reading_spot||'standing',objectId:data.pending?.decision?.object_id||'',area:data.pending?.decision?.observe_area||'',twin:Boolean(data.twin),posture:data.pending?.posture||null,verb:data.pending?.decision?.verb||'',dest:data.pending?.decision?[data.pending.decision.destination_x,data.pending.decision.destination_z]:null};
  if(!initialized){initialized=true;crow.position.copy(stations[data.location]||stations.cabin);anim.snap=true;}
  if(anim.returning)return;
  if(data.twin){anim.book=false;anim.seated=0;anim.floor=0;anim.activeAction='idle';beginDesired();return}
@@ -320,7 +325,7 @@ if(clientVersion&&s.runtime.version&&clientVersion!==s.runtime.version){globalTh
 const maintenance=s.runtime.maintenance||{status:'idle'};if(updateRequested&&maintenance.status==='complete'){globalThis.location?.reload?.();return;}const updating=['checking','backing_up','pulling','restarting'].includes(maintenance.status);
 if($('updateCrow')){ $('updateCrow').disabled=updating||!s.maintenance_enabled; $('updateCrow').textContent=updating?'Updating…':'Back up and update';txt('updateStatus',maintenance.message||(s.maintenance_enabled?'Ready. Your private life data stays on the PC.':'Start Crow with --lan from its Git checkout to enable authenticated updates.'));}
 if(['complete','up_to_date','failed','interrupted'].includes(maintenance.status))updateRequested=false;
-txt('toggle',s.paused?'Begin life':'Pause');{const visitor=s.viewer==='visitor';$('toggle').hidden=visitor;const up=$('updateCrow')?.closest?.('section');if(up)up.hidden=visitor;document.body?.classList?.toggle('visitor',visitor);}txt('clock',`${s.clock.date} · ${s.clock.time} · ${s.twin?'twin clock':s.crow_clock?`Crow's time${s.crow_clock.scale>1?' ('+s.crow_clock.scale+'× speed)':''}`:'UK time'}`);txt('status',s.runtime.status+(s.last_seconds!==null?' · Last choice '+s.last_seconds+'s':''));txt('error',s.last_error);$('toggle').disabled=updating;txt('activity',({eat:'Eating',drink:'Drinking',rest:'Resting',practise:'Practising archery',explore:'Exploring',craft:'Making a carving',read:'Reading Wikipedia',sleep:'Sleeping',observe:'Watching the woodland',reflect:'Reflecting',gather:'Gathering materials',plan:'Preparing a construction plan',construct:'Constructing',move_object:'Carrying and placing an object',inspect:'Inspecting an object',fell_tree:'Felling a tree',interact:'Working with objects',browse:'Browsing the web',talk:'Talking with Edda',trade:'At the trading post',use_item:'Using an item',garden:'Working in the garden',resume_work:'Returning to his work'})[s.action]||s.action);txt('reason',s.reason);$('energy').value=s.energy;txt('resources',`Wood: ${s.materials} kg · Stone: ${s.stone||0} kg · Archery sessions: ${s.skills.archery} · Carvings: ${s.skills.craft}`);txt('intention',s.current_intention||'Crow has not expressed an intention yet.');
+txt('toggle',s.paused?'Begin life':'Pause');{const visitor=s.viewer==='visitor';$('toggle').hidden=visitor;const up=$('updateCrow')?.closest?.('section');if(up)up.hidden=visitor;document.body?.classList?.toggle('visitor',visitor);}txt('clock',`${s.clock.date} · ${s.clock.time} · ${s.twin?'twin clock':s.crow_clock?`Crow's time${s.crow_clock.scale>1?' ('+s.crow_clock.scale+'× speed)':''}`:'UK time'}`);txt('status',s.runtime.status+(s.last_seconds!==null?' · Last choice '+s.last_seconds+'s':''));txt('error',s.last_error);$('toggle').disabled=updating;txt('activity',({eat:'Eating',drink:'Drinking',rest:'Resting',practise:'Practising archery',explore:'Exploring',craft:'Making a carving',read:'Reading Wikipedia',sleep:'Sleeping',observe:'Watching the woodland',reflect:'Reflecting',gather:'Gathering materials',plan:'Preparing a construction plan',construct:'Constructing',move_object:'Carrying and placing an object',inspect:'Inspecting an object',fell_tree:'Felling a tree',interact:'Working with objects',browse:'Browsing the web',talk:'Talking with Edda',trade:'At the trading post',use_item:'Using an item',garden:'Working in the garden',plant_tree:'Planting a tree',resume_work:'Returning to his work'})[s.action]||s.action);txt('reason',s.reason);$('energy').value=s.energy;txt('resources',`Wood: ${s.materials} kg · Stone: ${s.stone||0} kg · Archery sessions: ${s.skills.archery} · Carvings: ${s.skills.craft}`);txt('intention',s.current_intention||'Crow has not expressed an intention yet.');
 setActivity(s);
 $('feed').replaceChildren();for(const m of s.memories.slice(-16).reverse())entry($('feed'),m.event,[m.at?new Date(m.at).toLocaleString('en-GB',{timeZone:'Europe/London'}):`Earlier prototype · Day ${m.day} · ${m.time}`,m.intention?'Aim: '+m.intention:'',m.reason?'Why: '+m.reason:'',m.next_step?'Tentative next step: '+m.next_step:''].filter(Boolean).join(' · '));
 $('wishes').replaceChildren();for(const w of s.wishes.slice(-10).reverse())entry($('wishes'),w.text,`${w.reason} · First expressed day ${w.day} · ${w.mentions} mention(s)`);if(!s.wishes.length)entry($('wishes'),'No wishes expressed yet.');

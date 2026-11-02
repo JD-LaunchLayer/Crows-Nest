@@ -21,6 +21,7 @@ AREAS = {
     'woodland_edge': {'name': 'the woodland edge around the clearing', 'x': 0., 'z': 0., 'r_min': 17., 'r_max': 31.},
     'spring_side': {'name': 'the ground around the spring and fruit bushes', 'x': -17., 'z': -1., 'r': 5.},
     'clearing': {'name': 'the open clearing', 'x': 0., 'z': 0., 'r': 15.},
+    'deeper_woods': {'name': 'the deeper woods beyond the edge', 'x': 0., 'z': 0., 'r_min': 31., 'r_max': 46.},
 }
 
 # Approximate UK leaf calendar (day of year): leaf-out, autumn colour start, bare.
@@ -69,6 +70,10 @@ def ensure(state):
     world = state['built_world']
     eco = state.setdefault('ecology', {})
     if eco.get('version') == 1:
+        # Trees added later (the deeper woods, planted ones) get a species once; nothing else changes.
+        for ident, t in world['trees'].items():
+            if ident not in eco['tree_species']:
+                eco['tree_species'][ident] = t.get('species') or SPECIES_CYCLE[(int(ident.split('-')[1]) * 7) % len(SPECIES_CYCLE)]
         return eco
     trees = world['trees']
     species = {}
@@ -209,6 +214,8 @@ def _plant_facts(state, p, doy, daylight):
 
 def _tree_facts(state, t, doy):
     sp = state['ecology']['tree_species'][t['id']]
+    if t['stage'] == 'young':
+        return [(t['id'], f'{t["id"]} is a young {sp} he planted, about {t["height"]:.1f} m tall, with {leaf_state(sp, doy)}.')]
     if t['stage'] != 'standing':
         return [(t['id'], f'{t["id"]} is a felled {sp} tree; its stump and {t.get("stock", 0):g} kg of timber remain.')]
     article = 'an' if sp[0] in 'aeiou' else 'a'

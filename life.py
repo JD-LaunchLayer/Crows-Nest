@@ -40,17 +40,27 @@ def ensure(state):
     return state['body']
 
 
+def _day_of_year(state):
+    from datetime import datetime
+    try:return datetime.fromisoformat(state['clock']['iso']).timetuple().tm_yday
+    except (KeyError,ValueError,TypeError):return 200
+
+
 def effort(action):
     return {'sleep':0.,'rest':.05,'read':.08,'reflect':.08,'observe':.1,
             'eat':.1,'drink':.05,'inspect':.12,'test_object':.2,'plan':.25,
             'craft':.55,'construct':.75,'gather':.65,'explore':.45,
-            'practise':.65,'move_object':.8,'fell_tree':1.,'browse':.08,'trade':.3,'garden':.45,'talk':.05,'use_item':.2}.get(action,.15)
+            'practise':.65,'move_object':.8,'fell_tree':1.,'plant_tree':.6,'browse':.08,'trade':.3,'garden':.45,'talk':.05,'use_item':.2}.get(action,.15)
 
 
 def advance(state, seconds, action):
     body=ensure(state)
     # Small integration steps keep digestion and recovery independent of tick size.
     remaining=max(0.,float(seconds))
+    doy=_day_of_year(state)
+    # Wild fruit (v0.23): the bushes bear from mid-July to mid-October; nothing grows on them the rest of
+    # the year, and from November what is left goes over or is taken by birds, about a tenth a day.
+    fruiting=196<=doy<=288;spoiling=doy>=305 or doy<=59
     while remaining>0:
         dt=min(remaining,60.)/3600;remaining-=dt*3600
         sleeping=action=='sleep';resting=action in ['sleep','rest'];work=effort(action)
@@ -62,7 +72,8 @@ def advance(state, seconds, action):
         body['exertion']=clamp(body['exertion']+(work*.16-(.32 if resting else .04))*dt,0,1)
         body['active_hours']+=dt
         supplies=state['provisions']
-        supplies['berries']=min(supplies['berry_capacity'],supplies['berries']+.25*dt)
+        if fruiting:supplies['berries']=min(supplies['berry_capacity'],supplies['berries']+.25*dt)
+        elif spoiling:supplies['berries']=max(0.,supplies['berries']*(1-.1/24*dt))
         supplies['water_litres']=min(supplies['water_capacity'],supplies['water_litres']+2*dt)
         for signal in state['affect']['signals']:signal['age_hours']+=dt
         wear(state,action,dt)
@@ -142,7 +153,7 @@ def perceive(state):
     return {'sensations':sensations,'work_impairment':round(fatigue(state),2),
             'supplies':{k:round(state['provisions'][k],2) for k in ['pantry','berries','water_litres']},
             'sources':{'food_store':'Ready-to-eat provisions; finite stock.',
-                       'berry_patch':'Edible fruit; regrows slowly during active time.',
+                       'berry_patch':'Wild fruit bushes; they bear fruit from mid-summer into autumn and none the rest of the year.',
                        'spring':'Drinkable spring basin; replenishes during active time.'}}
 
 
@@ -161,7 +172,11 @@ def consume(state, action, ident):
         key={'food_store':'pantry','berry_patch':'berries'}.get(ident)
         if key is None:return {'success':False,'text':'That object is not a known edible food source.'}
         amount=min(1.,stock[key],max(0,(55-b['stomach'])/22))
-        if amount<=.001:return {'success':False,'text':'No food was consumed; the source is empty or the stomach is full.'}
+        if amount<=.001:
+            if key=='berries' and stock[key]<=.001:
+                bare='The fruit bushes are bare.'+('' if 196<=_day_of_year(state)<=288 else ' Their fruiting season is over for the year.')
+                return {'success':False,'text':bare}
+            return {'success':False,'text':'No food was consumed; the source is empty or the stomach is full.'}
         stock[key]-=amount;b['stomach']+=22*amount
         text=f'Ate {amount:.2f} serving from {obj["name"]}. Nourishment will become available through digestion.'
     sync_energy(state)

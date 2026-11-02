@@ -42,7 +42,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.22.2'
+APP_VERSION = '0.23.0'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -70,8 +70,8 @@ def pass_time(seconds):
         own['virtual'] = (datetime.fromisoformat(own['virtual']) + timedelta(seconds=seconds)).isoformat()
 
 
-ACTIONS = {'rest': 'cabin', 'sleep': 'cabin', 'practise': 'range', 'explore': 'woods', 'craft': 'workbench', 'read': 'library', 'observe': 'woods', 'reflect': 'cabin', 'gather': 'woods', 'plan': 'workbench', 'construct': 'workbench', 'move_object': 'workbench', 'inspect': 'workbench', 'fell_tree': 'woods', 'eat':'cabin', 'drink':'cabin', 'resume_work':'cabin', 'browse':'cafe', 'trade':'shop', 'talk':'shop', 'use_item':'workbench', 'interact':'workbench', 'garden':'garden'}
-DURATIONS = {'rest': 900, 'practise': 1800, 'explore': 1200, 'craft': 2700, 'read': 900, 'observe': 600, 'reflect': 600, 'gather': 1200, 'plan': 600, 'construct': 1800, 'move_object': 300, 'inspect': 60, 'fell_tree': 5400, 'eat':300, 'drink':120, 'browse':900, 'trade':300, 'talk':600, 'use_item':300, 'interact':600, 'garden':900}
+ACTIONS = {'rest': 'cabin', 'sleep': 'cabin', 'practise': 'range', 'explore': 'woods', 'craft': 'workbench', 'read': 'library', 'observe': 'woods', 'reflect': 'cabin', 'gather': 'woods', 'plan': 'workbench', 'construct': 'workbench', 'move_object': 'workbench', 'inspect': 'workbench', 'fell_tree': 'woods', 'eat':'cabin', 'drink':'cabin', 'resume_work':'cabin', 'browse':'cafe', 'trade':'shop', 'talk':'shop', 'use_item':'workbench', 'interact':'workbench', 'garden':'garden', 'plant_tree':'woods'}
+DURATIONS = {'rest': 900, 'practise': 1800, 'explore': 1200, 'craft': 2700, 'read': 900, 'observe': 600, 'reflect': 600, 'gather': 1200, 'plan': 600, 'construct': 1800, 'move_object': 300, 'inspect': 60, 'fell_tree': 5400, 'eat':300, 'drink':120, 'browse':900, 'trade':300, 'talk':600, 'use_item':300, 'interact':600, 'garden':900, 'plant_tree':1200}
 CONFIG = ROOT / 'crow-config.json'
 if CONFIG.exists():
     config = json.loads(CONFIG.read_text())
@@ -396,7 +396,7 @@ DECISION_DEFAULTS={'wish':'','wish_reason':'','object_id':'','plan_id':0,'destin
     'reading_mode':'lookup','research_question':'','next_step':'','creation_name':'','creation_shape':'orb',
     'project_id':-1,'project_title':'','project_status':'active','target_action':'rest','target_sessions':1,
     'observe_area':'woodland_edge','focus':'','trade_mode':'ask','trade_item':'','trade_quantity':1,'opening':'','hope':'','use_item':'','use_on':'','use_how':'',
-    'verb':'','other_id':'','procedure_id':'','hypothesis':'','prediction':'','bed':1,'garden_task':'look'}
+    'verb':'','other_id':'','procedure_id':'','hypothesis':'','prediction':'','bed':1,'garden_task':'look','sow_item':'','sapling':''}
 # One neutral line per action. Details are requested only after an action is chosen.
 ACTION_MENU={'rest':'quiet rest in the cabin','sleep':'sleep (until 07:00 at night, 90 minutes by day)',
     'eat':'eat from an available food source','drink':'drink from the spring',
@@ -412,7 +412,8 @@ ACTION_MENU={'rest':'quiet rest in the cabin','sleep':'sleep (until 07:00 at nig
     'talk':'talk with Edda Thorne, who keeps the trading post: chat, bargain, barter, ask or offer favours',
     'use_item':'use something you own, in whatever way you choose',
     'interact':'work material, divide or arrange solids, place objects on surfaces, or choose a supported posture',
-    'garden':'work at the garden beds beside the cabin'}
+    'garden':'work at the garden beds beside the cabin',
+    'plant_tree':'plant a young tree you own somewhere in the woodland; it grows slowly over years'}
 # The local 4,096-token model needs a tight context; the cloud model gets roughly three times the room.
 WIDE=PROVIDER=='anthropic'
 CONTEXT_BUDGET=int(os.environ.get('CROW_CONTEXT_CHARS','16000' if WIDE else '5600'))
@@ -429,6 +430,7 @@ def available_actions():
     if not any(p['status'] in ['proposed','in_progress'] for p in world['plans']):allowed.remove('construct')
     if not any(o.get('portable') for o in world['objects'].values()):allowed.remove('move_object')
     if not any(state.get('possessions',{}).values()):allowed.remove('use_item')
+    if not any(state.get('possessions',{}).get(k) for k in world_state.SAPLINGS):allowed.remove('plant_tree')
     return allowed
 
 
@@ -474,7 +476,7 @@ def decision_context():
         'interests':experience.summary(state,4 if WIDE else 2),
         'inventory_kg':near['inventory_kg'],'supplies':life.perceive(state)['supplies'],
         'trade_credit':state.get('trading',{}).get('credit',0),'possessions':state.get('possessions',{}),
-        'garden_beds':garden.summary(state),
+        'garden_beds':garden.summary(state),'woods':world_state.forest_state(state),
         'people':[{'name':'Edda Thorne','where':'trading post','times_talked':town.keeper(state)['talks'],
                    'open_favours':[f['id']+': '+f['task'] for f in town.keeper(state)['favours']]}],
         'nearby':[o['id']+' ('+o['name']+')' for o in near['objects']]+[t['id']+' '+t['stage'] for t in near['trees'][:2]]}
@@ -576,10 +578,20 @@ def parameter_request(d):
                 {'library_query':STRING,'research_question':STRING},
                 {'research':reading_journal.research_context(state)})
     if a=='garden':
-        return ('Choose a bed (1-3) and what to do there: sow, water, weed, harvest, or just look.',
-                {'bed':{'type':'integer','enum':[1,2,3]},'garden_task':{'type':'string','enum':['sow','water','weed','harvest','look']}},
-                {'beds':garden.summary(state),'seed_packets':state.get('possessions',{}).get('seeds',0),
+        owned=[k for k in garden.CROPS if state.get('possessions',{}).get(k)]
+        return ('Choose a bed (1-3) and what to do there: sow, water, weed, harvest, or just look. '
+                'sow_item is what you sow or plant if sowing, from what you own, or empty.',
+                {'bed':{'type':'integer','enum':[1,2,3]},'garden_task':{'type':'string','enum':['sow','water','weed','harvest','look']},
+                 'sow_item':{'type':'string','enum':['']+owned}},
+                {'beds':garden.summary(state),'what_you_can_sow':{k:state['possessions'][k] for k in owned},
                  'spring_water_litres':round(state['provisions']['water_litres'],1)})
+    if a=='plant_tree':
+        owned=[k for k in world_state.SAPLINGS if state.get('possessions',{}).get(k)]
+        planted=[{k:t[k] for k in ['id','x','z','height','species']} for t in world_state.ensure(state)['trees'].values() if t['stage']=='young']
+        return ('Choose which young tree to plant and where (x, z in metres; the clearing centre is 0, 0). '
+                'Open woodland ground lies between about 12 and 46 m from the centre, away from other trees and buildings.',
+                {'sapling':{'type':'string','enum':owned},'destination_x':{'type':'number'},'destination_z':{'type':'number'}},
+                {'woods':world_state.forest_state(state),'your_planted_trees':planted[-10:]})
     if a=='use_item':
         owned=[k for k,v in state.get('possessions',{}).items() if v]
         return ('Choose what you use, optionally what you use it on (one of your tools, or nothing), and how, in your own words.',
@@ -951,7 +963,10 @@ def finish_action(geometry=None):
         if not reading:raise ValueError('No retrieved page; browsing cannot finish')
         description='Read a web page at the café: '+reading['title']+' ('+reading['url']+').'
     elif a=='garden':
-        result=garden.work(state,d.get('bed',1),d.get('garden_task','look'));description=result['text']
+        result=garden.work(state,d.get('bed',1),d.get('garden_task','look'),d.get('sow_item',''));description=result['text']
+    elif a=='plant_tree':
+        result=world_state.plant_tree(state,d.get('sapling',''),d.get('destination_x',0),d.get('destination_z',0),now().isoformat())
+        description=result['text']
     elif a=='use_item':
         result=town.use_item(state,d.get('use_item',''),d.get('use_on',''),d.get('use_how',''));description=result['text']
     elif a=='talk':
@@ -1110,7 +1125,10 @@ def tick(elapsed):
     """Advance physical state by active lived seconds (real seconds × his time scale), never invented actions."""
     if not state['paused']:
         pass_time(elapsed)
-        garden.advance(state,elapsed/3600,now().timetuple().tm_yday)
+        doy=now().timetuple().tm_yday
+        garden.advance(state,elapsed/3600,doy)
+        world_state.grow_trees(state,elapsed/3600,garden.warmth(doy))
+        if town.weekly_delivery(state,now()):runtime['status']='A delivery arrived at the trading post'
     clock()
     if state['paused']:return
     p=state['pending']

@@ -9,7 +9,7 @@ root=pathlib.Path(__file__).resolve().parents[1];sys.path.insert(0,str(root))
 import world_state as w
 state={'materials':0,'creations':[{'id':1,'name':'Old carving','shape':'orb'}],'location':'workbench'}
 world=w.ensure(state)
-assert 'carving-1' in world['objects'] and len(world['trees'])==71
+assert 'carving-1' in world['objects'] and all(f'tree-{i}' in world['trees'] for i in range(71)) and len(world['trees'])>150
 assert world['objects']['carving-1']['x']==3
 assert abs(w.mass(world['objects']['carving-1']['parts'])['wood']-1)<.02
 assert w.collect(state,'wood')['success'] and state['materials']==3 and world['sources']['wood']['stock']==247

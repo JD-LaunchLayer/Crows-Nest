@@ -30,7 +30,17 @@ STARTING_STOCK = {
     'lantern': {'name': 'Oil lantern', 'price': 6, 'qty': 1, 'effect': 'possession:lantern'},
     'whetstone': {'name': 'Whetstone', 'price': 4, 'qty': 1, 'effect': 'possession:whetstone'},
     'seeds': {'name': 'Packet of vegetable seeds (one bed)', 'price': 2, 'qty': 8, 'effect': 'possession:seeds'},
+    'salad_seeds': {'name': 'Salad leaf seeds (one bed)', 'price': 1, 'qty': 4, 'effect': 'possession:salad_seeds'},
+    'radish_seeds': {'name': 'Radish seeds (one bed)', 'price': 1, 'qty': 4, 'effect': 'possession:radish_seeds'},
+    'seed_potatoes': {'name': 'Seed potatoes (one bed)', 'price': 2, 'qty': 3, 'effect': 'possession:seed_potatoes'},
+    'broad_bean_seeds': {'name': 'Broad bean seeds (one bed)', 'price': 2, 'qty': 3, 'effect': 'possession:broad_bean_seeds'},
+    'garlic_bulbs': {'name': 'Garlic bulbs for planting (one bed)', 'price': 2, 'qty': 3, 'effect': 'possession:garlic_bulbs'},
+    'onion_sets': {'name': 'Onion sets (one bed)', 'price': 2, 'qty': 3, 'effect': 'possession:onion_sets'},
+    'hazel_sapling': {'name': 'Young hazel tree, bare-rooted', 'price': 2, 'qty': 4, 'effect': 'possession:hazel_sapling'},
+    'birch_sapling': {'name': 'Young silver birch, bare-rooted', 'price': 2, 'qty': 3, 'effect': 'possession:birch_sapling'},
+    'oak_sapling': {'name': 'Young oak, bare-rooted', 'price': 3, 'qty': 2, 'effect': 'possession:oak_sapling'},
 }
+RESTOCK_DAYS = 7  # Edda's delivery comes once a week on Crow's own calendar, topping shelves back up to these levels
 
 
 def _building(ident, name, x, z, roof, wall, w=5., d=4.):
@@ -119,7 +129,27 @@ def ensure(state):
     if 'seeds' not in post['stock'] and not post.get('seeds_added'):
         post['stock']['seeds'] = dict(STARTING_STOCK['seeds'])
     post['seeds_added'] = True
+    for k, v in STARTING_STOCK.items():  # new lines on the board for older saves (v0.23)
+        post['stock'].setdefault(k, dict(v))
     return post
+
+
+def weekly_delivery(state, now):
+    """Once a week of Crow's time a delivery tops the standard lines back up. Extra lines Jordan stocked stay as they are."""
+    post = ensure(state)
+    last = post.get('last_delivery')
+    if last is None:
+        post['last_delivery'] = now.isoformat()
+        return None
+    from datetime import datetime
+    if (now - datetime.fromisoformat(last)).total_seconds() < RESTOCK_DAYS * 86400:
+        return None
+    for k, v in STARTING_STOCK.items():
+        item = post['stock'].setdefault(k, dict(v))
+        item['qty'] = max(item['qty'], v['qty'])
+    post['last_delivery'] = now.isoformat()
+    post['ledger'] = (post.get('ledger', []) + [{'at': now.isoformat(), 'text': 'The weekly delivery arrived; the shelves were topped up.'}])[-60:]
+    return True
 
 
 def _p(ident, x, y, z, w, h, d, color, shape='box', material='wood'):
@@ -176,7 +206,11 @@ KEEPER_PERSONA = ('You are Edda Thorne, keeper of the small trading post beside 
     'You have your own small concerns: the store-room roof leaks when it rains, deliveries arrive irregularly, and the post is '
     'often quiet. You speak naturally and briefly, as a person, never as an assistant or narrator. You know only what Crow says '
     'to you and what has happened between you; you cannot read his thoughts. Do not invent events in the world. You can only '
-    'change anything through the single proposal you return; the posted board shows normal prices.')
+    'change anything through the single proposal you return; the posted board shows normal prices. '
+    'You keep a kitchen garden yourself and know the ordinary practical basics of growing food and planting trees '
+    'in this part of England: what goes in when and roughly how long things take. Share it if he asks. You are not an expert: '
+    'for anything deeper or more particular you would say there are books at the reading cabin and a terminal at the café '
+    'that can find most things, rather than guessing. A delivery comes once a week and tops your shelves up.')
 
 
 def keeper(state):
@@ -471,7 +505,16 @@ POSSESSION_LOOKS = {
 ITEM_KNOWLEDGE = {
     'provisions_bundle': 'ready food that keeps well: bread, cheese and dried fruit, about four meals',
     'lantern': 'gives light after dark: you can see what you are doing and work outdoors at night nearly as well as by day',
-    'seeds': 'vegetable seeds for one garden bed: sow, keep the soil damp and the weeds down; they ripen in a few weeks in summer, much slower in winter',
+    'seeds': 'mixed vegetable seeds for one bed: sow from April to August; about two months in summer; tender, so frost kills them and they will not grow in the cold months',
+    'salad_seeds': 'salad leaves for one bed: sow April to September; ready in about five weeks of warm weather; nothing grows in winter',
+    'radish_seeds': 'radishes for one bed: the quickest crop, about four weeks in warm weather, April to September; useless in winter',
+    'seed_potatoes': 'seed potatoes for one bed: plant in April, dig in late summer; a good heavy crop, about six meals; frost kills the tops',
+    'broad_bean_seeds': 'broad beans for one bed: hardy; sown now, in October or November, they sit through winter and crop in early summer; or sow in spring',
+    'garlic_bulbs': 'garlic for one bed: plant the cloves in autumn, October to December; they need the cold, and are ready next July',
+    'onion_sets': 'onion sets for one bed: hardy kinds go in during autumn, others in spring; ready the next summer',
+    'hazel_sapling': 'a young hazel, about knee high: plant it in open ground in the dormant season, November to March; it grows quickly and could be cut for poles or firewood in about seven years',
+    'birch_sapling': 'a young birch: plant November to March; fast growing, ready to fell in perhaps six or seven years',
+    'oak_sapling': 'a young oak: plant November to March; slow, it takes a dozen years or more to make a felling-size tree, and lives for centuries',
     'whetstone': 'for sharpening blades: drawn along an axe or carving knife it restores a dulled edge; dull blades make chopping slow and carving rough',
 }
 TOOLS = {'axe', 'carving_knife'}

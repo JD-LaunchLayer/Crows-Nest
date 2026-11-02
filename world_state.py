@@ -51,6 +51,16 @@ def ensure(state):
             ident='tree-'+str(i)
             world['trees'][ident]={'id':ident,'x':x,'z':z,'height':h,'stage':'standing','timber_kg':round(h*18),'stock':0}
         world['tools']={'axe':1}
+    if not world.get('deep_forest_added'):
+        # v0.23: the woodland continues beyond the edge ring. Existing trees keep their ids and places.
+        start=1+max(int(i.split('-')[1]) for i in world['trees'] if i.startswith('tree-'))
+        for k in range(150):
+            a=k*2.39996+.7;r=32+(k%13)*1.05
+            x,z=round(math.cos(a)*r,2),round(math.sin(a)*r,2)
+            if any((t['x']-x)**2+(t['z']-z)**2<2.2**2 for t in world['trees'].values()):continue
+            h=round(4.5+(k%6)*.7,2);ident='tree-'+str(start+k)
+            world['trees'][ident]={'id':ident,'x':x,'z':z,'height':h,'stage':'standing','timber_kg':round(h*18),'stock':0}
+        world['deep_forest_added']=True;world['revision']+=1
     for i,c in enumerate(state.get('creations',[])):
         ident='carving-'+str(c['id'])
         if ident not in world['objects']:
@@ -245,3 +255,64 @@ def move(state, ident, x, z):
     if intersects_world(world,moved,x,z,ident):return {'success':False,'text':'The destination intersects another solid object; it was not moved.'}
     o.update(parts=moved['parts'],x=x,z=z,revision=o['revision']+1);o.pop('on',None);world['revision']+=1
     return {'success':True,'object_id':ident,'text':f'Carried {o["name"]} and put it down at ({x:g}, {z:g}).'}
+
+
+# ---- The forest as a resource: finite unless he plants (v0.23) ----
+# Growth in metres per year at summer pace; a young tree becomes fellable at FELLABLE_M.
+GROWTH_M_PER_YEAR = {'hazel': .5, 'silver birch': .6, 'ash': .45, 'oak': .3, 'hornbeam': .35, 'holly': .2}
+FELLABLE_M = 4.0
+SAPLINGS = {'hazel_sapling': 'hazel', 'birch_sapling': 'silver birch', 'oak_sapling': 'oak'}
+
+
+def forest_state(state):
+    """What he can tell about the woods by looking around: counts and how far off the trees stand."""
+    trees = ensure(state)['trees'].values()
+    standing = [t for t in trees if t['stage'] == 'standing']
+    d = sorted(math.hypot(t['x'], t['z']) for t in standing)
+    return {'standing_trees': len(standing), 'felled_stumps': sum(t['stage'] == 'felled' for t in trees),
+            'young_trees_planted': sum(t['stage'] == 'young' for t in trees),
+            'nearest_standing_tree_m_from_clearing_centre': round(d[0]) if d else None,
+            'typical_distance_of_nearest_ten_m': round(d[min(9, len(d) - 1)]) if d else None,
+            'note': 'Trees do not come back by themselves; only planted ones grow.'}
+
+
+def plant_tree(state, item, x, z, at):
+    world = ensure(state)
+    owned = state.setdefault('possessions', {})
+    if item not in SAPLINGS or not owned.get(item):
+        return {'success': False, 'text': 'He has no young tree of that kind to plant.'}
+    r = math.hypot(x, z)
+    if not 12 <= r <= 46:
+        return {'success': False, 'text': 'That spot is not open woodland ground; the village and the far woods are outside the planting ground.'}
+    if any((t['x'] - x) ** 2 + (t['z'] - z) ** 2 < 1.6 ** 2 for t in world['trees'].values() if t['stage'] != 'felled'):
+        return {'success': False, 'text': 'Another tree stands too close to that spot for a new one to grow.'}
+    if any((o['x'] - x) ** 2 + (o['z'] - z) ** 2 < 2.5 ** 2 for o in world['objects'].values()):
+        return {'success': False, 'text': 'Something is already standing on that spot.'}
+    owned[item] -= 1
+    world.setdefault('next_planted', 1)
+    ident = f"planted-{world['next_planted']}"
+    world['next_planted'] += 1
+    species = SAPLINGS[item]
+    world['trees'][ident] = {'id': ident, 'x': round(x, 2), 'z': round(z, 2), 'height': .6, 'stage': 'young', 'timber_kg': 0,
+                             'stock': 0, 'planted': at, 'species': species}
+    state.setdefault('ecology', {}).setdefault('tree_species', {})[ident] = species
+    world['revision'] += 1
+    return {'success': True, 'text': f'Planted a young {species} as {ident} at ({x:.0f}, {z:.0f}). It stands about 0.6 m tall.',
+            'tree_id': ident}
+
+
+def grow_trees(state, hours, season_factor):
+    """Planted trees grow with the seasons of his own calendar; at 4 m they can be felled for timber."""
+    world = ensure(state)
+    years = hours / (24 * 365)
+    changed = False
+    for t in world['trees'].values():
+        if t['stage'] != 'young':
+            continue
+        rate = GROWTH_M_PER_YEAR.get(t.get('species', 'hazel'), .4)
+        t['height'] = round(t['height'] + rate * years * season_factor * 2, 4)  # soil warmth averages 0.5 over a year
+        if t['height'] >= FELLABLE_M:
+            t.update(stage='standing', timber_kg=round(t['height'] * 18))
+            changed = True
+    if changed:
+        world['revision'] += 1
