@@ -1,7 +1,7 @@
 import * as T from '/vendor/three.module.js';
 import {installTouchControls} from '/mobile_controls.js';
 import {createSky} from '/sky.js';
-import {createJournal} from '/journal.js';
+import {createJournal} from '/journal.js';import {buildVillage} from '/village.js';
 import {createLifeView} from '/life_view.js';
 import {createDiary} from '/diary_view.js';
 const $=id=>document.getElementById(id),txt=(id,v)=>$(id).textContent=v;
@@ -26,7 +26,7 @@ function box(w,h,d,c,x,y,z,p=scene){return mesh(new T.BoxGeometry(w,h,d),c,x,y,z
 const obstacles=[];function block(x,z,w,d){obstacles.push({x,z,w:w/2+.3,d:d/2+.3})}
 const floor=mesh(new T.PlaneGeometry(110,110,1,1),'#74815a',0,-.03,0);floor.rotation.x=-Math.PI/2;floor.castShadow=false;
 const stations={cabin:new T.Vector3(-10,0,-6),range:new T.Vector3(10,0,-7),woods:new T.Vector3(13,0,10),workbench:new T.Vector3(0,0,10),library:new T.Vector3(-11,0,5),cafe:new T.Vector3(9,0,-14.2),shop:new T.Vector3(-3,0,-14.2),garden:new T.Vector3(-9,0,-14.2)};
-for(const p of Object.values(stations)){const mid=p.clone().multiplyScalar(.5),path=box(1.5,.035,p.length(),'#a39d77',mid.x,0,mid.z);path.rotation.y=Math.atan2(p.x,p.z);path.castShadow=false;}
+buildVillage({T,scene,mat}); // scenery only: lanes, green and high street (village.js)
 // Open-front cabin: floor and three walls, so it is possible to look inside.
 box(6,.15,5,'#806c4b',-10,.05,-10);box(6,3,.2,'#76644b',-10,1.5,-12.5);box(.2,3,5,'#806c4b',-13,1.5,-10);box(.2,3,5,'#806c4b',-7,1.5,-10);
 block(-10,-12.5,6,.2);block(-13,-10,.2,5);block(-7,-10,.2,5);

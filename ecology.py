@@ -228,6 +228,52 @@ def _tree_facts(state, t, doy):
     return facts
 
 
+# What can only be made out up close: bark, branching, buds and leaf form. Real British
+# natural history, written for each species. Seen when he inspects a tree, or when an
+# observation is focused on that tree by name.
+CLOSE = {
+    'hornbeam': {'bark': 'smooth silver-grey bark; the trunk is fluted with shallow ridges, like tensed muscle',
+                 'branches': 'branches rise steeply from low on the trunk, crowded with fine twigs',
+                 'buds': 'slender pointed buds lie pressed flat against the twigs',
+                 'leaves': 'oval leaves with doubly toothed edges and straight parallel veins, pleated between the veins'},
+    'oak': {'bark': 'rough grey-brown bark split into deep vertical fissures and ridges',
+            'branches': 'thick branches spread wide and twist as they go',
+            'buds': 'rounded brown buds sit clustered at the twig tips',
+            'leaves': 'leaves with rounded lobes, two small ear-like lobes at the base and almost no stalk'},
+    'silver birch': {'bark': 'the white bark peels in papery bands; low on the trunk it turns dark and cracked',
+                     'branches': 'slender branches angle upwards and the fine twigs droop at their tips',
+                     'buds': 'small pointed buds sit on twigs dotted with tiny pale warts',
+                     'leaves': 'small triangular leaves with double-toothed edges on thin stalks'},
+    'hazel': {'bark': 'smooth, shiny copper-brown bark peeling in thin papery strips',
+              'branches': 'several stems rise together from one base rather than a single trunk',
+              'buds': 'small rounded buds, faintly hairy, alternate along the twigs',
+              'leaves': 'rounded leaves, soft and hairy, with a pointed tip and toothed edges'},
+    'ash': {'bark': 'pale grey bark, smooth on the young stems, in a criss-cross of ridges on the old trunk',
+            'branches': 'branches curve downwards then turn up at their tips',
+            'buds': 'stout black buds sit in opposite pairs at the twig ends',
+            'leaves': 'each leaf is a row of paired leaflets along one stalk'},
+    'holly': {'bark': 'thin smooth grey bark',
+              'branches': 'dense branches keep their leaves all year',
+              'buds': 'small green buds sit where the leaves meet the twigs',
+              'leaves': 'glossy dark leaves, the lower ones spiny-edged and the higher ones smoother'},
+}
+
+
+def close_facts(state, t, doy):
+    sp = state['ecology']['tree_species'][t['id']]
+    if t['stage'] != 'standing' or sp not in CLOSE:
+        return []
+    c, i = CLOSE[sp], t['id']
+    facts = [(i, f'Up close, {i} has {c["bark"]}.'), (i, f'On {i}, {c["branches"]}.')]
+    cal = LEAVES.get(sp)
+    if cal is None or _between(doy, cal[1] - 60, 365) or _between(doy, 1, cal[0]):
+        facts.append((i, f'On {i}, {c["buds"]}.'))
+    if leaf_cover(sp, doy) > 0:
+        late = cal is not None and doy > cal[1]
+        facts.append((i, f'{i} has {c["leaves"]}' + ('; the ones left have turned yellow-brown.' if late else '.')))
+    return facts
+
+
 def in_area(area, x, z):
     a = AREAS[area]
     d = math.hypot(x - a['x'], z - a['z'])
@@ -302,10 +348,19 @@ def observe(state, area, focus, doy, daylight, limit=5, lamp=False):
         jitter = int(_key(fact[1] + str(eco['observations'])), 16) % 1000 / 1000
         return (-(overlap * 2 + jitter - .8 * min(seen, 3)))
     ranked = sorted(facts, key=order)
-    chosen = ranked[:limit - 1]
-    rest = [f for f in ranked[limit - 1:] if not (want & _terms(f[1] + ' ' + f[2]))]
-    if rest:  # one incidental thing outside the focus, so attention is not a closed loop
-        chosen.append(rest[eco['observations'] % len(rest)])
+    focused = [f for f in ranked if about_named(f)]
+    if focused:
+        # Looking at one named thing: close detail of it, and nothing about its neighbours.
+        for n in named:
+            t = state['built_world']['trees'].get(n)
+            if t and in_area(area, t['x'], t['z']):
+                focused += [(a, x, '') for a, x in close_facts(state, t, doy)]
+        chosen = focused[:8 if limit > 2 else 2]
+    else:
+        chosen = ranked[:limit - 1]
+        rest = [f for f in ranked[limit - 1:] if not (want & _terms(f[1] + ' ' + f[2]))]
+        if rest:  # one incidental thing outside the focus, so attention is not a closed loop
+            chosen.append(rest[eco['observations'] % len(rest)])
     findings = []
     for about, text, _ in chosen:
         k = _key(text)
@@ -333,7 +388,7 @@ def inspect(state, ident, doy, daylight, lamp=False):
     if daylight < .12 and not lamp:
         return {'success': True, 'text': f'Too dark to examine {ident} in detail.'}
     if tree:
-        facts = _tree_facts(state, tree, doy)
+        facts = _tree_facts(state, tree, doy) + close_facts(state, tree, doy)
         facts += [f for p in eco['plants'] if p.get('host') == ident for f in _plant_facts(state, p, doy, daylight)]
         x, z = tree['x'], tree['z']
     else:

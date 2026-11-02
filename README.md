@@ -906,3 +906,19 @@ In November that made the clearing dark until about 07:55 and from about 16:05,
 while the real sky drawn over him had the sun up from 07:05. Light now runs from
 civil dawn to civil dusk around true solar noon (equation of time included), so
 mornings and late afternoons are usable as they are in Wickford.
+
+## v0.21.5 — a village layout, and looking closely at one tree
+
+**Village (scenery only).** The straight spokes from the centre are replaced by a
+village layout in `village.js`: a green with a lane around it, a High Street with
+a small market square in front of the trading post and café, and named lanes and
+footpaths out to the cabin, garden, library, workshop, range, spring, standing
+stones and woods. Crow's simulation never reads this file; his places, objects and
+coordinates are unchanged. `VILLAGE.PLOTS` lists open places for future buildings
+(anything he should see and use must also be added to his world in `town.py`).
+
+**Close looks.** A focused observation naming a tree (or an inspection) now gives
+that tree's close detail (bark, branching, buds and leaf form, written per species
+from British natural history) and nothing about its neighbours. Before, only
+species, height, leaves and seeds existed, so a named look filled up with other
+trees and he read that as drifting.
