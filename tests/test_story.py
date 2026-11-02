@@ -1,0 +1,51 @@
+"""Stories, threads and promises: continuity recorded from what actually happened, never chosen for him."""
+import copy, importlib.util, shutil, sys, tempfile
+from datetime import datetime
+from pathlib import Path
+ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT))
+import story
+
+s={'body':{'active_hours':10.}}
+def ev(i,intention,action='observe',text='Observed something.'):
+    return {'id':i,'kind':'experience','at':f'2026-11-0{1+i%8}T10:00','intention':intention,'action':action,'event':text,'reason':'Because.'}
+a=story.note_step(s,ev(1,'Map the unlogged woodland edge for new plants'))
+b=story.note_step(s,ev(2,'Map unlogged woodland edge near (17,-17) for new plants'))
+assert a is b and a['stage']=='started' and a['kind']=='looking'
+story.note_step(s,ev(3,'Look for new plants along the unlogged woodland edge'))
+assert a['stage']=='pursuing' and a['count']==3
+c=story.note_step(s,ev(4,'Carve a bowl that holds water','craft'));assert c is not a and c['kind']=='making'
+assert [x['id'] for x in story.context(s)]==[a['id']], 'one-step beginnings are not yet stories'
+s['body']['active_hours']=10+story.DORMANT_HOURS+1;story.age(s);assert a['stage']=='dormant'
+story.note_step(s,ev(5,'Map the unlogged woodland edge for new plants'));assert a['stage']=='pursuing'
+m=ev(6,'Map the unlogged woodland edge for new plants','read');story.note_step(s,m);story.settle(s,m,'answered');assert a['stage']=='answered'
+s['body']['active_hours']+=story.LEFT_HOURS*2;story.age(s);assert c['stage']=='left'
+# Threads and promises.
+t=story.add_thread(s,'Moss only on the north side of the birch?','grove',7,'t');assert t and not story.add_thread(s,'Moss only on north side of the birch','grove',8,'t')
+assert story.follow_thread(s,t['id'],9,'t')['status']=='followed'
+p=story.add_promise(s,'Fix the store-room roof next week','Edda Thorne','t');assert story.keep_promise(s,p['id'],'t')['status'].startswith('kept')
+assert not story.open_items(s)['promises']
+
+# In his life: steps join stories as activities finish; reflections can leave threads open and follow them up.
+with tempfile.TemporaryDirectory() as td:
+    shutil.copy(ROOT/'crow.py',Path(td)/'crow.py')
+    spec=importlib.util.spec_from_file_location('crow_story_test',Path(td)/'crow.py');app=importlib.util.module_from_spec(spec);spec.loader.exec_module(app)
+    app.CLOCK_OVERRIDE=lambda:datetime(2026,11,1,12,0,tzinfo=app.TZ);app.state['paused']=False
+    base={'reason':'Want to see.','intention':'Watch which insects visit the ivy flowers','next_step':'','wish':'','wish_reason':'','project_id':-1,
+          'project_title':'','project_status':'active','target_action':'observe','target_sessions':1}
+    seen={}
+    def model(prompt,schema,limit=650,purpose='other',system=None):
+        seen[purpose]=schema
+        return ({'feeling':'Curious.','lesson':'','topic':'ivy insects','enjoyment':1,'personality_note':'','next_step':'','reading_summary':'',
+                 'answer_status':'not_applicable','meaning':'Something to watch.','adjustment':'','valence':.3,'arousal':.2,'importance':.4,
+                 'left_open':model.left,'thread_followed':model.follow,'promise_kept':0},1)
+    app.model_call=model
+    for i in range(2):
+        model.left='Which insect comes to the ivy after dark?' if i==0 else '';model.follow=0 if i==0 else app.state['threads'][0]['id']
+        app.start_action({**app.DECISION_DEFAULTS,**base,'action':'observe','observe_area':'woodland_edge','focus':'ivy insects'},1)
+        app.tick(app.state['pending']['remaining']);m=app.finish_action();app.reflect(m)
+    st=app.state['stories'][-1];assert st['count']==2 and m['story_id']==st['id']
+    assert app.state['threads'][0]['status']=='followed' and app.state['threads'][0]['place']=='woodland_edge'
+    assert 'left_open' in seen['reflect']['properties']
+    ctx=app.decision_context();assert ctx['your_ongoing_stories'][0]['story'].startswith('Watch which insects')
+print('PASS: matching intentions continue one story; single steps are not stories; dormant and answered only by time or evidence; '
+      'threads deduped and followed; promises kept by his account; stories reach his decisions.')

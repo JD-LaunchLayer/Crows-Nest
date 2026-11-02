@@ -783,3 +783,24 @@ See [mechanics, architectural references and limits](docs/EXPERIENCE_LOOPS.md).
 ```bash
 python3 tests/test_experience.py
 ```
+
+
+## v0.17.0 — stories, unfinished threads and promises
+
+Ideas from what pinos.world publicly shows about Pino, implemented independently.
+
+- **Stories.** Each finished activity joins the open story whose aim matches its
+  intention (shared-word similarity), or begins a new one. A story with three or
+  more steps is "pursuing"; left alone for 72 active hours it goes "dormant", and
+  after 240 it is "left". It becomes "answered" only when a source he read
+  answered its question, or "done" when a making milestone is completed. His
+  ongoing stories reach his decisions, and the journal shows each with its
+  recent steps and why he took them.
+- **Threads.** After an experience he may note something he left unfinished
+  there; later reflections can say a thread was followed up.
+- **Promises.** If he promises Edda something in conversation it is recorded;
+  a later reflection can say he kept it (shown as his own account).
+
+```bash
+python3 tests/test_story.py
+```
