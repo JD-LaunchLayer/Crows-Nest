@@ -31,3 +31,9 @@ with tempfile.TemporaryDirectory() as td:
     assert 'Up close' in r['text'] and 'branches' in r['text']
     assert 'Up close' in ecology.inspect(st,target,312,1.)['text']
 print('PASS v0.21.5: a named look stays on that tree, with bark, branch, bud and leaf detail.')
+# v0.22.1: a name he is steering away from is not the target.
+r=ecology.observe(st,area,f'a different tree at the edge, not {target}',312,1.)
+assert not (r['findings'] and all(target in f['text'] for f in r['findings'])) and (r['edge'] or {}).get('kind')!='seen_all'
+r=ecology.observe(st,area,f'a plant or tree other than {target}',312,1.)
+assert (r['edge'] or {}).get('kind')!='seen_all'
+print('PASS v0.22.1: "not tree-65" looks elsewhere instead of at tree-65.')

@@ -337,7 +337,11 @@ def observe(state, area, focus, doy, daylight, limit=5, lamp=False):
     # Deterministic per observation so results are reproducible, but not the same every visit.
     # A focus that names something (tree-65) means looking at that thing: everything visible
     # about it comes first. Before v0.21.3 the name was reduced to the word "tree" and matched every tree.
-    named = set(re.findall(r'\b[a-z]+-\d+\b', str(focus).lower()))
+    # Names he is steering away from ("not tree-65", "other than tree-65") are not what he is looking at.
+    lowered = str(focus).lower()
+    named = {m.group() for m in re.finditer(r'\b[a-z]+-\d+\b', lowered)
+             if not re.search(r'\b(not|except|excluding|besides|beyond|instead of|other than|apart from|rather than|away from|than)\s+(the\s+)?$',
+                              lowered[max(0, m.start() - 20):m.start()])}
     def about_named(fact):
         return fact[0] in named or any(re.search(r'\b' + re.escape(n) + r'\b', fact[1].lower()) for n in named)
     def order(fact):

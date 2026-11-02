@@ -42,7 +42,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.22.0'
+APP_VERSION = '0.22.1'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -493,7 +493,7 @@ def choose_action():
         'interpretation, appraisal/self_report=how it mattered to you, trial/procedure_result=executor result, search_miss=failed search); use them if they help. '
         'recent_pattern only counts what you recently did; repeating, changing or stopping are all choices. '
         'Reading is knowledge, not practical skill. Planning or research does not complete a physical creation. '
-        'Only people, resources and capabilities described in this world exist. Details of the action (targets, methods, search terms) are asked next, only for the action you choose. '
+        'Only people, resources and capabilities described in this world exist. Every action includes walking to where it happens; there is no separate walking step. Details of the action (targets, methods, search terms) are asked next, only for the action you choose. '
         'Interest histories separate your reported enjoyment from repeated choices and physical results; none defines your identity or orders a return. '
         'project: none, continue/pause/abandon with project_id, or start (titled next). wish may be empty; a wish creates nothing. '
         'memory_ids_used lists IDs of memories that actually informed this choice, or is empty. Keep text brief. '

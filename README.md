@@ -964,3 +964,13 @@ address is never shown. Steps (Linux Mint, once):
 5. `cloudflared tunnel route dns crow yourdomain.example`
 6. `cloudflared tunnel run --url http://127.0.0.1:8765 crow`
    (keep it running beside Crow; `sudo cloudflared service install` makes it start with the PC)
+
+## v0.22.1 — "not tree-65" means somewhere else
+
+A focus like "a different tree at the edge, not tree-65" was read as a look *at*
+tree-65, because the name was in it. He got tree-65 again, was told he had seen
+it all, and wondered why he kept drifting back to it. Names he is steering away
+from ("not", "other than", "instead of", "away from"…) are now ignored. His action
+list also states a rule of his world he had to guess at: every action includes
+walking to where it happens, so there is no separate walking step (he had been
+choosing "explore" to walk to a tree and gathering wood instead).
