@@ -34,7 +34,7 @@ with tempfile.TemporaryDirectory() as td:
     assert context['recent_events'] and context['relevant_memories'] and context['body']
     texts=' '.join(m['text'] for m in context['relevant_memories'])
     assert 'split the bowl rim' in texts, 'old specific lesson should be recalled for a matching intention'
-    assert len(prompt)+len(app.BASELINE)<7600
+    assert len(prompt)+len(app.BASELINE)<8600  # ~2,900 tokens: room for the 320-token reply inside the local 4,096 window
     # Recall and context building never rewrite his saved life.
     life_only=lambda s:{k:v for k,v in s.items() if k not in ('minute','day','clock','daylight')}
     assert life_only(app.state)==life_only(before)

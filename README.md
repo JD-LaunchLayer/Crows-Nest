@@ -783,3 +783,70 @@ See [mechanics, architectural references and limits](docs/EXPERIENCE_LOOPS.md).
 ```bash
 python3 tests/test_experience.py
 ```
+
+
+## v0.17.0 — stories, unfinished threads and promises
+
+Ideas from what pinos.world publicly shows about Pino, implemented independently.
+
+- **Stories.** Each finished activity joins the open story whose aim matches its
+  intention (shared-word similarity), or begins a new one. A story with three or
+  more steps is "pursuing"; left alone for 72 active hours it goes "dormant", and
+  after 240 it is "left". It becomes "answered" only when a source he read
+  answered its question, or "done" when a making milestone is completed. His
+  ongoing stories reach his decisions, and the journal shows each with its
+  recent steps and why he took them.
+- **Threads.** After an experience he may note something he left unfinished
+  there; later reflections can say a thread was followed up.
+- **Promises.** If he promises Edda something in conversation it is recorded;
+  a later reflection can say he kept it (shown as his own account).
+
+```bash
+python3 tests/test_story.py
+```
+
+## v0.18.0 — patterns in his own record
+
+After each reflection, fixed rules recompute patterns from his last 400
+appraisals and the events behind them (not from anything the model claims):
+
+- how an activity tends to leave him (mean appraisal valence above +0.15 "tends
+  to lift me", below −0.15 "tends to leave me low", otherwise "much the same");
+- whether it tends to work out (world results succeeding 80%+ or 40%−).
+
+A pattern needs at least four occasions ("forming"); with six or more it is
+"held" if the last three agree, otherwise "doubted". When the record changes
+the old statement is marked "revised" and kept, and the new one begins. The
+patterns reach his decisions as "patterns in your record", and the journal
+lists them, including what they used to be.
+
+## v0.19.0 — how his work feels
+
+Each session he appraises is tagged, by rule, as **pull** (appraised positively),
+**grind** (flat or negative effortful work), **doubt** (a missed criterion, an
+unanswered question or a failed result) or neutral. Running tallies decay
+gently, so recent sessions count most. They attach to the story the session
+belonged to and, when it counted towards one, to the project. His decisions see
+how each project has mostly felt lately; the journal shows pull, grind and
+doubt per project and the latest feel per story.
+
+## v0.20.0 — a garden
+
+Three garden beds beside the cabin (`garden.py`). `garden` lets him sow, water,
+weed, harvest or just look at a bed. Moisture falls and weeds creep in per active
+hour (faster in summer); a crop grows only while the bed is damp and not choked,
+ripening in about three weeks at summer pace and roughly four times slower in
+midwinter; a bed left very dry withers its crop. Watering carries 2 litres
+from the spring basin. A ripe bed gives up to 3 servings, fewer if it suffered.
+Seed packets are sold at the trading post (Edda knows how they are grown; Crow
+sees only a packet of seeds). What he perceives is soil, weeds and plants in
+words, never numbers. The beds render in 3D: damp soil darkens, weeds show as
+tufts, plants grow, yellow or wither.
+
+Also: `tests/test_version.py` checks that the page and server versions match
+(a mismatch makes the browser reload continuously); the side panel names the
+newer activities; "Find Crow" avoids placing the camera behind a wall.
+
+```bash
+python3 tests/test_garden.py
+```
