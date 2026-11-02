@@ -890,3 +890,11 @@ fractional answer for a whole number is rounded, a missing reading status counts
 as "not applicable", and an answer cut off for length is asked again once with
 more room (the cut-off attempt still counts toward the daily cap). When an answer
 still does not fit, `last_fallback` names the field and what was given.
+
+## v0.21.3 — looking at the tree he means
+
+When he observed an area with a focus such as "look closely at tree-65", the name
+was reduced to the word "tree", which matched every tree equally, so he kept
+getting neighbouring trees. He spent a day believing he kept drifting off his
+plan. Now a focus that names something brings everything visible about it first.
+His own reading of those days is left as he wrote it.

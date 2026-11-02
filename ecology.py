@@ -13,6 +13,7 @@ follows the real standing/felled state of each tree. Seasonal appearance
 follows the real UK calendar date, so what is visible changes through the year.
 """
 import hashlib
+import re
 import math
 
 AREAS = {
@@ -288,7 +289,14 @@ def observe(state, area, focus, doy, daylight, limit=5, lamp=False):
     want = _terms(focus)
     eco['observations'] += 1
     # Deterministic per observation so results are reproducible, but not the same every visit.
+    # A focus that names something (tree-65) means looking at that thing: everything visible
+    # about it comes first. Before v0.21.3 the name was reduced to the word "tree" and matched every tree.
+    named = set(re.findall(r'\b[a-z]+-\d+\b', str(focus).lower()))
+    def about_named(fact):
+        return fact[0] in named or any(re.search(r'\b' + re.escape(n) + r'\b', fact[1].lower()) for n in named)
     def order(fact):
+        if about_named(fact):
+            return -100 - len(want & _terms(fact[1]))
         overlap = len(want & _terms(fact[1] + ' ' + fact[2]))
         seen = eco['seen'].get(_key(fact[1]), 0)
         jitter = int(_key(fact[1] + str(eco['observations'])), 16) % 1000 / 1000
