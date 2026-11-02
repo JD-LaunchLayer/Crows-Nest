@@ -21,4 +21,12 @@ r=town.trade(s,'buy','carving-7',1,'t');assert r['success'] and 'carving-7' in s
 s['materials']=9;ok=town.apply_proposal(s,{'kind':'buy_goods','item':'wood','quantity':9,'credit':3},'t',1)
 assert ok['success'] and s['materials']==0 and post['stock']['wood']['qty']==15
 assert town.board(s)['for_sale']['wood']['left']==15
+# v0.25: things he made fetch well above their raw materials, more when better made; shaped workpieces sell too.
+low=dict(s['creations'][0]);s['creations'].append({'id':8,'name':'Good bowl','shape':'bowl','quality':9,'day':2});world_state.ensure(s)
+assert town._goods_value(s,'carving-8',1)>town._goods_value(s,'carving-7',1)>1/3*2
+from world_state import part
+wp={'id':'workpiece-1','name':'Shaped block','kind':'workpiece','portable':True,'x':1,'z':1,'parts':[part('body',0,.1,0,.2,.2,.2)],'revision':0}
+s['built_world']['objects']['workpiece-1']=wp;raw=world_state.mass(wp['parts'])['wood']/3
+v=town._goods_value(s,'workpiece-1',1);assert v>=2*raw+1
+r=town.trade(s,'sell','workpiece-1',1,'t');assert r['success'] and 'workpiece-1' in post['stock']
 print('PASS v0.24.4: sold goods go on the shelves and can be bought back at a profit; carvings return; Edda\'s deals move real goods.')

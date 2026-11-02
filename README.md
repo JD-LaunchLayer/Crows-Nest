@@ -1105,3 +1105,27 @@ paid: wood (bought at 1 credit per 3 kg, sold on at 0.5 credit a kg), stone (1 p
 back returns it to his world), and now anything he owns (the post pays about half
 its board price and sells it on at the board price). Edda's own deals move goods
 the same way. Her weekly delivery still only tops up her usual lines.
+
+## v0.25.0 — a crow's body, birds, and made goods
+
+- **His figure.** In the 3D view Crow is now drawn as a small, round, cute crow
+  (big eyes, a rust scarf, wings for arms) on the same movements as before. Looks
+  only: to himself and to Edda he is still an elf; nothing he perceives changed.
+- **Birds.** Ten kinds of wild bird now move about the clearing, the woods' edge,
+  the grove, the spring and the deeper woods: perched on branches, roofs and
+  things he has built, on the ground, or flying over. At night they roost out of
+  sight. He can notice them only by how they look and where they are (for example
+  "a small round brown bird with an orange-red face and breast is on a low branch
+  of tree-12"). Nothing names them or says what they are doing.
+- **Favours say how they are done.** A favour agreed with Edda is done by working
+  at the trading post as its job (trade, job favour-N); whatever the work needs is
+  there. Before, nothing said this, and he went looking for the crates.
+- **Plain descriptions.** Inspecting something with no close detail now gives a
+  plain description (fixed or portable, what it is made of, its size, its parts)
+  before the measured properties.
+- **Made goods are worth more.** The trading post pays for things he made by what
+  they are made of and how well they are made, always more than the raw material.
+  Nothing tells him this; the price is simply what it is.
+- "past …" now counts as excluding something, like "not …".
+- Supplies he perceives now state their units: servings of ready food and of fruit
+  on the bushes, litres of spring water.

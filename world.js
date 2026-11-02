@@ -96,6 +96,40 @@ function syncEcology(view){
  while(plantGroup.children.length){const c=plantGroup.children[0];plantGroup.remove(c);c.geometry.dispose()}
  for(const p of view.plants||[]){const look=PLANT_LOOK[p.species];if(!look)continue;const [c,w,h]=look;const m=mesh(new T.DodecahedronGeometry(.5,0),c,p.x,h/2,p.z,plantGroup);m.scale.set(w,h,w);m.castShadow=false;}
 }
+// Birds (v0.25): where each one is comes from the server, on Crow's clock, so what you see is what he could notice.
+// Between moves they fly over in a short arc; in the air they circle; perched they bob and look about.
+const birdGroup=new T.Group();scene.add(birdGroup);const birdMeshes=new Map();
+function makeBird(b){
+ const [body,wing,accent,bill]=b.colours,k=b.size/.3,g=new T.Group();birdGroup.add(g);
+ const torsoB=mesh(new T.SphereGeometry(.09,8,6),body,0,0,0,g);torsoB.scale.set(.9,.85,1.35);torsoB.castShadow=false;
+ mesh(new T.SphereGeometry(.07,8,6),accent,0,-.01,.05,g).scale.set(.85,.9,.7);
+ const head=new T.Group();head.position.set(0,.07,.1);g.add(head);
+ mesh(new T.SphereGeometry(.058,8,6),body,0,0,0,head);
+ const bk=mesh(new T.ConeGeometry(.018,.06,4),bill,0,-.005,.07,head);bk.rotation.x=Math.PI/2;
+ for(const x of [-.035,.035])mesh(new T.SphereGeometry(.011,5,4),'#0c0c0c',x,.015,.04,head);
+ const tail=box(.07,.015,.12,wing,0,.01,-.15,g);tail.rotation.x=.25;
+ const wings=[-1,1].map(side=>{const w=new T.Group();w.position.set(side*.07,.03,0);g.add(w);box(.13,.012,.1,wing,side*.065,0,0,w);return w});
+ g.scale.setScalar(k);return {g,head,wings,pos:new T.Vector3(b.x,b.y,b.z),from:null,to:null,t:0,dur:1,mode:b.mode,target:b,angle:0};
+}
+function syncBirds(list){
+ for(const b of list||[]){let m=birdMeshes.get(b.id);if(!m){m=makeBird(b);birdMeshes.set(b.id,m);m.g.position.set(b.x,b.y,b.z);}
+  const moved=Math.hypot(b.x-m.target.x,b.z-m.target.z)>.2||Math.abs(b.y-m.target.y)>.2||b.mode!==m.target.mode;
+  if(moved){m.from=m.g.position.clone();m.to=b.mode==='air'?new T.Vector3(b.x+(b.radius||8),b.y,b.z):new T.Vector3(b.x,b.y,b.z);
+   m.t=0;m.dur=Math.min(7,Math.max(1.4,m.from.distanceTo(m.to)/5));}
+  m.target=b;m.g.visible=b.mode!=='roost';}
+}
+function animateBirds(dt,elapsed){
+ for(const m of birdMeshes.values()){if(!m.g.visible)continue;const b=m.target;let flapping=false;
+  if(m.from&&m.t<1){m.t=Math.min(1,m.t+dt/m.dur);const e=T.MathUtils.smoothstep(m.t,0,1);
+   const p=m.from.clone().lerp(m.to,e);p.y+=Math.sin(Math.PI*e)*Math.min(4,m.from.distanceTo(m.to)*.25);
+   const d=p.clone().sub(m.g.position);if(d.lengthSq()>1e-6)m.g.rotation.y=Math.atan2(d.x,d.z);m.g.position.copy(p);flapping=true;
+   if(m.t>=1){m.from=null;if(b.mode==='air')m.angle=0;}}
+  else if(b.mode==='air'){m.angle+=dt*.5;const r=b.radius||8;const x=b.x+Math.cos(m.angle)*r,z=b.z+Math.sin(m.angle)*r;
+   m.g.rotation.y=Math.atan2(-Math.sin(m.angle),Math.cos(m.angle))+Math.PI;m.g.position.set(x,b.y+Math.sin(elapsed*.7+m.angle)*.4,z);flapping=Math.sin(elapsed*1.3+m.angle*3)>-.2;}
+  else{m.g.position.y=b.y+.05+Math.abs(Math.sin(elapsed*3+m.angle))*.006;m.head.rotation.y=Math.sin(elapsed*.9+b.x)*.8;
+   if(b.mode==='ground'&&Math.sin(elapsed*.6+b.z)>.95)m.head.rotation.x=.6;else m.head.rotation.x=0;}
+  const flap=flapping?Math.sin(elapsed*22)*.9:0;m.wings[0].rotation.z=-flap-.05;m.wings[1].rotation.z=flap+.05;}
+}
 // Garden beds beside the cabin: soil darkens when damp, weeds show as tufts, plants grow with the crop.
 const GARDEN_BEDS=[[-11.4,-15.6],[-9.0,-15.6],[-6.6,-15.6]];const gardenGroup=new T.Group();scene.add(gardenGroup);let gardenKey='';
 function syncGarden(g){
@@ -151,34 +185,38 @@ sign('WOODLAND',13.8,1.55,8.1,[6,3.6],{w:1.8,h:.4,post:true});
 sign('GARDEN',-12.9,1.3,-14.7,[-8,-8],{w:1.5,h:.38,post:true});
 // Jointed placeholder elf: hips, knees, shoulders and elbows support sitting and reaching.
 const crow=new T.Group();scene.add(crow);
-// An original low-poly elf: slate cloak, teal tunic, rust sash, silver hair tied back.
-const SKIN='#e2c6a6',TUNIC='#3f6058',CLOAK='#3b4352',SASH='#9c4f2c',TROUSERS='#47443a',BOOTS='#2e2924',HAIR='#d8d3c6';
+// A cute low-poly crow on two legs (looks only: he still thinks of himself as he always has).
+// Same joints as before (hips, knees, shoulders, elbows, head), so every pose still works.
+const FEATHER='#1d2028',SHEEN='#2c3446',BELLY='#3a3f4c',BEAK='#4a4c52',LEG='#3b3d42',SCARF='#9c4f2c',EYE='#f6f2e6';
 function cyl(rt,rb,h,c,x,y,z,p,seg=7){return mesh(new T.CylinderGeometry(rt,rb,h,seg),c,x,y,z,p)}
-const torso=cyl(.27,.21,.62,TUNIC,0,1.12,0,crow);
-cyl(.215,.3,.26,TUNIC,0,.74,0,crow);                       // tunic skirt
-mesh(new T.TorusGeometry(.225,.035,4,10),SASH,0,.86,0,crow).rotation.x=Math.PI/2;
-box(.1,.2,.03,SASH,.13,.72,.2,crow).rotation.z=-.2;          // sash tail
-cyl(.2,.3,.95,CLOAK,0,.95,-.12,crow,6).scale.z=.35;                        // cloak hanging behind
-mesh(new T.TorusGeometry(.2,.06,4,10,Math.PI*1.4),CLOAK,0,1.43,-.02,crow).rotation.x=Math.PI/2; // folded hood at the collar
-cyl(.07,.08,.16,SKIN,0,1.5,0,crow);                          // neck
-const headPivot=new T.Group();headPivot.position.y=1.66;crow.add(headPivot);
-mesh(new T.IcosahedronGeometry(.2,1),SKIN,0,.04,0,headPivot).scale.set(.92,1.12,1);
-const hair=mesh(new T.SphereGeometry(.215,8,5,0,Math.PI*2,0,Math.PI*.55),HAIR,0,.07,-.025,headPivot);hair.rotation.x=-.25;
-mesh(new T.ConeGeometry(.06,.36,5),HAIR,0,-.12,-.2,headPivot).rotation.x=Math.PI*.92;   // tied-back tail
-for(const x of [-.2,.2]){const ear=mesh(new T.ConeGeometry(.045,.27,4),SKIN,x,.06,-.01,headPivot);ear.rotation.z=x>0?-1.05:1.05;ear.rotation.x=-.35;}
-for(const x of [-.075,.075]){box(.05,.03,.02,'#f4efe2',x,.07,.185,headPivot);box(.022,.026,.02,'#b0782e',x,.07,.193,headPivot);box(.065,.014,.02,'#9b958a',x,.115,.188,headPivot).rotation.z=x>0?-.15:.15;}
-mesh(new T.ConeGeometry(.025,.07,4),SKIN,0,.02,.205,headPivot).rotation.x=Math.PI/2;      // nose
-box(.07,.012,.01,'#a4705e',0,-.05,.19,headPivot);                                         // mouth
+const torso=mesh(new T.IcosahedronGeometry(.36,1),FEATHER,0,1.02,0,crow);torso.scale.set(1,1.18,.92);   // round body
+mesh(new T.IcosahedronGeometry(.27,1),BELLY,0,.98,.13,crow).scale.set(.95,1.1,.6);                        // lighter belly
+for(const [x,r] of [[-.07,.35],[0,0],[.07,-.35]]){const f=box(.1,.04,.42,SHEEN,x,.82,-.36,crow);f.rotation.x=.55;f.rotation.y=r*.4;} // tail fan
+mesh(new T.TorusGeometry(.2,.05,5,12),SCARF,0,1.4,0,crow).rotation.x=Math.PI/2;                           // a little rust scarf
+box(.09,.2,.03,SCARF,.1,1.27,.19,crow).rotation.z=-.25;
+const headPivot=new T.Group();headPivot.position.y=1.62;crow.add(headPivot);
+mesh(new T.IcosahedronGeometry(.25,1),FEATHER,0,.04,0,headPivot).scale.set(1,.98,1);                     // big round head
+for(const [x,r] of [[-.04,-.3],[.04,.3],[0,0]]){const t=box(.03,.13,.03,FEATHER,x,.29,-.03,headPivot);t.rotation.z=r;t.rotation.x=-.3;} // head tuft
+const beak=mesh(new T.ConeGeometry(.075,.24,5),BEAK,0,0,.28,headPivot);beak.rotation.x=Math.PI/2;       // short stout beak
+for(const x of [-.105,.105]){                                                                             // big shiny eyes
+ mesh(new T.SphereGeometry(.062,10,8),EYE,x,.075,.19,headPivot);
+ mesh(new T.SphereGeometry(.04,10,8),'#14161b',x*1.04,.075,.235,headPivot);
+ mesh(new T.SphereGeometry(.013,6,5),'#ffffff',x*1.04+.012,.09,.27,headPivot);
+}
+for(const x of [-.17,.17])mesh(new T.SphereGeometry(.035,8,6),'#6a4a5a',x,-.04,.17,headPivot).scale.set(1,.6,.4); // rosy cheeks
 const legs=[],knees=[],arms=[],elbows=[];
 for(const x of [-.12,.12]){
  const hip=new T.Group();hip.position.set(x,.76,0);crow.add(hip);legs.push(hip);
- cyl(.085,.075,.36,TROUSERS,0,-.18,0,hip);
+ cyl(.075,.05,.36,FEATHER,0,-.18,0,hip);                         // feathered thighs
  const knee=new T.Group();knee.position.y=-.36;hip.add(knee);knees.push(knee);
- cyl(.075,.07,.3,BOOTS,0,-.15,0,knee);box(.15,.1,.27,BOOTS,0,-.33,.05,knee);
- const shoulder=new T.Group();shoulder.position.set(Math.sign(x)*.33,1.36,0);crow.add(shoulder);arms.push(shoulder);
- cyl(.07,.06,.3,TUNIC,0,-.15,0,shoulder);
- const elbow=new T.Group();elbow.position.y=-.3;shoulder.add(elbow);elbows.push(elbow);
- cyl(.06,.055,.26,'#5b4635',0,-.13,0,elbow);mesh(new T.IcosahedronGeometry(.055,0),SKIN,0,-.29,0,elbow);
+ cyl(.03,.03,.32,LEG,0,-.16,0,knee);
+ for(const r of [-.45,0,.45]){const toe=box(.025,.02,.16,LEG,Math.sin(r)*.06,-.34,.06+Math.cos(r)*.02,knee);toe.rotation.y=r;} // three toes
+ box(.025,.02,.08,LEG,0,-.34,-.06,knee);                         // back toe
+ const shoulder=new T.Group();shoulder.position.set(Math.sign(x)*.34,1.3,0);crow.add(shoulder);arms.push(shoulder);
+ const wing=box(.07,.36,.2,FEATHER,Math.sign(x)*.02,-.16,-.02,shoulder);wing.rotation.z=Math.sign(x)*.12; // wing as upper arm
+ const elbow=new T.Group();elbow.position.y=-.32;shoulder.add(elbow);elbows.push(elbow);
+ box(.06,.26,.17,SHEEN,0,-.13,0,elbow);
+ for(let k=0;k<3;k++){const q=box(.04,.13,.05,FEATHER,0,-.3,-.06+k*.06,elbow);q.rotation.x=(k-1)*.25;}   // feather 'fingers'
 }
 // His lantern: carried and lit after dark once he owns one. The light is real in the scene.
 const heldLantern=new T.Group();elbows[0].add(heldLantern);heldLantern.position.set(0,-.38,.06);heldLantern.visible=false;
@@ -353,12 +391,12 @@ $('reading').replaceChildren();const source=s.pending?.reading;if(source){const 
 const pending=s.pending;txt('remaining',pending?(pending.decision?.action==='read'&&pending.duration===0?`${s.paused?'Paused · ':''}Quick research · finishes after processing the excerpt`:`${s.paused?'Paused · ':''}${Math.ceil(pending.remaining/60)} min remaining · ${Math.round(pending.duration/60)} min session`):s.reflection_pending?'Processing this experience.':'Choosing the next activity.');
 journal.update(s);
 lifeView.update(s);diary.update(s);player.follow(s);syncGarden(s.garden);edda.visible=Boolean(s.keeper&&s.built_world?.objects?.trading_post);const lit=Boolean(s.possessions?.lantern)&&s.daylight<.12;heldLantern.visible=lit;lanternLight.intensity=lit?6:0;
-$('creations').replaceChildren();for(const c of s.creations.slice(-8).reverse())entry($('creations'),c.name,`${c.shape} · Day ${c.day}`);if(s.built_world){syncBuiltWorld(s.built_world)}else{creations(s.creations)}syncEcology(s.ecology_view);lamp.intensity=s.action==='read'&&s.pending?15:(s.daylight<.2?8:1.5);
+$('creations').replaceChildren();for(const c of s.creations.slice(-8).reverse())entry($('creations'),c.name,`${c.shape} · Day ${c.day}`);if(s.built_world){syncBuiltWorld(s.built_world)}else{creations(s.creations)}syncEcology(s.ecology_view);syncBirds(s.birds_view);lamp.intensity=s.action==='read'&&s.pending?15:(s.daylight<.2?8:1.5);
 const celestial=sky.update(new Date(s.clock.iso));if($('skyInfo'))txt('skyInfo',`Sun ${celestial.sun.altitude.toFixed(0)}° · Moon ${celestial.moon.altitude.toFixed(0)}° above horizon · Wickford`);
 if($('worldPlans')&&s.built_world){$('worldPlans').replaceChildren();for(const p of s.built_world.plans.slice(-5).reverse())entry($('worldPlans'),`${p.name} · ${p.status}`,`Plan ${p.id} · ${Object.entries(p.bill).map(([m,q])=>q+' kg '+m).join(', ')||'No new materials'} · ${p.work_done_minutes||0}/${p.minutes} min work`);$('worldObjects').replaceChildren();for(const o of Object.values(s.built_world.objects))entry($('worldObjects'),o.name,`${o.id} · (${o.x.toFixed(1)}, ${o.z.toFixed(1)}) · ${o.parts.length} parts`);txt('sourceStocks',Object.entries(s.built_world.sources).map(([m,v])=>`${m}: ${v.stock} kg remains`).join(' · '));}
 }catch(e){if(updateRequested){txt('status','Reconnecting after the update…');txt('error','');}else{txt('status','Connection lost — keep the Python terminal open.');txt('error',e.message)}}}
 function resize(){renderer.setSize(holder.clientWidth,holder.clientHeight);camera.aspect=holder.clientWidth/holder.clientHeight;camera.updateProjectionMatrix()}addEventListener('resize',resize);resize();
-function frame(now){const dt=Math.min(.08,(now-last)/1000);last=now;if(keys.has('ArrowLeft'))yaw+=dt*1.5;if(keys.has('ArrowRight'))yaw-=dt*1.5;let f=(keys.has('KeyW')||keys.has('ArrowUp')?1:0)-(keys.has('KeyS')||keys.has('ArrowDown')?1:0),r=(keys.has('KeyD')?1:0)-(keys.has('KeyA')?1:0);f+=touchInput.forward;r+=touchInput.right;const norm=Math.max(1,Math.hypot(f,r)),speed=4*dt/norm;const dx=(-Math.sin(yaw)*f+Math.cos(yaw)*r)*speed,dz=(-Math.cos(yaw)*f-Math.sin(yaw)*r)*speed;if(fits(camera.position.x+dx,camera.position.z))camera.position.x+=dx;if(fits(camera.position.x,camera.position.z+dz))camera.position.z+=dz;camera.rotation.set(pitch,yaw,0,'YXZ');
+function frame(now){const dt=Math.min(.08,(now-last)/1000);last=now;animateBirds(dt,now/1000);if(keys.has('ArrowLeft'))yaw+=dt*1.5;if(keys.has('ArrowRight'))yaw-=dt*1.5;let f=(keys.has('KeyW')||keys.has('ArrowUp')?1:0)-(keys.has('KeyS')||keys.has('ArrowDown')?1:0),r=(keys.has('KeyD')?1:0)-(keys.has('KeyA')?1:0);f+=touchInput.forward;r+=touchInput.right;const norm=Math.max(1,Math.hypot(f,r)),speed=4*dt/norm;const dx=(-Math.sin(yaw)*f+Math.cos(yaw)*r)*speed,dz=(-Math.cos(yaw)*f-Math.sin(yaw)*r)*speed;if(fits(camera.position.x+dx,camera.position.z))camera.position.x+=dx;if(fits(camera.position.x,camera.position.z+dz))camera.position.z+=dz;camera.rotation.set(pitch,yaw,0,'YXZ');
 const simdt=s?.paused?0:dt;let moving=false;
 const step=anim.steps[0];
 if(step){

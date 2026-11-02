@@ -289,20 +289,36 @@ def _take(state, item, quantity, at):
         _stock_in(post, item, r['name'], r['price'], quantity, r['effect'])
         return f'{quantity:g} kg of {item}'
     obj = state['built_world']['objects'].get(item)
-    if obj and obj.get('kind') == 'carving':
+    if obj and obj.get('kind') in ('carving', 'workpiece'):
         paid = _goods_value(state, item, 1) or 2
         state['built_world']['objects'].pop(item)
         state['built_world']['revision'] += 1
         for c in state.get('creations', []):
             if 'carving-' + str(c['id']) == item:
                 c['sold'] = at
-        _stock_in(post, item, obj['name'] + ' (a carving)', round(paid * 1.5 + .5), 1, 'object:' + item, object=obj)
+        _stock_in(post, item, obj['name'] + (' (a carving)' if obj.get('kind') == 'carving' else ''), round(paid * 1.5 + .5), 1, 'object:' + item, object=obj)
         return obj['name']
     state['possessions'][item] -= quantity
     price = _board_price(post, item) or 2
     name = (post['stock'].get(item) or STARTING_STOCK.get(item) or {}).get('name', item.replace('_', ' '))
     _stock_in(post, item, name, price, quantity, 'possession:' + item)
     return f'{quantity} × {name}'
+
+
+def _made_value(state, obj):
+    """What the post pays for something he made: always well above its raw materials, more the better it is made (v0.25)."""
+    from world_state import mass
+    kg = mass(obj.get('parts', [])) if obj.get('parts') else {}
+    raw = kg.get('wood', 0) / SELL_RATES['wood']['kg_per_credit'] + kg.get('stone', 0) / SELL_RATES['stone']['kg_per_credit']
+    if obj.get('kind') == 'carving':
+        creation = next((c for c in state.get('creations', []) if 'carving-' + str(c['id']) == obj['id']), {})
+        quality = creation.get('quality', 5)
+    else:  # a shaped workpiece: how closely it came out to what he meant
+        m = obj.get('work_measurement') or {}
+        err = abs(m.get('actual_width_m', 0) - m.get('target_width_m', 0)) * 1000 if m else 10
+        quality = max(1, min(10, round(10 - err / 3)))
+    value = raw * 2 + 1 + quality * .25
+    return max(1., round(value * 2) / 2)
 
 
 def _goods_value(state, item, quantity):
@@ -317,11 +333,9 @@ def _goods_value(state, item, quantity):
         price = (post.get('stock', {}).get(item) or STARTING_STOCK.get(item) or {}).get('price', 2)
         return max(.5, round(price / 2 * 2) / 2) * quantity
     obj = state['built_world']['objects'].get(item)
-    if not obj or not obj.get('parts') or obj.get('kind') != 'carving':
+    if not obj or not obj.get('parts') or obj.get('kind') not in ('carving', 'workpiece') or not obj.get('portable', True):
         return None
-    creation = next((c for c in state.get('creations', []) if 'carving-' + str(c['id']) == item), {})
-    q = creation.get('quality', 5)
-    return 1 if q < 5 else 2 if q < 8 else 3
+    return _made_value(state, obj)
 
 
 def check_proposal(state, p, day):
@@ -385,7 +399,8 @@ def apply_proposal(state, p, at, day):
         fav = {'id': f'favour-{kp["next_favour"]}', 'task': p['task'].strip()[:160], 'minutes': p['minutes'], 'credit': p['credit'], 'agreed': at}
         kp['next_favour'] += 1
         kp['favours'] = (kp['favours'] + [fav])[-6:]
-        text = f'Agreed a favour for Edda: "{fav["task"]}" ({fav["minutes"]} minutes, {fav["credit"]:g} credit). It can be done as job {fav["id"]}.'
+        text = (f'Agreed a favour for Edda: "{fav["task"]}" ({fav["minutes"]} minutes, {fav["credit"]:g} credit). '
+                f'It is done by working at the trading post as job {fav["id"]}; whatever the work needs is there.')
     else:
         kp['last_gift'] = day
         post['credit'] = round(post['credit'] + p['credit'], 2)
@@ -412,7 +427,7 @@ def board(state):
     return {'your_credit': post['credit'],
             'for_sale': {k: {'name': v['name'], 'price': v['price'], 'left': v['qty']} for k, v in post['stock'].items() if v['qty'] > 0},
             'we_buy': {'wood': '1 credit per 3 kg', 'stone': '1 credit per 5 kg',
-                       'carving': '1–3 credit for a carving you made, by how well it turned out',
+                       'things you made': 'priced by what they are and how well they are made',
                        'things you own': 'about half what the post sells them for'},
             'note': 'What the post buys goes on its shelves and is sold on at the posted price.',
             'jobs': {**{k: {'name': v['name'], 'minutes': v['minutes'], 'pays': v['credit']} for k, v in JOBS.items()},

@@ -15,6 +15,7 @@ import town
 import story
 import garden
 import music
+import birds
 import web
 import sys
 import world_state
@@ -43,7 +44,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.24.4'
+APP_VERSION = '0.25.0'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -413,7 +414,7 @@ ACTION_MENU={'rest':'quiet rest in the cabin','sleep':'sleep (until 07:00 at nig
     'construct':'work on an existing blueprint if materials allow','move_object':'carry a portable object somewhere',
     'resume_work':'resume one of your paused jobs with its saved progress',
     'browse':'use the terminal at the internet café to search the wider web and read pages',
-    'trade':'go to the trading post: buy, sell, do a posted job, or ask for something',
+    'trade':'go to the trading post: buy, sell, do a posted job or a favour you agreed with Edda, or ask for something',
     'talk':'talk with Edda Thorne, who keeps the trading post: chat, bargain, barter, ask or offer favours',
     'use_item':'use something you own, in whatever way you choose',
     'interact':'work material, divide or arrange solids, place objects on surfaces, or choose a supported posture',
@@ -514,7 +515,8 @@ def decision_context():
         'garden_beds':garden.summary(state),'woods':world_state.forest_state(state),
         'your_field_notebook':ecology.notebook(state),
         'people':[{'name':'Edda Thorne','where':'trading post','times_talked':town.keeper(state)['talks'],
-                   'open_favours':[f['id']+': '+f['task'] for f in town.keeper(state)['favours']]}],
+                   'open_favours':[f"{f['id']}: {f['task']} ({f['minutes']} min, pays {f['credit']:g} credit). "
+                                   f"Done by working at the trading post: trade, job {f['id']}." for f in town.keeper(state)['favours']]}],
         'nearby':[o['id']+' ('+o['name']+')' for o in near['objects']]+[t['id']+' '+t['stage'] for t in near['trees'][:2]]}
     context=compact(context)
     # Recent events are what just happened to him: give them room (180 characters cut most observations
@@ -658,7 +660,7 @@ def parameter_request(d):
     if a=='trade':
         carvings=[{'id':i,'name':o['name']} for i,o in objects.items() if o.get('kind')=='carving'][-8:]
         return ('Choose what to do at the trading post. trade_mode buy (trade_item = an item id for sale), sell (wood, stone, the id of '
-                'one of your carvings, or something you own), job (a posted job id), or ask (trade_item = something you would like the post to stock, in your words). '
+                'something you made, or something you own), job (a posted job id), or ask (trade_item = something you would like the post to stock, in your words). '
                 'trade_quantity is how many (1 if not relevant).',
                 {'trade_mode':{'type':'string','enum':['buy','sell','job','ask']},'trade_item':STRING,'trade_quantity':{'type':'integer','minimum':1,'maximum':20}},
                 {'board':town.board(state),'your_carvings':carvings,'inventory_kg':{'wood':state['materials'],'stone':state['stone']},
@@ -980,7 +982,15 @@ def finish_action(geometry=None):
             living=ecology.inspect(state,ident,now().timetuple().tm_yday,state.get('daylight',0),lamp)
         if living:result=living;description=living['text']
         else:
-            description=('Inspected '+json.dumps(obj,ensure_ascii=False)[:1500]) if obj else 'Inspection failed: that world object does not exist.'
+            # A plain description rather than raw data (v0.25): what it is made of, whether it moves, its parts and size.
+            if obj:
+                mats=sorted({p.get('material','wood') for p in obj.get('parts',[])})
+                parts=[p['id'].replace('_',' ') for p in obj.get('parts',[])]
+                wide=max((abs(p.get('x',0))+p.get('width',0)/2 for p in obj.get('parts',[])),default=0)*2
+                tall=max((p.get('y',0)+p.get('height',0)/2 for p in obj.get('parts',[])),default=0)
+                description=(f"Inspected the {obj.get('name',ident).lower()}: {'it can be picked up and carried' if obj.get('portable') else 'it is fixed in place'}; "
+                             f"made of {' and '.join(mats)}; about {wide:.1f} m across and {tall:.1f} m high; parts: {', '.join(parts[:12])}.")
+            else:description='Inspection failed: that world object does not exist.'
             result={'success':bool(obj),'text':description}
         if obj and obj.get('parts'):
             result['properties']=interactions.properties(obj)
@@ -1551,7 +1561,7 @@ class Handler(BaseHTTPRequestHandler):
             cached=STATE_CACHE.get(viewer)
             if not cached or time.monotonic()-cached[0]>1.5:
                 with LOCK:
-                    clock();body=json.dumps({**state,'ecology_view':ecology.view(state,now().timetuple().tm_yday),'reading_log':reading_journal.page(state)['items'],
+                    clock();body=json.dumps({**state,'ecology_view':ecology.view(state,now().timetuple().tm_yday),'birds_view':birds.view(state,ecology,state.get('daylight',0)),'reading_log':reading_journal.page(state)['items'],
                         'reading_count':len(state['reading_log']),'runtime':runtime,'viewer':viewer,
                         'maintenance_enabled':owner and ACCESS_TOKEN is not None and (ROOT/'.git').exists()}).encode()
                 cached=STATE_CACHE[viewer]=(time.monotonic(),body,gzip.compress(body,5))

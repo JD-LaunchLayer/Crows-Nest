@@ -151,7 +151,8 @@ def perceive(state):
     if b['exertion']>.45:sensations.append('Muscles feel tired from recent effort.')
     if not sensations:sensations.append('No strong bodily discomfort.')
     return {'sensations':sensations,'work_impairment':round(fatigue(state),2),
-            'supplies':{k:round(state['provisions'][k],2) for k in ['pantry','berries','water_litres']},
+            'supplies':{'ready_food_servings':round(state['provisions']['pantry'],2),'fruit_on_bushes_servings':round(state['provisions']['berries'],2),
+                        'spring_water_litres':round(state['provisions']['water_litres'],2)},  # units stated (v0.25)
             'sources':{'food_store':'Ready-to-eat provisions; finite stock.',
                        'berry_patch':'Wild fruit bushes; they bear fruit from mid-summer into autumn and none the rest of the year.',
                        'spring':'Drinkable spring basin; replenishes during active time.'}}

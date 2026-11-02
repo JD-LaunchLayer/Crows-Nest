@@ -266,7 +266,7 @@ CLOSE = {
 }
 
 
-NEGATIONS = re.compile(r'\b(not|no|except|excluding|besides|beyond|instead of|other than|apart from|rather than|away from|avoid|avoiding|skip|skipping|without)\b')
+NEGATIONS = re.compile(r'\b(not|no|past|except|excluding|besides|beyond|instead of|other than|apart from|rather than|away from|avoid|avoiding|skip|skipping|without)\b')
 NEW_WORDS = re.compile(r"\b(unrecorded|unlogged|not yet recorded|never recorded|not recorded|haven't recorded|have not recorded|unseen|unfamiliar|new to me|fresh)\b")
 
 
@@ -331,7 +331,7 @@ PLANT_KIND = {'bramble': 'shrub bush', 'holly seedlings': 'shrub bush seedling',
               'ivy': 'climber vine', 'bracken': 'fern', 'male fern': 'fern', 'fly agaric': 'fungus mushroom toadstool',
               'bluebell': 'flower bulb', 'wood anemone': 'flower', 'nettles': 'herb weed', 'moss': 'moss',
               'grass': 'grass'}
-KIND_WORDS = {'shrub', 'bush', 'tree', 'fern', 'flower', 'fungus', 'fungi', 'mushroom', 'toadstool', 'climber',
+KIND_WORDS = {'bird', 'shrub', 'bush', 'tree', 'fern', 'flower', 'fungus', 'fungi', 'mushroom', 'toadstool', 'climber',
               'vine', 'moss', 'grass', 'herb', 'weed', 'seedling', 'bulb'}
 
 
@@ -354,7 +354,15 @@ def visible_facts(state, area, doy, daylight):
         if in_area(area, t['x'], t['z']):
             sp = eco['tree_species'][t['id']]
             facts += [(a, x, _tags(sp, x)) for a, x in _tree_facts(state, t, doy)]
+    if daylight >= .12:  # birds about the place (v0.25): their look and where they are, never named
+        import birds, sys
+        facts += [(a, x, 'bird animal ' + x) for a, x in birds.facts(state, sys.modules[__name__], area, daylight)]
     return facts
+
+
+def fact_key(about, text):
+    """What counts as having seen something: a bird is the same bird wherever it perches."""
+    return _key(about) if str(about).startswith('bird-') else _key(text)
 
 
 def _key(text):
@@ -418,10 +426,10 @@ def observe(state, area, focus, doy, daylight, limit=5, lamp=False):
             return -100 - len(want & _terms(fact[1]))
         if avoided(fact):
             return 100  # what he said he is not looking for comes last
-        if seeking_new and _key(fact[1]) not in eco['seen'] and of_kind(fact):
+        if seeking_new and fact_key(fact[0], fact[1]) not in eco['seen'] and of_kind(fact):
             return -50 - len(want & _terms(fact[1] + ' ' + fact[2]))  # looking for what he has not noted yet
         overlap = len(want & _terms(fact[1] + ' ' + fact[2]))
-        seen = eco['seen'].get(_key(fact[1]), 0)
+        seen = eco['seen'].get(fact_key(fact[0], fact[1]), 0)
         jitter = int(_key(fact[1] + str(eco['observations'])), 16) % 1000 / 1000
         return (-(overlap * 2 + jitter - .8 * min(seen, 3)))
     ranked = sorted(facts, key=order)
@@ -443,7 +451,7 @@ def observe(state, area, focus, doy, daylight, limit=5, lamp=False):
             chosen.append(rest[eco['observations'] % len(rest)])
     findings = []
     for about, text, _ in chosen:
-        k = _key(text)
+        k = fact_key(about, text)
         findings.append({'about': about, 'text': text, 'new': k not in eco['seen']})
         eco['seen'][k] = eco['seen'].get(k, 0) + 1
         record(state, about)
@@ -598,6 +606,10 @@ def notebook(state):
         kind = (PLANT_KIND.get(p['species'], 'plant').split() or ['plant'])[0]
         where = f"on {p['host']}" if p.get('host') else f"({p['x']:.0f}, {p['z']:.0f})"
         out.setdefault(p['area'], {}).setdefault(kind if kind in ('moss', 'grass') else kind + 's', {}).setdefault(p['species'], []).append(where)
+    import birds
+    for b in birds.BIRDS:
+        if b['id'] in rec:
+            out.setdefault('birds_seen', {}).setdefault('birds', {}).setdefault(b['look'], ['about the place'])
     for ident, t in trees.items():
         if ident not in rec:
             continue
@@ -612,5 +624,6 @@ def notebook(state):
                 lines.append('trees: ' + ', '.join(f'{sp} {n}' for sp, n in sorted(items.items())))
             else:
                 lines.append(f'{kind}: ' + '; '.join(f'{sp} ' + ', '.join(w[:12] for w in ws[:6]) for sp, ws in sorted(items.items())))
-        book[AREAS.get(place, {}).get('name', place)] = lines
+        book['birds he has seen' if place == 'birds_seen' else AREAS.get(place, {}).get('name', place)] = \
+            [l.replace(' about the place', '') for l in lines] if place == 'birds_seen' else lines
     return book
