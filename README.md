@@ -1178,3 +1178,11 @@ or sleeps.
   smoking) like anyone local, saying so only if asked.
 - `python3 tools/wildlife_sheet.py` prints the character sheet (real species names, diets,
   wariness, food values); `--live` also shows the herd and each bird's trust now.
+
+## v0.26.1 — animals catch the eye
+
+A walk looking for "anything not yet recorded" notices a few new things, and ties among
+new things fell to list order, plants and trees first. With about 150 unrecorded trees in
+the deeper woods, the deer and birds there were never the ones noticed. Now something alive
+and moving is noticed before one more still tree, as it would be by anyone. If he says he is
+not looking for animals, they come last as before. Nothing about them is explained.

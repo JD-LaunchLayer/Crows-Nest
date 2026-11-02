@@ -423,17 +423,21 @@ def observe(state, area, focus, doy, daylight, limit=5, lamp=False):
         return not avoided(fact) and (not want_kinds or bool(want_kinds & _terms(fact[2])))
     def about_named(fact):
         return fact[0] in named or any(re.search(r'\b' + re.escape(n) + r'\b', fact[1].lower()) for n in named)
+    def lively(fact):
+        # Something alive and moving catches the eye before one more still tree (v0.26.1). Before, ties among
+        # new things fell to list order, plants and trees first, so animals were never the ones noticed.
+        return 3 if str(fact[2]).startswith(('bird animal', 'animal deer')) else 0
     def order(fact):
         if about_named(fact):
             return -100 - len(want & _terms(fact[1]))
         if avoided(fact):
             return 100  # what he said he is not looking for comes last
         if seeking_new and fact_key(fact[0], fact[1]) not in eco['seen'] and of_kind(fact):
-            return -50 - len(want & _terms(fact[1] + ' ' + fact[2]))  # looking for what he has not noted yet
+            return -50 - len(want & _terms(fact[1] + ' ' + fact[2])) - lively(fact)  # looking for what he has not noted yet
         overlap = len(want & _terms(fact[1] + ' ' + fact[2]))
         seen = eco['seen'].get(fact_key(fact[0], fact[1]), 0)
         jitter = int(_key(fact[1] + str(eco['observations'])), 16) % 1000 / 1000
-        return (-(overlap * 2 + jitter - .8 * min(seen, 3)))
+        return (-(overlap * 2 + jitter - .8 * min(seen, 3) + lively(fact) / 3))
     ranked = sorted(facts, key=order)
     focused = [f for f in ranked if about_named(f)]
     if focused:

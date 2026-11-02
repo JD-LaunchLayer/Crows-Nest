@@ -70,3 +70,15 @@ with tempfile.TemporaryDirectory() as td:
     assert wildlife.sheet()['birds'][0]['species']=='European robin'
     assert 'species' not in json.dumps(birds.view(st,ecology,1.))
 print('PASS v0.26: foods fill by their own unseen amounts; deer by look only; hunting, butchering, spoiling and smoking; birds come to trust him slowly.')
+# v0.26.1: on a walk looking for anything new, animals there are noticed before one more unrecorded tree.
+with tempfile.TemporaryDirectory() as td:
+    shutil.copy(ROOT/'crow.py',Path(td)/'crow.py')
+    spec=importlib.util.spec_from_file_location('crow_wild2',Path(td)/'crow.py');app=importlib.util.module_from_spec(spec)
+    with contextlib.redirect_stdout(io.StringIO()):spec.loader.exec_module(app)
+    app.CLOCK_OVERRIDE=lambda:datetime(2026,11,16,13,0,tzinfo=app.TZ);app.clock();st=app.state
+    area=wildlife.herd_area(st,ecology,.6)[0]
+    r=ecology.observe(st,area,'anything not yet recorded',320,.6,limit=3)
+    assert 'animal on long thin legs' in r['text'], r['text'][:300]
+    r=ecology.observe(st,area,'an unrecorded shrub, not an animal',320,.6,limit=3)
+    assert 'animal on long thin legs' not in r['text']
+print('PASS v0.26.1: animals catch the eye on a general look, and stay out of it when he says he is not looking for them.')
