@@ -898,3 +898,11 @@ was reduced to the word "tree", which matched every tree equally, so he kept
 getting neighbouring trees. He spent a day believing he kept drifting off his
 plan. Now a focus that names something brings everything visible about it first.
 His own reading of those days is left as he wrote it.
+
+## v0.21.4 — daylight that matches the sky
+
+The simulation's usable light ran from sunrise to sunset centred on 12:00 clock time.
+In November that made the clearing dark until about 07:55 and from about 16:05,
+while the real sky drawn over him had the sun up from 07:05. Light now runs from
+civil dawn to civil dusk around true solar noon (equation of time included), so
+mornings and late afternoons are usable as they are in Wickford.

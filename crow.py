@@ -38,7 +38,7 @@ ACCESS_TOKEN = None
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.21.3'
+APP_VERSION = '0.21.4'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -163,10 +163,18 @@ def clock(at=None):
     state['minute'] = dt.hour * 60 + dt.minute + dt.second / 60
     state['day'] = state['clock_origin_day'] + (dt.date() - datetime.fromisoformat(state['clock_origin_date']).date()).days
     state['clock'] = {'iso': dt.isoformat(), 'date': dt.strftime('%a %d %b'), 'time': dt.strftime('%H:%M:%S'), 'timezone': 'Europe/London', 'night': dt.hour < 7 or dt.hour >= 21}
-    # Approximate seasonal daylight at Wickford latitude, not a weather forecast.
-    decl = math.radians(23.44 * math.sin(2 * math.pi * (284 + dt.timetuple().tm_yday) / 365))
-    half = math.degrees(math.acos(clamp(-math.tan(math.radians(51.6))*math.tan(decl), -1, 1))) / 15
-    noon = 12 + (dt.dst().total_seconds()/3600 if dt.dst() else 0)
+    # Approximate seasonal daylight at Wickford (51.6 N, 0.52 E), not a weather forecast. Usable light runs
+    # from civil dawn to civil dusk (sun 6 degrees below the horizon), and solar noon includes the equation
+    # of time. Before v0.21.4 light ran only sunrise to sunset around clock noon, which in November made
+    # the world dark about an hour too early and too late, compared with the real sky drawn above him.
+    n = dt.timetuple().tm_yday
+    decl = math.radians(23.44 * math.sin(2 * math.pi * (284 + n) / 365))
+    lat = math.radians(51.6)
+    cos_h = (math.sin(math.radians(-6)) - math.sin(lat) * math.sin(decl)) / (math.cos(lat) * math.cos(decl))
+    half = math.degrees(math.acos(clamp(cos_h, -1, 1))) / 15
+    b = math.radians(360 / 365 * (n - 81))
+    equation_of_time = 9.87 * math.sin(2 * b) - 7.53 * math.cos(b) - 1.5 * math.sin(b)  # minutes
+    noon = 12 - equation_of_time / 60 - 0.52 / 15 + (dt.dst().total_seconds()/3600 if dt.dst() else 0)
     hour = dt.hour + dt.minute / 60
     state['daylight'] = max(0, math.sin(math.pi * (hour-(noon-half)) / (2*half))) if noon-half < hour < noon+half else 0
     return dt
