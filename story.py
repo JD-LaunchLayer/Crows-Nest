@@ -34,7 +34,7 @@ def _hours(state):
 
 
 KINDS = {'read': 'looking', 'browse': 'looking', 'observe': 'looking', 'inspect': 'looking', 'talk': 'asking',
-         'craft': 'making', 'construct': 'making', 'plan': 'making', 'garden': 'tending'}
+         'craft': 'making', 'construct': 'making', 'plan': 'making', 'interact': 'making', 'garden': 'tending'}
 
 
 def note_step(state, memory):
@@ -169,7 +169,8 @@ PHRASE = {'eat': 'Eating', 'drink': 'Drinking at the spring', 'observe': 'Watchi
           'explore': 'Exploring the woodland', 'gather': 'Gathering materials', 'fell_tree': 'Felling trees',
           'construct': 'Building', 'plan': 'Planning things to build', 'inspect': 'Examining things closely',
           'reflect': 'Sitting and thinking', 'practise': 'Archery practice', 'use_item': 'Using my things',
-          'garden': 'Working in the garden', 'move_object': 'Moving things around'}
+          'garden': 'Working in the garden', 'move_object': 'Moving things around',
+          'interact': 'Working with objects'}
 MIN_OBS = 4
 
 
@@ -239,7 +240,7 @@ def belief_context(state, limit=6):
 
 # ---- How work feels: pull, grind and doubt, from his own appraisals of each session ----
 
-EFFORTFUL = {'craft', 'construct', 'gather', 'fell_tree', 'trade', 'garden', 'practise', 'explore', 'move_object'}
+EFFORTFUL = {'craft', 'construct', 'interact', 'gather', 'fell_tree', 'trade', 'garden', 'practise', 'explore', 'move_object'}
 
 
 def felt(memory, valence, answer_status=None):

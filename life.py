@@ -42,7 +42,7 @@ def effort(action):
     return {'sleep':0.,'rest':.05,'read':.08,'reflect':.08,'observe':.1,
             'eat':.1,'drink':.05,'inspect':.12,'test_object':.2,'plan':.25,
             'craft':.55,'construct':.75,'gather':.65,'explore':.45,
-            'practise':.65,'move_object':.8,'fell_tree':1.,'browse':.08,'trade':.3}.get(action,.15)
+            'practise':.65,'move_object':.8,'fell_tree':1.,'browse':.08,'trade':.3,'garden':.45,'talk':.05,'use_item':.2}.get(action,.15)
 
 
 def advance(state, seconds, action):
@@ -68,7 +68,7 @@ def advance(state, seconds, action):
     sync_energy(state)
 
 
-OUTDOOR_WORK = {'fell_tree', 'gather', 'construct', 'explore', 'practise', 'move_object', 'craft'}
+OUTDOOR_WORK = {'fell_tree', 'gather', 'construct', 'explore', 'practise', 'move_object', 'craft', 'garden'}
 INDOOR_WORK = {'trade'}
 
 

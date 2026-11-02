@@ -829,3 +829,24 @@ gently, so recent sessions count most. They attach to the story the session
 belonged to and, when it counted towards one, to the project. His decisions see
 how each project has mostly felt lately; the journal shows pull, grind and
 doubt per project and the latest feel per story.
+
+## v0.20.0 — a garden
+
+Three garden beds beside the cabin (`garden.py`). `garden` lets him sow, water,
+weed, harvest or just look at a bed. Moisture falls and weeds creep in per active
+hour (faster in summer); a crop grows only while the bed is damp and not choked,
+ripening in about three weeks at summer pace and roughly four times slower in
+midwinter; a bed left very dry withers its crop. Watering carries 2 litres
+from the spring basin. A ripe bed gives up to 3 servings, fewer if it suffered.
+Seed packets are sold at the trading post (Edda knows how they are grown; Crow
+sees only a packet of seeds). What he perceives is soil, weeds and plants in
+words, never numbers. The beds render in 3D: damp soil darkens, weeds show as
+tufts, plants grow, yellow or wither.
+
+Also: `tests/test_version.py` checks that the page and server versions match
+(a mismatch makes the browser reload continuously); the side panel names the
+newer activities; "Find Crow" avoids placing the camera behind a wall.
+
+```bash
+python3 tests/test_garden.py
+```

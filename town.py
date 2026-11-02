@@ -29,6 +29,7 @@ STARTING_STOCK = {
     'provisions_bundle': {'name': 'Bundle of bread, cheese and dried fruit (4 servings)', 'price': 3, 'qty': 6, 'effect': 'pantry:4'},
     'lantern': {'name': 'Oil lantern', 'price': 6, 'qty': 1, 'effect': 'possession:lantern'},
     'whetstone': {'name': 'Whetstone', 'price': 4, 'qty': 1, 'effect': 'possession:whetstone'},
+    'seeds': {'name': 'Packet of vegetable seeds (one bed)', 'price': 2, 'qty': 8, 'effect': 'possession:seeds'},
 }
 
 
@@ -115,6 +116,9 @@ def ensure(state):
         world['town_furnished'] = True
         world['revision'] += 1
     keeper(state)
+    if 'seeds' not in post['stock'] and not post.get('seeds_added'):
+        post['stock']['seeds'] = dict(STARTING_STOCK['seeds'])
+    post['seeds_added'] = True
     return post
 
 
@@ -461,11 +465,13 @@ def apply_stock_orders(state, root, at):
 POSSESSION_LOOKS = {
     'lantern': 'A brass and glass oil lantern with a wick, a small oil reservoir and a wire handle.',
     'whetstone': 'A flat grey stone about the length of a hand, fine-grained and smooth, slightly hollowed in the middle.',
+    'seeds': 'A paper packet of small dry seeds of mixed sizes.',
 }
 # What Edda knows about her goods (only she is told this).
 ITEM_KNOWLEDGE = {
     'provisions_bundle': 'ready food that keeps well: bread, cheese and dried fruit, about four meals',
     'lantern': 'gives light after dark: you can see what you are doing and work outdoors at night nearly as well as by day',
+    'seeds': 'vegetable seeds for one garden bed: sow, keep the soil damp and the weeds down; they ripen in a few weeks in summer, much slower in winter',
     'whetstone': 'for sharpening blades: drawn along an axe or carving knife it restores a dulled edge; dull blades make chopping slow and carving rough',
 }
 TOOLS = {'axe', 'carving_knife'}
