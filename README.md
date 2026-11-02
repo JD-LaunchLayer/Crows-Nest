@@ -1140,3 +1140,13 @@ the same way. Her weekly delivery still only tops up her usual lines.
   choice says these are the only things that can be carried and offers "none", which
   moves nothing and names what can be picked up. Where he put the carvings and the
   chair is left as it is: that happened.
+
+## v0.25.2 — a met need ends its story
+
+Stories end only on real evidence, and nothing counted as evidence that a body need
+had been met, so stories like "ease the thirst at the spring first" stayed open for
+good and he kept following them after the thirst had gone. Now, after drinking,
+eating or sleeping, if his body no longer reports that need, the story about easing it
+is marked done (with "the body no longer reported the need"). Other stories are
+untouched, and older need stories close only the next time he actually drinks, eats
+or sleeps.

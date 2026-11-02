@@ -14,6 +14,8 @@ All of this is bookkeeping over what actually happened. It never chooses an acti
   templates, have a status, and are revised when the record changes.
 - Project feel tracks pull, grind and doubt across project sessions.
 """
+import re
+
 import memory_recall
 
 STORY_MATCH = .4
@@ -85,6 +87,28 @@ def settle(state, memory, answer_status=None):
     elif 'Completed the planned making/building milestone' in str(memory.get('event', '')):
         story['stage'] = 'done'
         story['ended'] = memory.get('at', '')
+
+
+# A body need is answered by the body itself (v0.25.2): after drinking, eating or sleeping, if the body
+# no longer reports that need, the story about easing it is done. Before, nothing could ever end these,
+# so "drink at the spring first" stayed open and kept being followed after the thirst had gone.
+NEEDS = {'drink': (('thirst', 'drink', 'spring'), ('thirst',)),
+         'eat': (('hunger', 'hungry', 'eat', 'food', 'meal', 'provisions'), ('hunger',)),
+         'sleep': (('sleep', 'sleepiness', 'sleepy', 'tired'), ('sleepiness', 'sleepy'))}
+
+
+def settle_need(state, memory, sensations):
+    need = NEEDS.get(memory.get('action'))
+    story = next((s for s in state.get('stories', []) if s['id'] == memory.get('story_id')), None)
+    if not need or not story or story['stage'] not in ('started', 'pursuing', 'dormant'):
+        return
+    title = story['title'].lower()
+    felt = ' '.join(sensations).lower()
+    words = set(re.findall(r'[a-z]+', title))
+    if words & set(need[0]) and not any(w in felt for w in need[1]):
+        story['stage'] = 'done'
+        story['ended'] = memory.get('at', '')
+        story['ended_by'] = 'the body no longer reported the need'
 
 
 def age(state):

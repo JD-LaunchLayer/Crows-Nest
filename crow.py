@@ -44,7 +44,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.25.1'
+APP_VERSION = '0.25.2'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -1113,7 +1113,7 @@ def finish_action(geometry=None):
     if a in ('observe','explore'):details['new_evidence']=new_evidence
     m=event(description,d['reason'],**details)
     if a=='interact':interactions.record(state,d,result,m)
-    story.note_step(state,m);story.settle(state,m);story.age(state)
+    story.note_step(state,m);story.settle(state,m);story.settle_need(state,m,details['body_after']);story.age(state)
     if trial:life.bind_trial(state,trial,m)
     if a in ('read','browse'):
         reading_journal.record_reading(state,m,p,ROOT)
