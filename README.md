@@ -1065,3 +1065,12 @@ edge statements come straight after "Observed …" so they are never the part lo
 - **Exploring does what it says.** It walks him through a part of the woods he
   chooses, noticing a few things (what he has not recorded first), and picks up a
   little loose wood. Before, it only picked up wood.
+
+## v0.24.1 — headlines first
+
+His journal opens on a short Headlines view: what he is doing now, what he is
+aiming for, his day so far, highlights (firsts, new things noticed, talks, trades,
+music, gardening, being told there was nothing new), his latest thought, and what
+is worth knowing (food, credit, Edda, where the world ran out). "Show the full
+journal" opens everything as before. Display only: nothing of his history or memory
+changes, and Copy report is unchanged.

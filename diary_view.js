@@ -36,9 +36,37 @@ export function createDiary({document,player=null}){
   if(twin)parts.push('This is the time-lapse twin, living on a fast-forward clock.');
   return parts.join(' ');
  }
+ // Headlines: what is happening now and in his day so far, in a few short lines. The full journal is one click away.
+ function headlines(s){
+  const out=[],today=(s.memories||[]).filter(m=>m.day===s.day),done=today.filter(m=>m.kind==='experience'),short=(t,n=110)=>{t=String(t||'').replace(/\s+/g,' ').trim();const cut=t.search(/[.;](\s|$)/);t=cut>20&&cut<n?t.slice(0,cut):t;return t.length>n?t.slice(0,n-1)+'…':t};
+  const aff=s.affect||{},body=bodyWords(s.body);
+  out.push(['Right now',`${s.pending?(VERB[s.action]||s.action):'deciding what to do'} · ${mood(aff.valence||0,aff.arousal||0)} · ${body.length?body.join(', '):'body fine'}`]);
+  if(s.current_intention)out.push(['Aiming for',short(s.current_intention,140)]);
+  const counts={};for(const m of done)counts[m.action]=(counts[m.action]||0)+1;
+  out.push(['His day so far',done.length?`${done.length} things done: `+Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([a,n])=>`${VERB[a]||a} ${n}`).join(', '):'just begun']);
+  const hi=[];const seenBefore=new Set((s.memories||[]).filter(m=>m.kind==='experience'&&m.day<s.day).map(m=>m.action));
+  for(const m of done){const r=m.world_result||{};
+   if(!seenBefore.has(m.action)&&!hi.some(h=>h.startsWith('First')))hi.push(`First time ${VERB[m.action]||m.action}`);
+   if(['observe','explore'].includes(m.action)&&r.findings?.filter?.(f=>f.new).length)hi.push(`Noticed ${r.findings.filter(f=>f.new).length} new thing${r.findings.filter(f=>f.new).length>1?'s':''} (${m.time})`);
+   if(['talk','trade','play_music','garden','plant_tree','craft','practise','fell_tree','browse','read'].includes(m.action))hi.push(`${m.time} · ${short(m.event,100)}`);
+  }
+  const edges=done.filter(m=>/has been seen before|can be made out in|is not in /.test(m.event||'')).length;if(edges)hi.push(`Told ${edges}× today that there was nothing new where he looked`);
+  out.push(['Highlights',hi.length?hi.slice(-6):['nothing out of the ordinary']]);
+  const thought=(s.diary||[]).at(-1);if(thought)out.push(['Latest thought',`“${short(thought.text,150)}”`]);
+  const watch=[],p=s.provisions||{};
+  if((p.pantry||0)<1)watch.push(`no ready food${(p.berries||0)<10?`, ${(p.berries||0).toFixed(0)} servings of fruit left`:''}`);
+  if(s.trading)watch.push(`${s.trading.credit||0} trade credit`);
+  watch.push(s.keeper?.talks?`talked with Edda ${s.keeper.talks}×`:'has not met Edda');
+  const gaps=(s.world_gaps||[]).filter(g=>String(g.last||'').slice(0,10)===String(s.clock?.iso||'').slice(0,10));if(gaps.length)watch.push(`${gaps.length} place${gaps.length>1?'s':''} where the world ran out today`);
+  out.push(['Worth knowing',watch.join(' · ')]);
+  const box=$('diaryHeadlines');if(!box)return;box.replaceChildren();
+  for(const [k,v] of out){if(Array.isArray(v)){const h=el('p');h.append(el('b',k+':'));box.append(h);const ul=el('ul');for(const x of v)ul.append(el('li',x));box.append(ul);}else{const pEl=el('p');const b=el('b',k+': ');pEl.append(b,document.createTextNode(v));box.append(pEl);}}
+ }
+ if($('diaryMore'))$('diaryMore').onclick=()=>{const pages=$('diaryPages');const brief=pages.classList.toggle('brief');$('diaryMore').textContent=brief?'Show the full journal':'Show headlines only';};
  function update(s){
   latest=s;
   if(!$('diary'))return;
+  headlines(s);
   const key=JSON.stringify([s.beliefs&&s.beliefs.length,s.beliefs&&s.beliefs.at(-1),s.stories&&s.stories.length,s.stories&&s.stories.at(-1)&&s.stories.at(-1).count,s.threads,s.promises,s.keeper,s.trading,s.world_gaps,s.music&&s.music.sessions,s.possessions,s.decisions,s.pending&&s.pending.start,(s.diary||[]).length,s.interests,s.interest_history,(s.personality_notes||[]).length,s.affect,s.current_intention,s.clock&&s.clock.date]);
   if(key===last)return;last=key;
   if(s.clock)$('diaryDate').textContent=`${s.clock.date} · ${s.clock.time}${s.twin?' · twin clock':s.crow_clock?' · Crow\'s own time':' · UK time'}`;
