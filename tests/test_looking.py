@@ -45,5 +45,8 @@ with tempfile.TemporaryDirectory() as td:
         r=ecology.observe(st,'woodland_edge',f,314,1.)
         if r['edge']:break
     assert r['edge']['kind']=='seen_all' and 'Every shrub' in r['text'], r['text']
+    assert 'Every shrub' in r['text'][:200], 'v0.23.3: the edge statement comes first, never cut off'
+    st['memories'].append({'id':99999,'kind':'experience','time':'14:35','at':'2026-11-10T14:35','action':'observe','event':r['text']+' '+'x'*300})
+    ev=app.decision_context()['recent_events'][-1]['event'];assert 'Every shrub' in ev and len(ev)>180
     assert ecology.observe(st,'grove','an unrecorded fungus',314,1.)['edge']['kind']=='not_found'
 print('PASS v0.23.1: "not" lists respected; places by coordinates; unrecorded-first looking with an honest end; plant close-ups; markup stripped; reworded wishes merged; kinds he seeks and avoids respected.')

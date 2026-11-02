@@ -474,9 +474,10 @@ def observe(state, area, focus, doy, daylight, limit=5, lamp=False):
     elif want and not named and not seeking_new and not any(want & _terms(f['text']) for f in findings):
         edge = {'kind': 'not_found', 'target': '', 'place': area, 'focus': focus[:160]}
         edge_text = ' Nothing matching what he was looking for could be made out here.'
-    text = (f'Observed {a["name"]}' + (f' (ground light about {round(light * 100)}% of open sky). ' if light is not None else '. ') +
-            ' '.join(f['text'] for f in findings) +
-            ('' if findings else ' Nothing distinct stood out.') + edge_text)
+    # The edge statement comes first, so it is never the part lost when a long observation is shortened (v0.23.3).
+    text = (f'Observed {a["name"]}' + (f' (ground light about {round(light * 100)}% of open sky).' if light is not None else '.') +
+            edge_text + ' ' + ' '.join(f['text'] for f in findings) +
+            ('' if findings else ' Nothing distinct stood out.'))
     # Whether each detail was new is kept for bookkeeping (consolidation evidence, reports) but is no
     # longer told to him: a running novelty score was our yardstick, and it made watching feel like progress.
     return {'success': True, 'text': text, 'findings': findings, 'area': area, 'ground_light': light,

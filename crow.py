@@ -42,7 +42,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.23.2'
+APP_VERSION = '0.23.3'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -484,6 +484,9 @@ def decision_context():
                    'open_favours':[f['id']+': '+f['task'] for f in town.keeper(state)['favours']]}],
         'nearby':[o['id']+' ('+o['name']+')' for o in near['objects']]+[t['id']+' '+t['stage'] for t in near['trees'][:2]]}
     context=compact(context)
+    # Recent events are what just happened to him: give them room (180 characters cut most observations
+    # to their first finding and hid any closing statement). The budget below still trims if needed.
+    context['recent_events']=[{k:m.get(k) for k in ['id','time']}|{'event':str(m.get('event',''))[:700 if WIDE else 320]} for m in recent]
     return fit(context,CONTEXT_BUDGET,['nearby','interests','wishes','self_notes','research','projects','paused_work','patterns_in_your_record','left_open','held_most_strongly','your_ongoing_stories','recent_events','relevant_memories'])
 
 
@@ -934,7 +937,7 @@ def finish_action(geometry=None):
             seen=state.setdefault('inspected',{})
             fingerprint=result.get('seen_key') or hashlib.sha1(re.sub(r'ground light \d+%','',description).encode()).hexdigest()
             if seen.get(ident)==fingerprint:
-                description+=f' Everything that can be made out about {ident.replace("_"," ")} by eye has been seen before; nothing about it has changed since.'
+                description=f'Everything that can be made out about {ident.replace("_"," ")} by eye has been seen before; nothing about it has changed since. '+description
                 ecology.note_gap(state,{'kind':'seen_all','target':ident,'place':'inspect','focus':''},now().isoformat(),a)
             seen[ident]=fingerprint
             if len(seen)>400:seen.pop(next(iter(seen)))

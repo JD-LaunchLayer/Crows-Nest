@@ -1033,3 +1033,11 @@ garden. Scenery only; Crow's world is unchanged.
 - **Copy report** in the journal copies a compact text report (state, last events,
   thoughts, stories, open threads, patterns, wishes, Edda and trade, garden, woods,
   where the world ran out) for pasting into a chat.
+
+## v0.23.3 — he can see what just happened
+
+When deciding, each recent event was cut to 180 characters. Most observations lost
+all but their first finding, and the plain "every shrub here has been seen before"
+statement, which came last, never reached him. Recent events now keep up to 700
+characters with the cloud model (320 locally; the context budget still trims), and
+edge statements come straight after "Observed …" so they are never the part lost.
