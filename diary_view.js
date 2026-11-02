@@ -19,7 +19,7 @@ export function createDiary({document,player=null}){
  }
  const VERB={rest:'resting',sleep:'asleep',eat:'eating',drink:'drinking',observe:'watching the woodland',reflect:'thinking quietly',
   explore:'exploring',practise:'practising archery',read:'reading',inspect:'examining something',gather:'gathering materials',
-  fell_tree:'felling a tree',craft:'carving',plan:'drafting a plan',construct:'building',move_object:'carrying something',resume_work:'returning to his work',interact:'working with an object',browse:'browsing the web',talk:'talking with Edda',trade:'at the trading post',use_item:'using something',garden:'gardening',plant_tree:'planting a tree',play_music:'playing the harp'};
+  fell_tree:'felling a tree',craft:'carving',plan:'drafting a plan',construct:'building',move_object:'carrying something',resume_work:'returning to his work',interact:'working with an object',browse:'browsing the web',talk:'talking with Edda',trade:'at the trading post',use_item:'using something',garden:'gardening',plant_tree:'planting a tree',play_music:'playing the harp',hunt:'out with the bow',butcher:'cutting up a carcass',preserve:'smoking meat',put_out_food:'putting food out and waiting quietly'};
  function summary(s){
   const parts=[];const twin=s.twin;
   parts.push(s.pending?`He is ${VERB[s.action]||s.action}.`:'He is between activities.');
@@ -153,6 +153,9 @@ export function createDiary({document,player=null}){
   L.push(`CROW REPORT · v${v} · ${s.clock?.date||''} ${s.clock?.time||''}${s.crow_clock?' (his own time)':''}`);
   L.push('','HOW HE IS',summary(s));
   const p=s.provisions||{};L.push(`Food: pantry ${(p.pantry??0).toFixed(1)} · fruit ${(p.berries??0).toFixed(1)} · water ${(p.water_litres??0).toFixed(1)} L · credit ${s.trading?.credit??0} · owns: ${Object.entries(s.possessions||{}).filter(([,n])=>n).map(([k,n])=>n>1?k+'×'+n:k).join(', ')||'nothing'}`);
+  {const lots=p.larder||[];if(lots.length){const by={};for(const l of lots)by[l.food]=(by[l.food]||0)+l.servings;L.push('Larder: '+Object.entries(by).map(([k,n])=>`${k} ${n.toFixed(1)}`).join(' · '));}
+   const w=s.wildlife;if(w){const alive=(w.deer||[]).filter(d=>d.alive).length;const tr=Object.entries(w.trust||{}).filter(([,t])=>t>=.05).sort((a,b)=>b[1]-a[1]).slice(0,4);
+    L.push(`Wildlife: ${alive} deer in the herd · hunts ${w.hunts||0} · carcasses waiting ${(w.carcasses||[]).length}`+(tr.length?' · birds trusting him: '+tr.map(([k,t])=>`${k} ${t.toFixed(2)}`).join(', '):''));}}
   const trees=Object.values(s.built_world?.trees||{}),standing=trees.filter(t=>t.stage==='standing'),near=standing.map(t=>Math.hypot(t.x,t.z)).sort((a,b)=>a-b)[0];
   L.push(`Woods: ${standing.length} standing · ${trees.filter(t=>t.stage==='felled').length} stumps · ${trees.filter(t=>t.stage==='young').length} planted · nearest tree ${near?Math.round(near):'-'} m from centre · fallen timber ${s.built_world?.sources?.wood?.stock??'-'} kg · wood carried ${s.materials??0} kg`);
   if(s.model_spend)L.push(`Model: spend today $${(s.model_spend.usd||0).toFixed(3)} · ${s.model_spend.calls||0} calls · ${s.model_spend.fallbacks||0} fallbacks${s.model_spend.last_fallback?' · last fallback: '+cut(s.model_spend.last_fallback,140):''}`);

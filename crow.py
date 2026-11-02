@@ -16,6 +16,8 @@ import story
 import garden
 import music
 import birds
+import foods
+import wildlife
 import web
 import sys
 import world_state
@@ -44,7 +46,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.25.2'
+APP_VERSION = '0.26.0'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -72,8 +74,8 @@ def pass_time(seconds):
         own['virtual'] = (datetime.fromisoformat(own['virtual']) + timedelta(seconds=seconds)).isoformat()
 
 
-ACTIONS = {'rest': 'cabin', 'sleep': 'cabin', 'practise': 'range', 'explore': 'woods', 'craft': 'workbench', 'read': 'library', 'observe': 'woods', 'reflect': 'cabin', 'gather': 'woods', 'plan': 'workbench', 'construct': 'workbench', 'move_object': 'workbench', 'inspect': 'workbench', 'fell_tree': 'woods', 'eat':'cabin', 'drink':'cabin', 'resume_work':'cabin', 'browse':'cafe', 'trade':'shop', 'talk':'shop', 'use_item':'workbench', 'interact':'workbench', 'garden':'garden', 'plant_tree':'woods', 'play_music':'cabin'}
-DURATIONS = {'rest': 900, 'practise': 1800, 'explore': 1200, 'craft': 2700, 'read': 900, 'observe': 600, 'reflect': 600, 'gather': 1200, 'plan': 600, 'construct': 1800, 'move_object': 300, 'inspect': 60, 'fell_tree': 5400, 'eat':300, 'drink':120, 'browse':900, 'trade':300, 'talk':600, 'use_item':300, 'interact':600, 'garden':900, 'plant_tree':1200, 'play_music':1800}
+ACTIONS = {'rest': 'cabin', 'sleep': 'cabin', 'practise': 'range', 'explore': 'woods', 'craft': 'workbench', 'read': 'library', 'observe': 'woods', 'reflect': 'cabin', 'gather': 'woods', 'plan': 'workbench', 'construct': 'workbench', 'move_object': 'workbench', 'inspect': 'workbench', 'fell_tree': 'woods', 'eat':'cabin', 'drink':'cabin', 'resume_work':'cabin', 'browse':'cafe', 'trade':'shop', 'talk':'shop', 'use_item':'workbench', 'interact':'workbench', 'garden':'garden', 'plant_tree':'woods', 'play_music':'cabin', 'hunt':'woods', 'butcher':'cabin', 'preserve':'cabin', 'put_out_food':'woods'}
+DURATIONS = {'rest': 900, 'practise': 1800, 'explore': 1200, 'craft': 2700, 'read': 900, 'observe': 600, 'reflect': 600, 'gather': 1200, 'plan': 600, 'construct': 1800, 'move_object': 300, 'inspect': 60, 'fell_tree': 5400, 'eat':300, 'drink':120, 'browse':900, 'trade':300, 'talk':600, 'use_item':300, 'interact':600, 'garden':900, 'plant_tree':1200, 'play_music':1800, 'hunt':7200, 'butcher':10800, 'preserve':14400, 'put_out_food':2400}
 CONFIG = ROOT / 'crow-config.json'
 if CONFIG.exists():
     config = json.loads(CONFIG.read_text())
@@ -402,7 +404,7 @@ DECISION_DEFAULTS={'wish':'','wish_reason':'','object_id':'','plan_id':0,'destin
     'reading_mode':'lookup','research_question':'','next_step':'','creation_name':'','creation_shape':'orb',
     'project_id':-1,'project_title':'','project_status':'active','target_action':'rest','target_sessions':1,
     'observe_area':'woodland_edge','focus':'','trade_mode':'ask','trade_item':'','trade_quantity':1,'opening':'','hope':'','use_item':'','use_on':'','use_how':'',
-    'verb':'','other_id':'','procedure_id':'','hypothesis':'','prediction':'','bed':1,'garden_task':'look','sow_item':'','sapling':'','music_mode':'practise','title':'','notes':'','tempo':80,'piece_id':0,'songbook':'','explore_area':'woodland_edge'}
+    'verb':'','other_id':'','procedure_id':'','hypothesis':'','prediction':'','bed':1,'garden_task':'look','sow_item':'','sapling':'','music_mode':'practise','title':'','notes':'','tempo':80,'piece_id':0,'songbook':'','explore_area':'woodland_edge','hunt_area':'deeper_woods','food':'','put_area':'clearing'}
 # One neutral line per action. Details are requested only after an action is chosen.
 ACTION_MENU={'rest':'quiet rest in the cabin','sleep':'sleep (until 07:00 at night, 90 minutes by day)',
     'eat':'eat from an available food source','drink':'drink from the spring',
@@ -420,7 +422,11 @@ ACTION_MENU={'rest':'quiet rest in the cabin','sleep':'sleep (until 07:00 at nig
     'interact':'work material, divide or arrange solids, place objects on surfaces, or choose a supported posture',
     'garden':'work at the garden beds beside the cabin',
     'plant_tree':'plant a young tree you own somewhere in the woodland; it grows slowly over years',
-    'play_music':'sit and play the harp you own: make up a piece, change one of yours, play one again, or learn one from sheet music you have seen'}
+    'play_music':'sit and play the harp you own: make up a piece, change one of yours, play one again, or learn one from sheet music you have seen',
+    'hunt':'go out with the bow and arrows you own after an animal',
+    'butcher':'cut up the carcass beside the cabin with your knife',
+    'preserve':'smoke fresh meat slowly over a wood fire so it keeps',
+    'put_out_food':'put a little of your food down somewhere outdoors and wait quietly nearby'}
 # The local 4,096-token model needs a tight context; the cloud model gets roughly three times the room.
 WIDE=PROVIDER=='anthropic'
 CONTEXT_BUDGET=int(os.environ.get('CROW_CONTEXT_CHARS','16000' if WIDE else '5600'))
@@ -438,6 +444,11 @@ def available_actions():
     if not any(o.get('portable') for o in world['objects'].values()):allowed.remove('move_object')
     if not any(state.get('possessions',{}).values()):allowed.remove('use_item')
     if not any(state.get('possessions',{}).get(k) for k in world_state.SAPLINGS):allowed.remove('plant_tree')
+    owned=state.get('possessions',{})
+    if not (owned.get('hunting_bow') and owned.get('arrows')):allowed.remove('hunt')
+    if not state.get('wildlife',{}).get('carcasses'):allowed.remove('butcher')
+    if 'venison' not in foods.kinds(state):allowed.remove('preserve')
+    if not foods.kinds(state):allowed.remove('put_out_food')
     if not state.get('possessions',{}).get('harp'):allowed.remove('play_music')
     return allowed
 
@@ -570,7 +581,10 @@ def parameter_request(d):
                 {'objects':interactions.context(state,4),'recent_work':interactions.learning_context(state,limit=2)})
     if a=='eat':
         ids=[i for i,o in objects.items() if i in ['food_store','berry_patch'] and o.get('parts')]
-        return ('Choose which food source to eat from.',{'object_id':{'type':'string','enum':ids or ['food_store']}},{'supplies':life.perceive(state)['supplies']})
+        kinds=foods.kinds(state)
+        return ('Choose which food source to eat from, and from the provisions chest which food (empty: whatever comes to hand).',
+                {'object_id':{'type':'string','enum':ids or ['food_store']},'food':{'type':'string','enum':['']+kinds}},
+                {'supplies':life.perceive(state)['supplies'],'what_each_is':{k:foods.FOODS[k]['name'] for k in kinds}})
     if a=='drink':return None
     if a=='fell_tree':
         standing=[t for t in world['trees'].values() if t['stage']=='standing']
@@ -639,6 +653,15 @@ def parameter_request(d):
                  'piece_id':{'type':'integer','enum':[0]+[p['id'] for p in m['pieces']]},
                  'songbook':{'type':'string','enum':['']+([t['title'] for t in music.SONGBOOK] if m['songbook_seen'] else [])}},
                 {'harp':music.context(state),'body':life.perceive(state)['sensations']})
+    if a=='hunt':
+        return ('Choose where to go with the bow. You will be out about two hours.',
+                {'hunt_area':{'type':'string','enum':list(ecology.AREAS)}},
+                {'areas':ecology.area_summary(),'arrows':state.get('possessions',{}).get('arrows',0),'daylight':round(state.get('daylight',0),2)})
+    if a=='put_out_food':
+        kinds=foods.kinds(state)
+        return ('Choose where to put a little food down (about a quarter of a serving) and which food.',
+                {'put_area':{'type':'string','enum':list(ecology.AREAS)},'food':{'type':'string','enum':kinds}},
+                {'what_each_is':{k:foods.FOODS[k]['name'] for k in kinds},'areas':ecology.area_summary()})
     if a=='explore':
         return ('Choose which part of the woodland to walk through.',
                 {'explore_area':{'type':'string','enum':[k for k in ecology.AREAS if k!='clearing']}},
@@ -950,7 +973,7 @@ def finish_action(geometry=None):
     result=None
     trial=None
     if a in ['eat','drink']:
-        result=life.consume(state,a,d.get('object_id',''));description=result['text']
+        result=life.consume(state,a,d.get('object_id',''),d.get('food',''));description=result['text']
     elif a=='fell_tree':
         result=world_state.fell_tree(state,d.get('object_id',''));description=result['text']
     elif a=='gather':
@@ -1028,6 +1051,7 @@ def finish_action(geometry=None):
         result={'success':True,'text':walk+' '+wood['text'],'findings':seen.get('findings',[]),'area':area,'gathered':wood.get('success')}
         description=result['text'];new_evidence=bool(seen.get('new_details'))
         ecology.note_gap(state,seen.get('edge'),now().isoformat(),a)
+        wildlife.presence(state,ecology,area,state.get('daylight',0))
     elif a=='play_music':
         m=p.get('music') or {}
         if 'error' in m:
@@ -1079,6 +1103,15 @@ def finish_action(geometry=None):
         description='Talked with Edda Thorne at the trading post. '+lines+' '+deal['text']
     elif a=='trade':
         result=town.trade(state,d.get('trade_mode','ask'),d.get('trade_item',''),d.get('trade_quantity',1),now().isoformat());description=result['text']
+    elif a=='hunt':
+        result=wildlife.hunt(state,ecology,d.get('hunt_area') or 'deeper_woods',state.get('daylight',0),life.fatigue(state),
+                             state['decisions']*7907+state.get('completed',0));description=result['text']
+    elif a=='butcher':
+        result=wildlife.butcher(state,state.get('tool_condition',{}).get('carving_knife',1));description=result['text']
+    elif a=='preserve':
+        result=wildlife.preserve(state);description=result['text']
+    elif a=='put_out_food':
+        result=wildlife.put_out_food(state,ecology,d.get('put_area') or 'clearing',d.get('food',''),state.get('daylight',0));description=result['text']
     elif a=='observe':
         # Older saved observe decisions have no area; they are given open attention at the woodland edge.
         result=ecology.observe(state,d.get('observe_area') or 'woodland_edge',d.get('focus',''),
@@ -1086,6 +1119,7 @@ def finish_action(geometry=None):
         description=result['text']
         new_evidence=bool(result.get('new_details'))
         ecology.note_gap(state,result.get('edge'),now().isoformat(),a)
+        wildlife.presence(state,ecology,d.get('observe_area') or 'woodland_edge',state.get('daylight',0))
     else:description='Spent quiet time reflecting in his cabin.'
     tool={'fell_tree':'axe','gather':'axe','craft':'carving_knife'}.get(a)
     if tool and state.get('tool_condition',{}).get(tool,1)<.6:
@@ -1227,6 +1261,7 @@ def tick(elapsed):
         pass_time(elapsed)
         doy=now().timetuple().tm_yday
         garden.advance(state,elapsed/3600,doy)
+        foods.advance(state);wildlife.advance(state)
         world_state.grow_trees(state,elapsed/3600,garden.warmth(doy))
         if town.weekly_delivery(state,now()):runtime['status']='A delivery arrived at the trading post'
     clock()
@@ -1571,7 +1606,7 @@ class Handler(BaseHTTPRequestHandler):
             cached=STATE_CACHE.get(viewer)
             if not cached or time.monotonic()-cached[0]>1.5:
                 with LOCK:
-                    clock();body=json.dumps({**state,'ecology_view':ecology.view(state,now().timetuple().tm_yday),'birds_view':birds.view(state,ecology,state.get('daylight',0)),'reading_log':reading_journal.page(state)['items'],
+                    clock();body=json.dumps({**state,'ecology_view':ecology.view(state,now().timetuple().tm_yday),'birds_view':birds.view(state,ecology,state.get('daylight',0)),'deer_view':wildlife.view(state,ecology,state.get('daylight',0)),'reading_log':reading_journal.page(state)['items'],
                         'reading_count':len(state['reading_log']),'runtime':runtime,'viewer':viewer,
                         'maintenance_enabled':owner and ACCESS_TOKEN is not None and (ROOT/'.git').exists()}).encode()
                 cached=STATE_CACHE[viewer]=(time.monotonic(),body,gzip.compress(body,5))

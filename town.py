@@ -40,7 +40,11 @@ STARTING_STOCK = {
     'birch_sapling': {'name': 'Young silver birch, bare-rooted', 'price': 2, 'qty': 3, 'effect': 'possession:birch_sapling'},
     'oak_sapling': {'name': 'Young oak, bare-rooted', 'price': 3, 'qty': 2, 'effect': 'possession:oak_sapling'},
     'harp': {'name': 'Small harp in a cloth case', 'price': 12, 'qty': 1, 'effect': 'possession:harp'},
+    'hunting_bow': {'name': 'Hunting bow (ash longbow)', 'price': 10, 'qty': 1, 'effect': 'possession:hunting_bow'},
+    'arrows': {'name': 'Broadhead arrow', 'price': 1, 'qty': 12, 'effect': 'possession:arrows'},
 }
+# Not on the shelves, but the post will buy them (about half this price) and sell them on at it.
+OTHER_PRICES = {'hide': 4}
 RESTOCK_DAYS = 7  # Edda's delivery comes once a week on Crow's own calendar, topping shelves back up to these levels
 
 
@@ -110,6 +114,8 @@ def ensure(state):
     post = state.setdefault('trading', {'credit': 0., 'stock': {k: dict(v) for k, v in STARTING_STOCK.items()},
                                         'requests': [], 'ledger': []})
     state.setdefault('possessions', {})
+    for k in ('hunting_bow', 'arrows'):          # v0.26: on her shelves from now on
+        post['stock'].setdefault(k, dict(STARTING_STOCK[k]))
     if not world.get('town_added'):
         objects = world['objects']
         cafe = _building(CAFE, 'Internet café', 9., -17., '#5a4f63', '#b9ab8f')
@@ -221,7 +227,9 @@ KEEPER_PERSONA = ('You are Edda Thorne, keeper of the small trading post beside 
     'You keep a kitchen garden yourself and know the ordinary practical basics of growing food and planting trees '
     'in this part of England: what goes in when and roughly how long things take. Share it if he asks. You are not an expert: '
     'for anything deeper or more particular you would say there are books at the reading cabin and a terminal at the café '
-    'that can find most things, rather than guessing. A delivery comes once a week and tops your shelves up.')
+    'that can find most things, rather than guessing. A delivery comes once a week and tops your shelves up. '
+    'Like most country folk you know the birds and the roe deer in these woods by sight and habit, that patient people who put '
+    'out scraps can get birds coming close, and the basics of hunting, butchering and smoking meat; you only say so if asked.')
 
 
 def keeper(state):
@@ -261,7 +269,8 @@ def _give(state, stock, quantity):
     """Hand bought goods to Crow according to what they are."""
     kind, _, value = stock['effect'].partition(':')
     if kind == 'pantry':
-        state['provisions']['pantry'] = round(state['provisions']['pantry'] + float(value) * quantity, 2)
+        import foods
+        foods.add(state, stock.get('food', 'provisions'), float(value) * quantity)
     elif kind == 'materials':
         state['materials'] = round(state.get('materials', 0) + float(value) * quantity, 2)
     elif kind == 'stone':
@@ -330,7 +339,7 @@ def _goods_value(state, item, quantity):
         return quantity / SELL_RATES[item]['kg_per_credit']
     if state.get('possessions', {}).get(item, 0) >= quantity > 0:  # something he owns: about half its board price
         post = state.get('trading', {})
-        price = (post.get('stock', {}).get(item) or STARTING_STOCK.get(item) or {}).get('price', 2)
+        price = (post.get('stock', {}).get(item) or STARTING_STOCK.get(item) or {}).get('price', OTHER_PRICES.get(item, 2))
         return max(.5, round(price / 2 * 2) / 2) * quantity
     obj = state['built_world']['objects'].get(item)
     if not obj or not obj.get('parts') or obj.get('kind') not in ('carving', 'workpiece') or not obj.get('portable', True):
@@ -588,9 +597,18 @@ POSSESSION_LOOKS = {
     'lantern': 'A brass and glass oil lantern with a wick, a small oil reservoir and a wire handle.',
     'whetstone': 'A flat grey stone about the length of a hand, fine-grained and smooth, slightly hollowed in the middle.',
     'seeds': 'A paper packet of small dry seeds of mixed sizes.',
+    'hunting_bow': 'A plain ash longbow about as tall as he is, with a linen string and a leather grip; it takes a firm pull.',
+    'arrows': 'Wooden arrows fletched with grey feathers, each with a broad, flat, sharpened steel head.',
+    'hide': 'A raw animal hide, reddish-grey on the hair side, heavy and damp, rolled up.',
 }
 # What Edda knows about her goods (only she is told this).
 ITEM_KNOWLEDGE = {
+    'hunting_bow': ('a hunting bow: an ash longbow, the kind folk round here use for deer. The roe deer keep to the deeper woods '
+                    'and come to the edges at dawn and dusk. You need to get close and quiet, twenty-odd yards, and a clean shot '
+                    'behind the shoulder; a bad shot means a wounded animal and a long follow. A deer has to be gutted and '
+                    'skinned and the meat cut up with a good knife the same day or the next; fresh meat keeps only a few days, '
+                    'less in warm weather, but smoked slowly over a wood fire it keeps for months. The post will take a hide'),
+    'arrows': 'broadhead arrows for hunting, sold singly; a miss in the woods often means a lost arrow',
     'provisions_bundle': 'ready food that keeps well: bread, cheese and dried fruit, about four meals',
     'lantern': 'gives light after dark: you can see what you are doing and work outdoors at night nearly as well as by day',
     'seeds': 'mixed vegetable seeds for one bed: sow from April to August; about two months in summer; tender, so frost kills them and they will not grow in the cold months',

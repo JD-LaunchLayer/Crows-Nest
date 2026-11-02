@@ -1150,3 +1150,31 @@ eating or sleeping, if his body no longer reports that need, the story about eas
 is marked done (with "the body no longer reported the need"). Other stories are
 untouched, and older need stories close only the next time he actually drinks, eats
 or sleeps.
+
+## v0.26.0 — food that fills differently, deer, a bow, and birds that can come to trust him
+
+- **Foods have their own value.** Every food now has a fill per serving and a keeping
+  time (`foods.py`): a serving of wild fruit is a light handful, potatoes or meat fill him
+  for much longer. He is never shown the numbers; he sees what the food is and how many
+  servings, and feels the difference. His existing food is kept as plain provisions,
+  exactly as filling as before. Garden crops go into the chest by name.
+- **Deer.** A small herd of five roe deer lives in the deeper woods, lying up by day and
+  bedded at night, coming out to the woodland edge and the grove around dawn and dusk.
+  Fawns are born in early June. He can notice them only by how they look, where they are
+  and what they are doing ("a slender greyish-brown animal on long thin legs … is browsing
+  near (18, 7)"), never by name. They are drawn in the 3D view.
+- **A bow and arrows at Edda's.** Hunting appears as a choice only once he owns both. The
+  approach can fail, the shot uses his archery practice and can miss (the arrow may be
+  lost), wound (he may not find the animal) or kill. A kill gives a carcass beside the
+  cabin that must be cut up with his knife within about three cool days; that gives fresh
+  meat, which keeps a few days, and a hide the post will buy. Smoking meat over a wood
+  fire makes it keep for months. A kill leaves the herd smaller until fawns come.
+- **Birds can come to trust him.** Each bird has its own wariness and diet. Being quietly
+  about where they are builds a little trust; putting out a little food a bird eats builds
+  more, at most once every half day; hunting nearby sets it back; long absence lets it
+  fade. A bird that trusts him enough spends time about the cabin and may take food from
+  his hand. He can put food out somewhere as a plain choice; nothing says why.
+- **Edda** sells the bow and arrows and knows the country basics (deer, birds, butchering,
+  smoking) like anyone local, saying so only if asked.
+- `python3 tools/wildlife_sheet.py` prints the character sheet (real species names, diets,
+  wariness, food values); `--live` also shows the herd and each bird's trust now.

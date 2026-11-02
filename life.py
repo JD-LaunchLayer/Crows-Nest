@@ -50,7 +50,8 @@ def effort(action):
     return {'sleep':0.,'rest':.05,'read':.08,'reflect':.08,'observe':.1,
             'eat':.1,'drink':.05,'inspect':.12,'test_object':.2,'plan':.25,
             'craft':.55,'construct':.75,'gather':.65,'explore':.45,
-            'practise':.65,'move_object':.8,'fell_tree':1.,'plant_tree':.6,'play_music':.2,'browse':.08,'trade':.3,'garden':.45,'talk':.05,'use_item':.2}.get(action,.15)
+            'practise':.65,'move_object':.8,'fell_tree':1.,'plant_tree':.6,'play_music':.2,'browse':.08,'trade':.3,'garden':.45,'talk':.05,'use_item':.2,
+            'hunt':.5,'butcher':.55,'preserve':.3,'put_out_food':.08}.get(action,.15)
 
 
 def advance(state, seconds, action):
@@ -81,7 +82,7 @@ def advance(state, seconds, action):
     sync_energy(state)
 
 
-OUTDOOR_WORK = {'fell_tree', 'gather', 'construct', 'explore', 'practise', 'move_object', 'craft', 'garden'}
+OUTDOOR_WORK = {'fell_tree', 'gather', 'construct', 'explore', 'practise', 'move_object', 'craft', 'garden', 'hunt', 'butcher'}
 INDOOR_WORK = {'trade'}
 
 
@@ -151,14 +152,16 @@ def perceive(state):
     if b['exertion']>.45:sensations.append('Muscles feel tired from recent effort.')
     if not sensations:sensations.append('No strong bodily discomfort.')
     return {'sensations':sensations,'work_impairment':round(fatigue(state),2),
-            'supplies':{'ready_food_servings':round(state['provisions']['pantry'],2),'fruit_on_bushes_servings':round(state['provisions']['berries'],2),
+            'supplies':{'ready_food_servings':round(state['provisions']['pantry'],2),
+                        'in_the_provisions_chest':__import__('foods').view(state),
+                        **({'beside_the_cabin':__import__('wildlife').carcass_view(state)} if state.get('wildlife',{}).get('carcasses') else {}),'fruit_on_bushes_servings':round(state['provisions']['berries'],2),
                         'spring_water_litres':round(state['provisions']['water_litres'],2)},  # units stated (v0.25)
             'sources':{'food_store':'Ready-to-eat provisions; finite stock.',
                        'berry_patch':'Wild fruit bushes; they bear fruit from mid-summer into autumn and none the rest of the year.',
                        'spring':'Drinkable spring basin; replenishes during active time.'}}
 
 
-def consume(state, action, ident):
+def consume(state, action, ident, food=''):
     ensure(state);ident=ident or ('spring' if action=='drink' else 'food_store')
     obj=state['built_world']['objects'].get(ident)
     if not obj or not obj.get('parts'):return {'success':False,'text':'That source is not available.'}
@@ -172,14 +175,28 @@ def consume(state, action, ident):
     else:
         key={'food_store':'pantry','berry_patch':'berries'}.get(ident)
         if key is None:return {'success':False,'text':'That object is not a known edible food source.'}
-        amount=min(1.,stock[key],max(0,(55-b['stomach'])/22))
+        # v0.26: each food fills him by its own amount (foods.FOODS; never shown to him).
+        import foods
+        if key=='pantry':
+            foods.larder(state)
+            have=[l['food'] for l in stock['larder']]
+            kind=food if food in have else (have[0] if have else 'provisions')
+            if food and food not in have and have:
+                kind=next((l['food'] for l in stock['larder'] if foods.FOODS.get(l['food'],{}).get('name','')==food),kind)
+        else:kind='berries'
+        per=foods.fill(kind)
+        avail=sum(l['servings'] for l in stock['larder'] if l['food']==kind) if key=='pantry' else stock[key]
+        amount=min(1.,avail,max(0,(55-b['stomach'])/per))
         if amount<=.001:
             if key=='berries' and stock[key]<=.001:
                 bare='The fruit bushes are bare.'+('' if 196<=_day_of_year(state)<=288 else ' Their fruiting season is over for the year.')
                 return {'success':False,'text':bare}
             return {'success':False,'text':'No food was consumed; the source is empty or the stomach is full.'}
-        stock[key]-=amount;b['stomach']+=22*amount
-        text=f'Ate {amount:.2f} serving from {obj["name"]}. Nourishment will become available through digestion.'
+        if key=='pantry':foods.take(state,kind,amount)
+        else:stock[key]-=amount
+        b['stomach']+=per*amount
+        what=foods.FOODS.get(kind,foods.FOODS['provisions'])['name']
+        text=f'Ate {amount:.2f} serving of {what} from {obj["name"]}. Nourishment will become available through digestion.'
     sync_energy(state)
     return {'success':True,'text':text,'source_id':ident,'consumed':round(amount,3)}
 

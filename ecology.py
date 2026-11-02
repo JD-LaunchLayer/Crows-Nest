@@ -331,7 +331,7 @@ PLANT_KIND = {'bramble': 'shrub bush', 'holly seedlings': 'shrub bush seedling',
               'ivy': 'climber vine', 'bracken': 'fern', 'male fern': 'fern', 'fly agaric': 'fungus mushroom toadstool',
               'bluebell': 'flower bulb', 'wood anemone': 'flower', 'nettles': 'herb weed', 'moss': 'moss',
               'grass': 'grass'}
-KIND_WORDS = {'bird', 'shrub', 'bush', 'tree', 'fern', 'flower', 'fungus', 'fungi', 'mushroom', 'toadstool', 'climber',
+KIND_WORDS = {'bird', 'animal', 'shrub', 'bush', 'tree', 'fern', 'flower', 'fungus', 'fungi', 'mushroom', 'toadstool', 'climber',
               'vine', 'moss', 'grass', 'herb', 'weed', 'seedling', 'bulb'}
 
 
@@ -357,12 +357,14 @@ def visible_facts(state, area, doy, daylight):
     if daylight >= .12:  # birds about the place (v0.25): their look and where they are, never named
         import birds, sys
         facts += [(a, x, 'bird animal ' + x) for a, x in birds.facts(state, sys.modules[__name__], area, daylight)]
+    import wildlife, sys        # deer (v0.26): by look, where they are and what they are doing, never named
+    facts += [(a, x, 'animal deer mammal ' + x) for a, x in wildlife.facts(state, sys.modules[__name__], area, daylight)]
     return facts
 
 
 def fact_key(about, text):
     """What counts as having seen something: a bird is the same bird wherever it perches."""
-    return _key(about) if str(about).startswith('bird-') else _key(text)
+    return _key(about) if str(about).startswith(('bird-', 'deer-')) else _key(text)
 
 
 def _key(text):
@@ -610,6 +612,11 @@ def notebook(state):
     for b in birds.BIRDS:
         if b['id'] in rec:
             out.setdefault('birds_seen', {}).setdefault('birds', {}).setdefault(b['look'], ['about the place'])
+    import wildlife
+    for d in wildlife._read(state)['deer']:
+        if d['id'] in rec:
+            out.setdefault('birds_seen', {}).setdefault('animals', {}).setdefault(
+                wildlife._look(d, 330, 0).split(',')[0], ['about the place'])
     for ident, t in trees.items():
         if ident not in rec:
             continue
@@ -624,6 +631,6 @@ def notebook(state):
                 lines.append('trees: ' + ', '.join(f'{sp} {n}' for sp, n in sorted(items.items())))
             else:
                 lines.append(f'{kind}: ' + '; '.join(f'{sp} ' + ', '.join(w[:12] for w in ws[:6]) for sp, ws in sorted(items.items())))
-        book['birds he has seen' if place == 'birds_seen' else AREAS.get(place, {}).get('name', place)] = \
+        book['birds and animals he has seen' if place == 'birds_seen' else AREAS.get(place, {}).get('name', place)] = \
             [l.replace(' about the place', '') for l in lines] if place == 'birds_seen' else lines
     return book

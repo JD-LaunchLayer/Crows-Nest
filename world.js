@@ -130,6 +130,44 @@ function animateBirds(dt,elapsed){
    if(b.mode==='ground'&&Math.sin(elapsed*.6+b.z)>.95)m.head.rotation.x=.6;else m.head.rotation.x=0;}
   const flap=flapping?Math.sin(elapsed*22)*.9:0;m.wings[0].rotation.z=-flap-.05;m.wings[1].rotation.z=flap+.05;}
 }
+// Deer (v0.26): a small herd whose places come from the server on Crow's clock. They walk between spots,
+// lower their heads to feed, lift them to look about, and lie down by day and at night.
+const deerGroup=new T.Group();scene.add(deerGroup);const deerMeshes=new Map();
+function makeDeer(d){
+ const coat='#8a6a4c',dark='#4a3a2c',g=new T.Group();deerGroup.add(g);const body=new T.Group();g.add(body);
+ const trunk=mesh(new T.SphereGeometry(.3,10,8),coat,0,.78,0,body);trunk.scale.set(.75,.72,1.55);
+ mesh(new T.SphereGeometry(.13,8,6),'#efe8dc',0,.86,-.42,body).scale.set(1,1.1,.5);              // pale rump patch
+ const neck=new T.Group();neck.position.set(0,.95,.36);body.add(neck);
+ const nk=mesh(new T.CylinderGeometry(.07,.1,.42,7),coat,0,.18,.06,neck);nk.rotation.x=.45;
+ const head=new T.Group();head.position.set(0,.38,.18);neck.add(head);
+ mesh(new T.SphereGeometry(.1,8,6),coat,0,0,0,head).scale.set(.85,.9,1.2);
+ const snout=mesh(new T.ConeGeometry(.06,.18,6),coat,0,-.03,.15,head);snout.rotation.x=Math.PI/2;
+ mesh(new T.SphereGeometry(.028,6,5),'#151515',0,-.03,.24,head);
+ for(const x of [-.06,.06]){const ear=mesh(new T.ConeGeometry(.04,.14,5),coat,x*1.4,.1,-.03,head);ear.rotation.z=x>0?-.6:.6;ear.scale.z=.5;
+  mesh(new T.SphereGeometry(.018,5,4),'#111',x*.9,.03,.07,head);}
+ if(d.role==='buck')for(const x of [-.04,.04]){const a=mesh(new T.CylinderGeometry(.008,.014,.2,4),'#d9cdb3',x,.17,0,head);a.rotation.z=x>0?-.15:.15;}
+ const legs=[];for(const [x,z] of [[-.12,.3],[.12,.3],[-.12,-.3],[.12,-.3]]){const hip=new T.Group();hip.position.set(x,.68,z);body.add(hip);
+  cyl(.03,.02,.68,dark,0,-.34,0,hip,5);legs.push(hip);}
+ const k=d.small?.6:1;g.scale.setScalar(k);
+ return {g,body,neck,legs,from:null,to:null,t:0,dur:1,target:d,phase:Math.random()*6};
+}
+function syncDeer(list){
+ const seen=new Set();
+ for(const d of list||[]){seen.add(d.id);let m=deerMeshes.get(d.id);if(!m){m=makeDeer(d);deerMeshes.set(d.id,m);m.g.position.set(d.x,0,d.z);m.g.rotation.y=d.heading;}
+  if(Math.hypot(d.x-m.target.x,d.z-m.target.z)>.3){m.from=m.g.position.clone();m.to=new T.Vector3(d.x,0,d.z);m.t=0;m.dur=Math.min(20,Math.max(3,m.from.distanceTo(m.to)/1.4));}
+  m.target=d;}
+ for(const [id,m] of deerMeshes)if(!seen.has(id)){deerGroup.remove(m.g);deerMeshes.delete(id);}
+}
+function animateDeer(dt,elapsed){
+ for(const m of deerMeshes.values()){const d=m.target;let walking=false;
+  if(m.from&&m.t<1){m.t=Math.min(1,m.t+dt/m.dur);const p=m.from.clone().lerp(m.to,T.MathUtils.smoothstep(m.t,0,1));
+   const dir=p.clone().sub(m.g.position);if(dir.lengthSq()>1e-7)m.g.rotation.y=Math.atan2(dir.x,dir.z);m.g.position.copy(p);walking=true;if(m.t>=1)m.from=null;}
+  const lying=!walking&&(d.doing==='lying down'||d.doing==='bedded down');
+  m.body.position.y=T.MathUtils.lerp(m.body.position.y,lying?-.5:0,dt*2);
+  m.legs.forEach((l,i)=>{l.rotation.x=walking?Math.sin(elapsed*6+i*1.6)*.45:lying?(i<2?-1.3:1.3):0;});
+  const feeding=!walking&&!lying&&(d.doing==='browsing'||d.doing==='grazing')&&Math.sin(elapsed*.4+m.phase)>-.4;
+  m.neck.rotation.x=T.MathUtils.lerp(m.neck.rotation.x,feeding?1.25:d.doing==='standing alert'?-.25:0,dt*2);}
+}
 // Garden beds beside the cabin: soil darkens when damp, weeds show as tufts, plants grow with the crop.
 const GARDEN_BEDS=[[-11.4,-15.6],[-9.0,-15.6],[-6.6,-15.6]];const gardenGroup=new T.Group();scene.add(gardenGroup);let gardenKey='';
 function syncGarden(g){
@@ -375,7 +413,7 @@ if(clientVersion&&s.runtime.version&&clientVersion!==s.runtime.version){globalTh
 const maintenance=s.runtime.maintenance||{status:'idle'};if(updateRequested&&maintenance.status==='complete'){globalThis.location?.reload?.();return;}const updating=['checking','backing_up','pulling','restarting'].includes(maintenance.status);
 if($('updateCrow')){ $('updateCrow').disabled=updating||!s.maintenance_enabled; $('updateCrow').textContent=updating?'Updating…':'Back up and update';txt('updateStatus',maintenance.message||(s.maintenance_enabled?'Ready. Your private life data stays on the PC.':'Start Crow with --lan from its Git checkout to enable authenticated updates.'));}
 if(['complete','up_to_date','failed','interrupted'].includes(maintenance.status))updateRequested=false;
-txt('toggle',s.paused?'Begin life':'Pause');{const visitor=s.viewer==='visitor';$('toggle').hidden=visitor;const up=$('updateCrow')?.closest?.('section');if(up)up.hidden=visitor;document.body?.classList?.toggle('visitor',visitor);}txt('clock',`${s.clock.date} · ${s.clock.time} · ${s.twin?'twin clock':s.crow_clock?`Crow's time${s.crow_clock.scale>1?' ('+s.crow_clock.scale+'× speed)':''}`:'UK time'}`);txt('status',s.runtime.status+(s.last_seconds!==null?' · Last choice '+s.last_seconds+'s':''));txt('error',s.last_error);$('toggle').disabled=updating;txt('activity',({eat:'Eating',drink:'Drinking',rest:'Resting',practise:'Practising archery',explore:'Exploring',craft:'Making a carving',read:'Reading Wikipedia',sleep:'Sleeping',observe:'Watching the woodland',reflect:'Reflecting',gather:'Gathering materials',plan:'Preparing a construction plan',construct:'Constructing',move_object:'Carrying and placing an object',inspect:'Inspecting an object',fell_tree:'Felling a tree',interact:'Working with objects',browse:'Browsing the web',talk:'Talking with Edda',trade:'At the trading post',use_item:'Using an item',garden:'Working in the garden',plant_tree:'Planting a tree',play_music:'Playing the harp',resume_work:'Returning to his work'})[s.action]||s.action);txt('reason',s.reason);{const b=s.body||{};$('energy').value=b.reserve??s.energy;if($('rested'))$('rested').value=Math.max(0,Math.min(100,100-(b.sleep_debt||0)*100/12-(b.exertion||0)*40));}txt('resources',`Wood: ${s.materials} kg · Stone: ${s.stone||0} kg · Archery sessions: ${s.skills.archery} · Carvings: ${s.skills.craft}`);txt('intention',s.current_intention||'Crow has not expressed an intention yet.');
+txt('toggle',s.paused?'Begin life':'Pause');{const visitor=s.viewer==='visitor';$('toggle').hidden=visitor;const up=$('updateCrow')?.closest?.('section');if(up)up.hidden=visitor;document.body?.classList?.toggle('visitor',visitor);}txt('clock',`${s.clock.date} · ${s.clock.time} · ${s.twin?'twin clock':s.crow_clock?`Crow's time${s.crow_clock.scale>1?' ('+s.crow_clock.scale+'× speed)':''}`:'UK time'}`);txt('status',s.runtime.status+(s.last_seconds!==null?' · Last choice '+s.last_seconds+'s':''));txt('error',s.last_error);$('toggle').disabled=updating;txt('activity',({eat:'Eating',drink:'Drinking',rest:'Resting',practise:'Practising archery',explore:'Exploring',craft:'Making a carving',read:'Reading Wikipedia',sleep:'Sleeping',observe:'Watching the woodland',reflect:'Reflecting',gather:'Gathering materials',plan:'Preparing a construction plan',construct:'Constructing',move_object:'Carrying and placing an object',inspect:'Inspecting an object',fell_tree:'Felling a tree',interact:'Working with objects',browse:'Browsing the web',talk:'Talking with Edda',trade:'At the trading post',use_item:'Using an item',garden:'Working in the garden',plant_tree:'Planting a tree',play_music:'Playing the harp',resume_work:'Returning to his work',hunt:'Out with the bow',butcher:'Cutting up a carcass',preserve:'Smoking meat',put_out_food:'Putting food out and waiting quietly'})[s.action]||s.action);txt('reason',s.reason);{const b=s.body||{};$('energy').value=b.reserve??s.energy;if($('rested'))$('rested').value=Math.max(0,Math.min(100,100-(b.sleep_debt||0)*100/12-(b.exertion||0)*40));}txt('resources',`Wood: ${s.materials} kg · Stone: ${s.stone||0} kg · Archery sessions: ${s.skills.archery} · Carvings: ${s.skills.craft}`);txt('intention',s.current_intention||'Crow has not expressed an intention yet.');
 setActivity(s);
 $('feed').replaceChildren();for(const m of s.memories.slice(-16).reverse())entry($('feed'),m.event,[m.at?new Date(m.at).toLocaleString('en-GB',{timeZone:'Europe/London'}):`Earlier prototype · Day ${m.day} · ${m.time}`,m.intention?'Aim: '+m.intention:'',m.reason?'Why: '+m.reason:'',m.next_step?'Tentative next step: '+m.next_step:''].filter(Boolean).join(' · '));
 $('wishes').replaceChildren();for(const w of s.wishes.slice(-10).reverse())entry($('wishes'),w.text,`${w.reason} · First expressed day ${w.day} · ${w.mentions} mention(s)`);if(!s.wishes.length)entry($('wishes'),'No wishes expressed yet.');
@@ -387,12 +425,12 @@ $('reading').replaceChildren();const source=s.pending?.reading;if(source){const 
 const pending=s.pending;txt('remaining',pending?(pending.decision?.action==='read'&&pending.duration===0?`${s.paused?'Paused · ':''}Quick research · finishes after processing the excerpt`:`${s.paused?'Paused · ':''}${Math.ceil(pending.remaining/60)} min remaining · ${Math.round(pending.duration/60)} min session`):s.reflection_pending?'Processing this experience.':'Choosing the next activity.');
 journal.update(s);
 lifeView.update(s);diary.update(s);player.follow(s);syncGarden(s.garden);edda.visible=Boolean(s.keeper&&s.built_world?.objects?.trading_post);const lit=Boolean(s.possessions?.lantern)&&s.daylight<.12;heldLantern.visible=lit;lanternLight.intensity=lit?6:0;
-$('creations').replaceChildren();for(const c of s.creations.slice(-8).reverse())entry($('creations'),c.name,`${c.shape} · Day ${c.day}`);if(s.built_world){syncBuiltWorld(s.built_world)}else{creations(s.creations)}syncEcology(s.ecology_view);syncBirds(s.birds_view);lamp.intensity=s.action==='read'&&s.pending?15:(s.daylight<.2?8:1.5);
+$('creations').replaceChildren();for(const c of s.creations.slice(-8).reverse())entry($('creations'),c.name,`${c.shape} · Day ${c.day}`);if(s.built_world){syncBuiltWorld(s.built_world)}else{creations(s.creations)}syncEcology(s.ecology_view);syncBirds(s.birds_view);syncDeer(s.deer_view);lamp.intensity=s.action==='read'&&s.pending?15:(s.daylight<.2?8:1.5);
 const celestial=sky.update(new Date(s.clock.iso));if($('skyInfo'))txt('skyInfo',`Sun ${celestial.sun.altitude.toFixed(0)}° · Moon ${celestial.moon.altitude.toFixed(0)}° above horizon · Wickford`);
 if($('worldPlans')&&s.built_world){$('worldPlans').replaceChildren();for(const p of s.built_world.plans.slice(-5).reverse())entry($('worldPlans'),`${p.name} · ${p.status}`,`Plan ${p.id} · ${Object.entries(p.bill).map(([m,q])=>q+' kg '+m).join(', ')||'No new materials'} · ${p.work_done_minutes||0}/${p.minutes} min work`);$('worldObjects').replaceChildren();for(const o of Object.values(s.built_world.objects))entry($('worldObjects'),o.name,`${o.id} · (${o.x.toFixed(1)}, ${o.z.toFixed(1)}) · ${o.parts.length} parts`);txt('sourceStocks',Object.entries(s.built_world.sources).map(([m,v])=>`${m}: ${v.stock} kg remains`).join(' · '));}
 }catch(e){if(updateRequested){txt('status','Reconnecting after the update…');txt('error','');}else{txt('status','Connection lost — keep the Python terminal open.');txt('error',e.message)}}}
 function resize(){renderer.setSize(holder.clientWidth,holder.clientHeight);camera.aspect=holder.clientWidth/holder.clientHeight;camera.updateProjectionMatrix()}addEventListener('resize',resize);resize();
-function frame(now){const dt=Math.min(.08,(now-last)/1000);last=now;animateBirds(dt,now/1000);if(keys.has('ArrowLeft'))yaw+=dt*1.5;if(keys.has('ArrowRight'))yaw-=dt*1.5;let f=(keys.has('KeyW')||keys.has('ArrowUp')?1:0)-(keys.has('KeyS')||keys.has('ArrowDown')?1:0),r=(keys.has('KeyD')?1:0)-(keys.has('KeyA')?1:0);f+=touchInput.forward;r+=touchInput.right;const norm=Math.max(1,Math.hypot(f,r)),speed=4*dt/norm;const dx=(-Math.sin(yaw)*f+Math.cos(yaw)*r)*speed,dz=(-Math.cos(yaw)*f-Math.sin(yaw)*r)*speed;if(fits(camera.position.x+dx,camera.position.z))camera.position.x+=dx;if(fits(camera.position.x,camera.position.z+dz))camera.position.z+=dz;camera.rotation.set(pitch,yaw,0,'YXZ');
+function frame(now){const dt=Math.min(.08,(now-last)/1000);last=now;animateBirds(dt,now/1000);animateDeer(dt,now/1000);if(keys.has('ArrowLeft'))yaw+=dt*1.5;if(keys.has('ArrowRight'))yaw-=dt*1.5;let f=(keys.has('KeyW')||keys.has('ArrowUp')?1:0)-(keys.has('KeyS')||keys.has('ArrowDown')?1:0),r=(keys.has('KeyD')?1:0)-(keys.has('KeyA')?1:0);f+=touchInput.forward;r+=touchInput.right;const norm=Math.max(1,Math.hypot(f,r)),speed=4*dt/norm;const dx=(-Math.sin(yaw)*f+Math.cos(yaw)*r)*speed,dz=(-Math.cos(yaw)*f-Math.sin(yaw)*r)*speed;if(fits(camera.position.x+dx,camera.position.z))camera.position.x+=dx;if(fits(camera.position.x,camera.position.z+dz))camera.position.z+=dz;camera.rotation.set(pitch,yaw,0,'YXZ');
 const simdt=s?.paused?0:dt;let moving=false;
 const step=anim.steps[0];
 if(step){

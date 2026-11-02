@@ -140,7 +140,8 @@ def work(state, bed, task, item=''):
         if stage(b) != 'ripe':
             return {'success': False, 'text': f'Nothing in bed {bed} is ready to pick. ' + look(b)}
         servings = round(CROPS.get(b.get('item', 'seeds'), CROPS['seeds'])[2] * max(.3, b['health']), 1)
-        state['provisions']['pantry'] = round(state['provisions']['pantry'] + servings, 2)
+        import foods
+        foods.add(state, CROPS.get(b.get('item', 'seeds'), CROPS['seeds'])[0], servings)
         g['picked'] = round(g['picked'] + servings, 2)
         name = CROPS.get(b.get('item', 'seeds'), CROPS['seeds'])[0]
         b.update(crop=None, growth=0., health=1., item=None)

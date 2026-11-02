@@ -23,7 +23,7 @@ with tempfile.TemporaryDirectory() as td:
     r=ecology.observe(st,'clearing','birds',316,1.);assert 'bird' in json.dumps(r['findings']) or r['edge']
     # 'past tree-56' is not a look at tree-56.
     assert ecology._negated('unrecorded plant past tree-56 and tree-21',len('unrecorded plant past '))
-    s=app.decision_context()['supplies'];assert set(s)=={'ready_food_servings','fruit_on_bushes_servings','spring_water_litres'}
+    s=app.decision_context()['supplies'];assert set(s)=={'ready_food_servings','in_the_provisions_chest','fruit_on_bushes_servings','spring_water_litres'}
     # Favours say how they are done; objects are described in words, not raw data.
     import town;town.apply_proposal(st,{'kind':'favour','task':'Carry the crates in','minutes':60,'credit':2},'t',1)
     fav=app.decision_context()['people'][0]['open_favours'][0];assert 'trade, job favour-' in fav
