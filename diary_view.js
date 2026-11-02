@@ -38,7 +38,7 @@ export function createDiary({document}){
  }
  function update(s){
   if(!$('diary'))return;
-  const key=JSON.stringify([s.stories&&s.stories.length,s.stories&&s.stories.at(-1)&&s.stories.at(-1).count,s.threads,s.promises,s.keeper,s.trading,s.possessions,s.decisions,s.pending&&s.pending.start,(s.diary||[]).length,s.interests,s.interest_history,(s.personality_notes||[]).length,s.affect,s.current_intention,s.clock&&s.clock.date]);
+  const key=JSON.stringify([s.beliefs&&s.beliefs.length,s.beliefs&&s.beliefs.at(-1),s.stories&&s.stories.length,s.stories&&s.stories.at(-1)&&s.stories.at(-1).count,s.threads,s.promises,s.keeper,s.trading,s.possessions,s.decisions,s.pending&&s.pending.start,(s.diary||[]).length,s.interests,s.interest_history,(s.personality_notes||[]).length,s.affect,s.current_intention,s.clock&&s.clock.date]);
   if(key===last)return;last=key;
   if(s.clock)$('diaryDate').textContent=`${s.clock.date} · ${s.clock.time}${s.twin?' · twin clock':s.crow_clock?' · Crow\'s own time':' · UK time'}`;
   $('diaryBadge').textContent=s.twin?'CROW · TIME-LAPSE TWIN':'CROW\'S JOURNAL';
@@ -86,6 +86,10 @@ export function createDiary({document}){
     const list=el('ol');for(const step of st.steps.slice(-6)){const li=el('li');li.append(el('span',(step.at||'').slice(0,16).replace('T',' ')+' · '));li.append(document.createTextNode(step.text+(step.because?' — because: '+step.because:'')));list.append(li)}
     box.append(list);stories.append(box)}
    if(!shown.length)stories.append(el('p','No story has more than one step yet.','muted'))}
+  const bel=$('diaryBeliefs');if(bel){bel.replaceChildren();const list=(s.beliefs||[]);
+   for(const b of list.filter(b=>b.status!=='revised').slice(-8).reverse())bel.append(el('p',`${b.statement} · ${b.status}, ${b.observations} times`,'thought'));
+   for(const b of list.filter(b=>b.status==='revised').slice(-3).reverse())bel.append(el('p',`Used to be: “${b.statement}”`,'muted'));
+   if(!list.length)bel.append(el('p','Not enough experience for any pattern yet.','muted'))}
   const open=$('diaryOpen');if(open){open.replaceChildren();
    const threads=(s.threads||[]).filter(t=>t.status==='open'),promises=(s.promises||[]).filter(p=>p.status==='open');
    for(const t of threads.slice(-6).reverse())open.append(el('p',`“${t.text}” · at ${String(t.place||'').replace('_',' ')}`,'thought'));

@@ -159,3 +159,79 @@ def open_items(state):
     ensure(state)
     return {'threads': [{'id': t['id'], 'text': t['text'], 'place': t['place']} for t in state['threads'] if t['status'] == 'open'][-6:],
             'promises': [{'id': p['id'], 'text': p['text'], 'to': p['to']} for p in state['promises'] if p['status'] == 'open'][-6:]}
+
+
+# ---- Beliefs: patterns computed from his own record by fixed, published rules ----
+
+PHRASE = {'eat': 'Eating', 'drink': 'Drinking at the spring', 'observe': 'Watching the woodland closely',
+          'read': 'Looking things up at the library', 'browse': 'Searching the web at the café', 'craft': 'Carving',
+          'rest': 'Resting', 'sleep': 'Sleeping', 'talk': 'Talking with Edda', 'trade': 'Trading at the post',
+          'explore': 'Exploring the woodland', 'gather': 'Gathering materials', 'fell_tree': 'Felling trees',
+          'construct': 'Building', 'plan': 'Planning things to build', 'inspect': 'Examining things closely',
+          'reflect': 'Sitting and thinking', 'practise': 'Archery practice', 'use_item': 'Using my things',
+          'garden': 'Working in the garden', 'move_object': 'Moving things around'}
+MIN_OBS = 4
+
+
+def _feeling_words(mean):
+    if mean > .15:
+        return 'tends to lift me'
+    if mean < -.15:
+        return 'tends to leave me low'
+    return 'leaves me much the same'
+
+
+def _outcome_words(rate):
+    if rate >= .8:
+        return 'usually works out'
+    if rate <= .4:
+        return 'often does not work out'
+    return None
+
+
+def _set_belief(state, key, statement, n, recent_agree, at):
+    beliefs = state['beliefs']
+    current = next((b for b in beliefs if b['key'] == key and b['status'] in ('forming', 'held', 'doubted')), None)
+    status = 'forming' if n < 6 else ('held' if recent_agree else 'doubted')
+    if current and current['statement'] == statement:
+        current.update(status=status, observations=n, updated=at)
+        return
+    if current:
+        current.update(status='revised', until=at)
+    beliefs.append({'key': key, 'statement': statement, 'status': status, 'observations': n, 'since': at, 'updated': at})
+    state['beliefs'] = beliefs[-80:]
+
+
+def update_beliefs(state, at):
+    """Recompute patterns from the last 400 appraisals and their events. Rules:
+    - feeling: mean appraisal valence per activity over at least 4 occasions;
+    - outcome: share of occasions whose world result succeeded, over at least 4;
+    - 'held' needs 6+ occasions with the last three agreeing; otherwise 'doubted';
+      a changed pattern revises the old statement, which stays visible."""
+    ensure(state)
+    events = {m['id']: m for m in state.get('memories', [])}
+    by_action = {}
+    for a in state.get('appraisals', [])[-400:]:
+        m = events.get(a.get('source_id'))
+        if not m or m.get('action') not in PHRASE:
+            continue
+        result = m.get('world_result') if isinstance(m.get('world_result'), dict) else {}
+        by_action.setdefault(m['action'], []).append((float(a.get('valence') or 0), result.get('success')))
+    for action, obs in by_action.items():
+        if len(obs) < MIN_OBS:
+            continue
+        mean = sum(v for v, _ in obs) / len(obs)
+        words = _feeling_words(mean)
+        recent = [_feeling_words(v) == words for v, _ in obs[-3:]]
+        _set_belief(state, 'feel:' + action, f'{PHRASE[action]} {words}.', len(obs), sum(recent) >= 2, at)
+        outcomes = [ok for _, ok in obs if isinstance(ok, bool)]
+        if len(outcomes) >= MIN_OBS:
+            words2 = _outcome_words(sum(outcomes) / len(outcomes))
+            if words2:
+                agree = [(ok if words2 == 'usually works out' else not ok) for ok in outcomes[-3:]]
+                _set_belief(state, 'work:' + action, f'{PHRASE[action]} {words2}.', len(outcomes), sum(agree) >= 2, at)
+
+
+def belief_context(state, limit=6):
+    return [{'pattern': b['statement'], 'status': b['status'], 'seen': b['observations']}
+            for b in state.get('beliefs', []) if b['status'] in ('held', 'doubted', 'forming')][-limit:]

@@ -804,3 +804,18 @@ Ideas from what pinos.world publicly shows about Pino, implemented independently
 ```bash
 python3 tests/test_story.py
 ```
+
+## v0.18.0 — patterns in his own record
+
+After each reflection, fixed rules recompute patterns from his last 400
+appraisals and the events behind them (not from anything the model claims):
+
+- how an activity tends to leave him (mean appraisal valence above +0.15 "tends
+  to lift me", below −0.15 "tends to leave me low", otherwise "much the same");
+- whether it tends to work out (world results succeeding 80%+ or 40%−).
+
+A pattern needs at least four occasions ("forming"); with six or more it is
+"held" if the last three agree, otherwise "doubted". When the record changes
+the old statement is marked "revised" and kept, and the new one begins. The
+patterns reach his decisions as "patterns in your record", and the journal
+lists them, including what they used to be.

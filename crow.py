@@ -37,7 +37,7 @@ ACCESS_TOKEN = None
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.17.0'
+APP_VERSION = '0.18.0'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -433,6 +433,7 @@ def decision_context():
         'recent_events':[{k:m.get(k) for k in ['id','time','event']} for m in recent],
         'held_most_strongly':consolidation.strongest(state,8 if WIDE else 3),
         'your_ongoing_stories':story.context(state,6 if WIDE else 3),'left_open':story.open_items(state),
+        'patterns_in_your_record':story.belief_context(state,8 if WIDE else 4),
         'relevant_memories':memory,'recent_pattern':memory_recall.recent_pattern(state),
         'paused_work':[{'id':w['id'],'action':w['pending']['decision']['action'],'intention':w['pending']['decision']['intention'],
             'minutes_left':round(w['pending']['remaining']/60,1)} for w in state['suspended_work'][-3:]],
@@ -448,7 +449,7 @@ def decision_context():
                    'open_favours':[f['id']+': '+f['task'] for f in town.keeper(state)['favours']]}],
         'nearby':[o['id']+' ('+o['name']+')' for o in near['objects']]+[t['id']+' '+t['stage'] for t in near['trees'][:2]]}
     context=compact(context)
-    return fit(context,CONTEXT_BUDGET,['nearby','interests','wishes','self_notes','research','projects','paused_work','left_open','held_most_strongly','your_ongoing_stories','recent_events','relevant_memories'])
+    return fit(context,CONTEXT_BUDGET,['nearby','interests','wishes','self_notes','research','projects','paused_work','patterns_in_your_record','left_open','held_most_strongly','your_ongoing_stories','recent_events','relevant_memories'])
 
 
 def choose_action():
@@ -1036,6 +1037,7 @@ def reflect(memory):
         if 'source' in memory:
             reading_journal.appraise(state,memory,result,ROOT)
         story.settle(state,memory,result.get('answer_status'))
+        story.update_beliefs(state,appraisal['at'])
         place=memory.get('world_result',{}).get('area') if isinstance(memory.get('world_result'),dict) else None
         if str(result.get('left_open','')).strip():
             story.add_thread(state,result['left_open'],place or ACTIONS.get(memory.get('action'),'the clearing'),memory['id'],appraisal['at'])

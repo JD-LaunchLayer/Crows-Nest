@@ -25,6 +25,22 @@ assert story.follow_thread(s,t['id'],9,'t')['status']=='followed'
 p=story.add_promise(s,'Fix the store-room roof next week','Edda Thorne','t');assert story.keep_promise(s,p['id'],'t')['status'].startswith('kept')
 assert not story.open_items(s)['promises']
 
+# Beliefs: patterns from his own record, by rule, revised when experience changes.
+b={'body':{'active_hours':0},'memories':[],'appraisals':[]}
+def occasion(i,action,valence,ok):
+    b['memories'].append({'id':i,'action':action,'world_result':{'success':ok}});b['appraisals'].append({'source_id':i,'valence':valence})
+for i in range(3):occasion(i,'browse',-.4,False)
+story.update_beliefs(b,'t');assert not b['beliefs'], 'three occasions are not a pattern'
+occasion(3,'browse',-.3,False);story.update_beliefs(b,'t')
+assert {x['statement'] for x in b['beliefs']}=={'Searching the web at the café tends to leave me low.','Searching the web at the café often does not work out.'}
+assert all(x['status']=='forming' for x in b['beliefs'])
+for i in range(4,7):occasion(i,'browse',-.3,False)
+story.update_beliefs(b,'t');assert all(x['status']=='held' for x in b['beliefs'])
+for i in range(7,20):occasion(i,'browse',.6,True)
+story.update_beliefs(b,'t2')
+assert any(x['status']=='revised' and 'leave me low' in x['statement'] for x in b['beliefs'])
+assert any(x['statement']=='Searching the web at the café tends to lift me.' and x['status']=='held' for x in b['beliefs'])
+
 # In his life: steps join stories as activities finish; reflections can leave threads open and follow them up.
 with tempfile.TemporaryDirectory() as td:
     shutil.copy(ROOT/'crow.py',Path(td)/'crow.py')
@@ -47,5 +63,5 @@ with tempfile.TemporaryDirectory() as td:
     assert app.state['threads'][0]['status']=='followed' and app.state['threads'][0]['place']=='woodland_edge'
     assert 'left_open' in seen['reflect']['properties']
     ctx=app.decision_context();assert ctx['your_ongoing_stories'][0]['story'].startswith('Watch which insects')
-print('PASS: matching intentions continue one story; single steps are not stories; dormant and answered only by time or evidence; '
+print('PASS: patterns form, hold and are revised from his record; matching intentions continue one story; single steps are not stories; dormant and answered only by time or evidence; '
       'threads deduped and followed; promises kept by his account; stories reach his decisions.')
