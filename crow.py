@@ -42,7 +42,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.23.0'
+APP_VERSION = '0.23.1'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -300,6 +300,9 @@ def conform(value, schema):
     elif kind == 'string':
         if not isinstance(value, str):
             return MISSING
+        leak = re.search(r'</?[a-z_]+>|<parameter\b|<invoke\b', value)
+        if leak:  # tool-call markup leaked into a text field; keep only the words before it
+            value = value[:leak.start()].rstrip()
     if 'enum' in schema and value not in schema['enum']:
         return MISSING
     return value
@@ -776,7 +779,9 @@ def start_action(d, seconds, reading=None):
     state['next_step'] = d.get('next_step', '').strip()[:300]
     wish = d['wish'].strip()[:200]
     if wish:
-        w = next((w for w in state['wishes'] if w['text'].casefold()==wish.casefold()), None)
+        # The same wish in new words counts as another mention, not a new wish (v0.23.1).
+        w = next((w for w in reversed(state['wishes']) if w.get('status')!='withdrawn' and
+                  (w['text'].casefold()==wish.casefold() or memory_recall.similar(w['text'],wish,.45))), None)
         if w:
             w['mentions'] += 1; w['last_day'] = state['day']
         else:

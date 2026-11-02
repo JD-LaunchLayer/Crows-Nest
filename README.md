@@ -1005,3 +1005,17 @@ garden. Scenery only; Crow's world is unchanged.
   grow by season and become fellable at 4 m: hazel and birch in about 6-7 years,
   oak in a dozen or more, at his 24× pace roughly 3-6 real months.
 - The cabin's name board now sits under the eave.
+
+## v0.23.1 — looking where he means
+
+- A name inside a list he is steering away from ("not a hornbeam, hazel, or
+  tree-65", "away from the bramble and tree-65") is no longer treated as the target.
+  The v0.22.1 fix only caught a name straight after "not".
+- He can name a place by its coordinates ("the bramble at (10, -21)") and get that
+  plant's close detail.
+- Smaller plants now have close detail too (bramble, bracken, ivy, holly, honeysuckle,
+  male fern, nettles, moss, fly agaric, grass), from British natural history.
+- Looking for something "unrecorded" or "not yet recorded" brings what he has not
+  noted first; when nothing in that place is new, he is told so plainly.
+- Tool markup that a cloud answer occasionally leaks into a text field is cut off.
+- The same wish in new words counts as another mention, not a new wish.

@@ -266,6 +266,40 @@ CLOSE = {
 }
 
 
+NEGATIONS = re.compile(r'\b(not|no|except|excluding|besides|beyond|instead of|other than|apart from|rather than|away from|avoid|avoiding|skip|skipping|without)\b')
+NEW_WORDS = re.compile(r"\b(unrecorded|unlogged|not yet recorded|never recorded|not recorded|haven't recorded|have not recorded|unseen|unfamiliar|new to me|fresh)\b")
+
+
+def _negated(text, at):
+    """True when a name sits in a clause he is steering away from: 'not a hornbeam, hazel or tree-65'."""
+    clause = re.split(r'[.;:!?]|\bbut\b|\binstead\b|\bthen\b', text[:at])[-1]
+    return bool(NEGATIONS.search(clause))
+
+
+# Close detail of the smaller plants: real British natural history, seen when he looks at one by name or place.
+CLOSE_PLANTS = {
+    'bramble': ['leaves of three to five toothed leaflets, dark above and paler beneath',
+                'ridged purplish stems armed with hooked prickles; where stem tips touch the ground they have rooted'],
+    'bracken': ['each frond is divided again and again along one tall grooved stem',
+                'the stems rise singly from underground runners, not from a crown'],
+    'ivy': ['leaves on the climbing stems are lobed; leaves on the flowering shoots are plain ovals',
+            'the climbing stems are covered in short brown rootlets pressed into the bark'],
+    'holly seedlings': ['the small glossy leaves have wavy, sharply spined edges', 'each seedling is only a hand or two high'],
+    'honeysuckle': ['oval leaves in opposite pairs along the stems', 'the stems twine clockwise, seen from above'],
+    'male fern': ['the fronds are divided twice; each small lobe is blunt and finely toothed',
+                  'pale brown papery scales cover the base of the stalks'],
+    'nettles': ['heart-shaped toothed leaves in opposite pairs', 'fine stinging hairs cover the square stems and the leaves'],
+    'moss': ['a dense cushion of tiny overlapping leaves, darker and wetter at the base'],
+    'fly agaric': ['the white flecks on the caps rub off; underneath are crowded white gills',
+                   'each stem is white with a ragged ring and a swollen base'],
+    'grass': ['fine blades, with last summer\'s seed heads gone to straw'],
+}
+
+
+def plant_close_facts(p, doy):
+    return [(p['id'], f'Up close, the {p["species"]} at ({p["x"]:.0f}, {p["z"]:.0f}) has {d}.') for d in CLOSE_PLANTS.get(p['species'], [])]
+
+
 def close_facts(state, t, doy):
     sp = state['ecology']['tree_species'][t['id']]
     if t['stage'] != 'standing' or sp not in CLOSE:
@@ -346,14 +380,25 @@ def observe(state, area, focus, doy, daylight, limit=5, lamp=False):
     # about it comes first. Before v0.21.3 the name was reduced to the word "tree" and matched every tree.
     # Names he is steering away from ("not tree-65", "other than tree-65") are not what he is looking at.
     lowered = str(focus).lower()
-    named = {m.group() for m in re.finditer(r'\b[a-z]+-\d+\b', lowered)
-             if not re.search(r'\b(not|except|excluding|besides|beyond|instead of|other than|apart from|rather than|away from|than)\s+(the\s+)?$',
-                              lowered[max(0, m.start() - 20):m.start()])}
+    named = set()
+    for m in re.finditer(r'\b[a-z]+-\d+\b|\((-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)\)', lowered):
+        if _negated(lowered, m.start()):
+            continue
+        if m.group(1) is None:
+            named.add(m.group())
+        else:  # a place he names by its coordinates: whatever grows right there
+            x, z = float(m.group(1)), float(m.group(2))
+            near = [p['id'] for p in eco['plants'] if math.hypot(p['x'] - x, p['z'] - z) < 2 and p.get('host') is None]
+            near += [t['id'] for t in state['built_world']['trees'].values() if math.hypot(t['x'] - x, t['z'] - z) < 1.5]
+            named.update(near[:2])
+    seeking_new = not named and bool(NEW_WORDS.search(lowered))
     def about_named(fact):
         return fact[0] in named or any(re.search(r'\b' + re.escape(n) + r'\b', fact[1].lower()) for n in named)
     def order(fact):
         if about_named(fact):
             return -100 - len(want & _terms(fact[1]))
+        if seeking_new and _key(fact[1]) not in eco['seen']:
+            return -50 - len(want & _terms(fact[1] + ' ' + fact[2]))  # looking for what he has not noted yet
         overlap = len(want & _terms(fact[1] + ' ' + fact[2]))
         seen = eco['seen'].get(_key(fact[1]), 0)
         jitter = int(_key(fact[1] + str(eco['observations'])), 16) % 1000 / 1000
@@ -366,6 +411,9 @@ def observe(state, area, focus, doy, daylight, limit=5, lamp=False):
             t = state['built_world']['trees'].get(n)
             if t and in_area(area, t['x'], t['z']):
                 focused += [(a, x, '') for a, x in close_facts(state, t, doy)]
+            plant = next((p for p in eco['plants'] if p['id'] == n), None)
+            if plant and in_area(area, plant['x'], plant['z']):
+                focused += [(a, x, '') for a, x in plant_close_facts(plant, doy)]
         chosen = focused[:8 if limit > 2 else 2]
     else:
         chosen = ranked[:limit - 1]
@@ -391,7 +439,10 @@ def observe(state, area, focus, doy, daylight, limit=5, lamp=False):
         edge = {'kind': 'seen_all', 'target': target, 'place': area, 'focus': focus[:160]}
         edge_text = (f' Everything that can be made out about {target} by eye has been seen before;'
                      f' nothing about it has changed since.')
-    elif want and not named and not any(want & _terms(f['text']) for f in findings):
+    elif seeking_new and findings and not new:
+        edge = {'kind': 'seen_all', 'target': area, 'place': area, 'focus': focus[:160]}
+        edge_text = f' Everything that can be made out in {a["name"]} at the moment has been seen before.'
+    elif want and not named and not seeking_new and not any(want & _terms(f['text']) for f in findings):
         edge = {'kind': 'not_found', 'target': '', 'place': area, 'focus': focus[:160]}
         edge_text = ' Nothing matching what he was looking for could be made out here.'
     text = (f'Observed {a["name"]}' + (f' (ground light about {round(light * 100)}% of open sky). ' if light is not None else '. ') +
@@ -416,7 +467,7 @@ def inspect(state, ident, doy, daylight, lamp=False):
         facts += [f for p in eco['plants'] if p.get('host') == ident for f in _plant_facts(state, p, doy, daylight)]
         x, z = tree['x'], tree['z']
     else:
-        facts = _plant_facts(state, plant, doy, daylight)
+        facts = _plant_facts(state, plant, doy, daylight) + plant_close_facts(plant, doy)
         x, z = plant['x'], plant['z']
         if not facts:
             facts = [(ident, f'Nothing of {plant["species"]} is visible above ground at ({x:.0f}, {z:.0f}) at this time of year.')]
