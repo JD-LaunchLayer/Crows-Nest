@@ -99,18 +99,19 @@ def age(state):
 
 
 def context(state, limit=4):
-    """His ongoing stories, as he would recall them (only those with more than one step)."""
+    """All his ongoing stories side by side (those with more than one step, not yet left behind).
+
+    Listed in the order they began, with no excerpt of the latest step, so the one he is
+    in the middle of is not given extra prominence. If there are more than `limit`, the
+    ones touched longest ago are left out, but the remainder stay in starting order."""
     ensure(state)
-    out = []
-    for s in sorted(state['stories'], key=lambda s: -s.get('updated_hours', 0)):
-        if s['count'] < 2 or s['stage'] in ('left',):
-            continue
-        out.append({'id': s['id'], 'story': s['title'], 'stage': s['stage'], 'steps': s['count'],
-                    'last_step': s['steps'][-1]['text'][:140] if s['steps'] else '',
-                    'feel': s.get('feel', {}).get('last')})
-        if len(out) >= limit:
-            break
-    return out
+    now = _hours(state)
+    live = [s for s in state['stories'] if s['count'] >= 2 and s['stage'] != 'left']
+    kept = sorted(live, key=lambda s: -s.get('updated_hours', 0))[:limit]
+    return [{'id': s['id'], 'story': s['title'], 'stage': s['stage'], 'steps': s['count'],
+             'hours_since_last_step': round(max(0., now - s.get('updated_hours', now))),
+             'feel': s.get('feel', {}).get('last')}
+            for s in sorted(kept, key=lambda s: s['id'])]
 
 
 def add_thread(state, text, place, source_id, at):

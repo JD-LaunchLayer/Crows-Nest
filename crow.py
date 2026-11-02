@@ -38,7 +38,7 @@ ACCESS_TOKEN = None
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.20.0'
+APP_VERSION = '0.21.0'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -435,7 +435,7 @@ def decision_context():
         'intention':state['current_intention'],'next_step':state['next_step'],
         'recent_events':[{k:m.get(k) for k in ['id','time','event']} for m in recent],
         'held_most_strongly':consolidation.strongest(state,8 if WIDE else 3),
-        'your_ongoing_stories':story.context(state,6 if WIDE else 3),'left_open':story.open_items(state),
+        'your_ongoing_stories':story.context(state,10 if WIDE else 4),'left_open':story.open_items(state),
         'patterns_in_your_record':story.belief_context(state,8 if WIDE else 4),
         'relevant_memories':memory,'recent_pattern':memory_recall.recent_pattern(state),
         'paused_work':[{'id':w['id'],'action':w['pending']['decision']['action'],'intention':w['pending']['decision']['intention'],

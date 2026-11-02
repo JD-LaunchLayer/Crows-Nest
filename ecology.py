@@ -309,7 +309,9 @@ def observe(state, area, focus, doy, daylight, limit=5, lamp=False):
     new = sum(f['new'] for f in findings)
     text = (f'Observed {a["name"]}' + (f' (ground light about {round(light * 100)}% of open sky). ' if light is not None else '. ') +
             ' '.join(f['text'] for f in findings) +
-            (f' {new} of {len(findings)} details were new to him.' if findings else ' Nothing distinct stood out.'))
+            ('' if findings else ' Nothing distinct stood out.'))
+    # Whether each detail was new is kept for bookkeeping (consolidation evidence, reports) but is no
+    # longer told to him: a running novelty score was our yardstick, and it made watching feel like progress.
     return {'success': True, 'text': text, 'findings': findings, 'area': area, 'ground_light': light,
             'new_details': new, 'focus': focus[:160]}
 

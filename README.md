@@ -850,3 +850,18 @@ newer activities; "Find Crow" avoids placing the camera behind a wall.
 ```bash
 python3 tests/test_garden.py
 ```
+
+## v0.21.0 — fewer nudges from us
+
+Two pieces of steering we had built in by accident are removed. Nothing is added
+to his world.
+
+- Observation results no longer end with "N of M details were new to him". That
+  running novelty score was our yardstick; told to him after every look, it made
+  watching feel like progress even when he enjoyed it little. Newness is still
+  recorded internally (for sleep consolidation and the reports), and the factual
+  count of recent observations with nothing new stays in his recent-pattern summary.
+- His decisions now see all his ongoing stories side by side (up to 10 with the
+  cloud model, 4 locally), in the order they began, including dormant ones, with
+  how long since each was last touched. The latest step's text is no longer shown,
+  so the story he is in the middle of gets no extra prominence.
