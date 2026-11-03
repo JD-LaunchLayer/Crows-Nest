@@ -1254,3 +1254,10 @@ events and promises are left as they happened.
   what he is hoping to do, his day so far, how he has been feeling, his wishes, what is on
   his mind, Edda, birds getting used to him, and his purse and pantry. The detailed notes
   are one click away, and Copy report is unchanged.
+
+## v0.27.1 — the note follows the mistake
+
+The plain notes from the world (no Tam, no cracked board, no "solid part" rule) were added
+once, to threads and promises that already existed. He kept writing new ones about the same
+things, which appeared without the note. Now any new thread or promise that mentions them
+gets the same note beside it. His words are unchanged.

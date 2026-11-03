@@ -154,7 +154,7 @@ def add_thread(state, text, place, source_id, at):
     text = ' '.join(str(text).split())[:200]
     if not text or any(memory_recall.similar(t['text'], text) for t in state['threads'] if t['status'] == 'open'):
         return None
-    thread = {'id': state['next_thread_id'], 'text': text, 'place': place, 'at': at, 'source_id': source_id, 'status': 'open'}
+    thread = {'id': state['next_thread_id'], 'text': text, 'place': place, 'at': at, 'source_id': source_id, 'status': 'open', **_phantom(text)}
     state['next_thread_id'] += 1
     state['threads'].append(thread)
     opened = [t for t in state['threads'] if t['status'] == 'open']
@@ -177,7 +177,7 @@ def add_promise(state, text, to, at):
     text = ' '.join(str(text).split())[:200]
     if not text:
         return None
-    promise = {'id': state['next_promise_id'], 'text': text, 'to': to, 'at': at, 'status': 'open'}
+    promise = {'id': state['next_promise_id'], 'text': text, 'to': to, 'at': at, 'status': 'open', **_phantom(text)}
     state['next_promise_id'] += 1
     state['promises'] = (state['promises'] + [promise])[-40:]
     return promise
@@ -205,6 +205,14 @@ PHANTOMS = [
     (('solid part', 'solid-part'), 'There was never a "solid part" rule. That message came from a fault in the world when a '
      'blueprint drawing did not work; it has been put right, and drawing a blueprint needs no materials.'),
 ]
+
+
+def _phantom(text):
+    """The plain note from the world for anything new that rests on the same mistakes (v0.27.1)."""
+    import re
+    low = str(text).lower()
+    notes = [n for words, n in PHANTOMS if any(re.search(r'\b' + re.escape(w) + r'\b', low) for w in words)]
+    return {'world_note': ' '.join(notes)} if notes else {}
 
 
 def annotate_phantoms(state):

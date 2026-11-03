@@ -31,4 +31,8 @@ with tempfile.TemporaryDirectory() as td:
     assert 6*3600<long<9*3600 and short<2*3600, (long,short)
     d={**app.DECISION_DEFAULTS,'action':'sleep','intention':'sleep','reason':'r'};st['paused']=False;b['sleep_debt']=2.
     app.start_action(d,1);assert st['pending']['duration']<3*3600, 'a nap by day lasts as long as he needs, not a set time'
+    t2=story.add_thread(st,'Whether I will settle the solid-part question before Monday','cabin',2,'t')
+    assert 'never a "solid part" rule' in t2['world_note'], 'new threads get the note too (v0.27.1)'
+    p2=story.add_promise(st,'I will look for Tam tomorrow','Edda Thorne','t');assert 'no Tam' in p2['world_note']
+    assert 'world_note' not in story.add_thread(st,'Whether the glossy black bird returns to the spring','spring',3,'t')
 print('PASS v0.27: gold and silver; plain notes beside the phantoms; tiredness from what he does; waking when rested; no night label.')
