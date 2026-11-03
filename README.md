@@ -1338,3 +1338,17 @@ nothing in his world let him write, so every attempt became quiet reflection, an
 a notebook: he can write pages in his own words and read them back by a word or a day. It
 starts empty, as it truly is. Pages are kept for good and can come back to mind like other
 memories. The journal's Crow today page shows his latest page.
+
+## v0.29.2 — pages as they are; doubts that don't grow
+
+- **Separate lines.** Writing ran everything together into one paragraph, so he could never
+  actually write separate lines. Line breaks are now kept.
+- **What is on a page.** Reading a page back now says plainly what is physically there
+  ("one paragraph of 1 sentence; no separate lines are written on this page", or "4 separate
+  lines"). He had been trying to copy "cord bundle lines" from a page that only held a plan
+  to write them.
+- **Going over a thought doesn't strengthen it.** Since v0.29 a recalled moment became easier
+  to recall again. Now only moments where something actually happened in his world are
+  strengthened that way; reflecting, writing and resting are not, so an idea nothing has
+  confirmed (like the cord bundle) stops growing by repetition. Counts already built up that
+  way are set aside.

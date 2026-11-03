@@ -47,7 +47,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.29.1'
+APP_VERSION = '0.29.2'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -465,6 +465,10 @@ if not state.get('felt_backfilled'):  # v0.29: how strongly past moments were fe
         _a=_ap.get(_m.get('id'))
         if _a and 'felt' not in _m:_m['felt']={'valence':_a.get('valence',0),'importance':_a.get('importance',0)}
     state['felt_backfilled']=True
+if not state.get('rehearsal_tidied'):  # v0.29.2: recall counts built up by going over his own thoughts no longer count
+    _inner={m.get('id') for m in state.get('memories',[]) if m.get('action') in ('reflect','notebook','rest','sleep')}
+    state['recall_strength']={k:v for k,v in state.get('recall_strength',{}).items() if not k.isdigit() or int(k) not in _inner}
+    state['rehearsal_tidied']=True
 
 
 def available_actions():
@@ -690,7 +694,7 @@ def parameter_request(d):
                  'songbook':{'type':'string','enum':['']+([t['title'] for t in music.SONGBOOK] if m['songbook_seen'] else [])}},
                 {'harp':music.context(state),'body':life.perceive(state)['sensations']})
     if a=='notebook':
-        return ('notebook_mode write: note_title and note_text are what you write, in your own words. '
+        return ('notebook_mode write: note_title and note_text are what you write, in your own words (one line per line). '
                 'notebook_mode read: note_query is a word or a day (such as 12-03) to look for, or empty for the latest pages.',
                 {'notebook_mode':{'type':'string','enum':['write','read']},'note_title':STRING,'note_text':STRING,'note_query':STRING},
                 {'your_notebook':notebook.summary(state)})
@@ -967,7 +971,11 @@ def start_action(d, seconds, reading=None):
     details={'action':action,'intention':intention,'next_step':state['next_step']}
     if action=='read':details['research_question']=d.get('research_question','')[:240]
     rs=state.setdefault('recall_strength',{})  # v0.29: what he recalled to choose this gets easier to recall again
-    for i in (d.get('recalled_ids') or [])[:8]:rs[str(i)]=rs.get(str(i),0)+1
+    # v0.29.2: only moments where something happened in his world are strengthened by being recalled; going over his own
+    # thinking (reflecting, writing, resting) does not make it stronger, so an unconfirmed idea does not grow by repetition.
+    acts={m.get('id'):m.get('action') for m in state['memories'][-3000:]}
+    for i in (d.get('recalled_ids') or [])[:8]:
+        if acts.get(i) not in ('reflect','notebook','rest','sleep',None):rs[str(i)]=rs.get(str(i),0)+1
     if len(rs)>4000:
         for k in sorted(rs,key=rs.get)[:len(rs)-4000]:rs.pop(k)
     for key in ['recalled_ids','memory_ids_used','project_choice']:

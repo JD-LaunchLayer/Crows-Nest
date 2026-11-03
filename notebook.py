@@ -15,7 +15,8 @@ def ensure(state):
 
 def write(state, title, text, at):
     pages = ensure(state)
-    text = ' '.join(str(text).split())[:1500]
+    # Keep his line breaks (v0.29.2): before, everything was run together, so separate lines could never be written.
+    text = '\n'.join(' '.join(l.split()) for l in str(text).replace('\r', '').split('\n') if l.strip())[:1500]
     title = ' '.join(str(title).split())[:80] or text[:40]
     if not text:
         return {'success': False, 'text': 'He opened his notebook but wrote nothing.'}
@@ -43,8 +44,18 @@ def read(state, query=''):
                                              f'He has written {len(pages)} page{"s" if len(pages) != 1 else ""} in all.', 'pages': []}
     else:
         hits = pages[-4:]
-    shown = ' | '.join(f'page {p["id"]} ({str(p["at"])[:16].replace("T", " ")}) "{p["title"]}": {p["text"][:300]}' for p in hits[-5:])
+    shown = ' | '.join(f'page {p["id"]} ({str(p["at"])[:16].replace("T", " ")}) "{p["title"]}": {p["text"][:300].replace(chr(10), " / ")} '
+                       f'[{shape(p["text"])}]' for p in hits[-5:])
     return {'success': True, 'text': 'Read back his notebook: ' + shown, 'pages': [p['id'] for p in hits[-5:]]}
+
+
+def shape(text):
+    """What is physically on a page, plainly (v0.29.2): how many lines and sentences. No judgement of what they mean."""
+    lines = [l for l in str(text).split('\n') if l.strip()]
+    sentences = len([x for x in re.split(r'(?<=[.!?])\s+', ' '.join(lines)) if x.strip()])
+    if len(lines) > 1:
+        return f'{len(lines)} separate lines written on this page'
+    return f'one paragraph of {sentences} sentence{"s" if sentences != 1 else ""}; no separate lines are written on this page'
 
 
 def summary(state):
