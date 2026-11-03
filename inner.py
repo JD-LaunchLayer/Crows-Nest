@@ -7,6 +7,7 @@ counts, scores, statistics, field names or rules about the program; those stay i
 Nothing here writes to his saved life, and nothing in his history is rewritten: past events are
 retold in the first person as they are read.
 """
+import math
 import re
 from datetime import datetime
 
@@ -63,9 +64,61 @@ def first_person(text):
     return t
 
 
-def tidy(text):
-    """Remove the bookkeeping his own words sometimes picked up: thread and promise numbers, memory IDs."""
+COMPASS = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west']
+LANDMARKS = {'my cabin': (-10, -10, 3), 'my garden': (-9, -15.6, 2.5), 'the spring': (-17, -1, 3),
+             'the archery range': (10, -8, 3), 'the tree grove': (17, 10, 6.5)}
+HIDDEN = {'deer': 'animal'}   # names he has not learned stay unnamed
+MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+
+def place_words(x, z):
+    """A spot as he would think of it: which way from the middle of the clearing, and how far out (+x east, -z north)."""
+    for name, (lx, lz, r) in LANDMARKS.items():
+        if math.hypot(x - lx, z - lz) <= r:
+            return name
+    d = math.hypot(x, z)
+    way = COMPASS[round(math.degrees(math.atan2(x, -z)) / 45) % 8]
+    if d < 4:
+        return 'the middle of the clearing'
+    if d < 15:
+        return f'the {way} side of the clearing'
+    if d < 31:
+        return f'the woodland edge to the {way}'
+    return f'the deeper woods to the {way}'
+
+
+def _light_words(pct):
+    return ('in open light' if pct >= 75 else 'in dappled light' if pct >= 45 else 'shaded' if pct >= 20 else 'in deep shade')
+
+
+def plain(text):
+    """Measurements retold as he would perceive them: places by direction, light by how it looks, dates as dates.
+    The stored record keeps the numbers (Jordan's report shows them); this is only how they come back to him."""
     t = str(text or '')
+
+    def spot(m):
+        x, z = float(m.group(2)), float(m.group(3))
+        return m.group(1) + place_words(x, z) if math.hypot(x, z) <= 60 else m.group(0)   # further than the world reaches: not a place
+    t = re.sub(r'(\b(?:at|near|by|around|to|from|of|in|towards?) )\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)', spot, t)
+    t = re.sub(r'\(\s*ground light (?:is )?(?:about )?(\d+)% of open sky\s*\)',
+               lambda m: '(the ground there is ' + _light_words(int(m.group(1))) + ')', t)
+    t = re.sub(r'ground light (?:here |there )?(?:is )?(?:about )?(\d+)% of open sky',
+               lambda m: 'the ground there is ' + _light_words(int(m.group(1))), t)
+
+    def date(m):
+        y, mo, d, hm = m.group(1), int(m.group(2)), int(m.group(3)), m.group(4)
+        return f'{d} {MONTHS[mo - 1]}' + (f', {hm}' if hm else '') if 1 <= mo <= 12 else m.group(0)
+    t = re.sub(r'\b(20\d\d)-(\d\d)-(\d\d)(?:[ T](\d\d:\d\d)(?::\d\d(?:\.\d+)?)?(?:[+-]\d\d:\d\d)?)?\b', date, t)
+    # Labels the world keeps on things (tree-34, log-2) are for finding them, not something he sees on them.
+    t = re.sub(r'\s*\(\s*[a-z][a-z_]*-\d+\s*\)', '', t)
+    t = re.sub(r'\b(?:(?i:a|an|the)\s+)?([a-z][a-z_]*)-\d+\b', lambda m: 'the ' + HIDDEN.get(m.group(1), m.group(1).replace('_', ' ')), t)
+    return t
+
+
+def tidy(text):
+    """Remove the bookkeeping his own words sometimes picked up: thread and promise numbers, memory IDs.
+    Measurements are retold in plain words first (v0.30.2), so a place like (3, 4) is never mistaken for a list of numbers."""
+    t = plain(text)
     t = re.sub(r'\s*\((?:threads?|promises?|memor(?:y|ies)|events?|lessons?|ids?)\s*[\d–\-, /and]+\)', '', t, flags=re.I)
     t = re.sub(r'(\b(?:threads?|promises?)\s*)\(\s*\d+\s*(?:[–\-/,]\s*\d+\s*)*\)', r'\1', t, flags=re.I)   # "promises (115–120)"
     t = re.sub(r'\s*\(\s*\d+\s*(?:[–\-/,]\s*\d+\s*)+\)', '', t)
@@ -96,6 +149,47 @@ def alike(a, b, overlap=.6):
     """The same thing in other words: most of the shorter one's words appear in the other."""
     x, y = _words(a), _words(b)
     return bool(x and y) and len(x & y) / min(len(x), len(y)) >= overlap
+
+
+def same_promise(a, b):
+    """The same undertaking, reworded: it shares its key words (or a label such as 12-03) with the other."""
+    import memory_recall
+    x = memory_recall.words(a) | set(re.findall(r'\d+-\d+', str(a)))
+    y = memory_recall.words(b) | set(re.findall(r'\d+-\d+', str(b)))
+    common = len(x & y)
+    return bool(x and y) and common >= 2 and common / min(len(x), len(y)) >= .34
+
+
+FELT = {'pull': 'it has been drawing me in lately', 'grind': 'it has felt like hard going lately',
+        'doubt': "I've had my doubts about it lately"}
+
+
+def patterns(statements):
+    """What he has learned of how things go, one line per activity: whether it works out and how it leaves him."""
+    feel, work, order = {}, {}, []
+    for st in statements:
+        st = st.replace('Working with objects', 'Working with my hands').rstrip('.')
+        m = re.match(r'(.+?) (tends to lift me|tends to leave me low|leaves me much the same|usually works out|often does not work out)$', st)
+        if not m:
+            order.append((st, None))
+            continue
+        what, how = m.groups()
+        (work if 'work out' in how or 'works out' in how else feel)[what] = how
+        if (what, 1) not in order:
+            order.append((what, 1))
+    out = []
+    for what, kind in order:
+        if kind is None:
+            out.append(what + '.')
+            continue
+        w, f = work.get(what), feel.get(what)
+        if w and f:
+            f = f.replace('tends', 'it tends').replace('leaves me much', 'it leaves me much')
+            but = (w == 'usually works out') != (f == 'it tends to lift me') and 'much the same' not in f
+            out.append(f'{what} {w}, {"but" if but else "and"} {f}.')
+        else:
+            out.append(f'{what} {w or f}.')
+    return out
 
 
 def distinct(items, key=lambda x: x, limit=None, overlap=.6):
@@ -211,7 +305,7 @@ def scene(state, ctx, extras):
         out.append('Things I hold onto:\n' + '\n'.join('- ' + clip(tidy(h), 160) for h in held))
     pats = [p for p in ctx.get('patterns_in_your_record', []) if p.get('status') != 'doubted']
     if pats:
-        out.append("How things tend to go for me:\n" + '\n'.join('- ' + p['pattern'] for p in pats))
+        out.append("How things tend to go for me:\n" + '\n'.join('- ' + p for p in patterns([p['pattern'] for p in pats])))
     stories = [s['story'] for s in ctx.get('your_ongoing_stories', []) if s.get('stage') not in ('done', 'answered', 'left')]
     stories = distinct([clip(tidy(s), 130) for s in reversed(stories)], limit=3)
     if stories:
@@ -220,8 +314,11 @@ def scene(state, ctx, extras):
     threads = distinct([clip(tidy(t['text']), 200) for t in reversed(lo.get('threads', []))], limit=3)
     if threads:
         out.append('Still on my mind:\n' + '\n'.join('- ' + t for t in threads))
-    promises = distinct([(p.get('to', 'someone').split()[0], clip(tidy(p['text']), 200)) for p in reversed(lo.get('promises', []))],
-                        key=lambda x: x[1], limit=3)
+    promises = []
+    for to, text in [(p.get('to', 'someone').split()[0], clip(tidy(p['text']), 200)) for p in reversed(lo.get('promises', []))]:
+        if not any(to == t2 and (alike(text, x2) or same_promise(text, x2)) for t2, x2 in promises):
+            promises.append((to, text))   # the newest wording of each undertaking; rewordings of it are the same promise
+    promises = promises[:3]
     if promises:
         out.append("Promises I've made:\n" + '\n'.join(f'- To {to}: {text}' for to, text in promises))
     wishes = distinct([clip(tidy(w['wish']), 160) for w in ctx.get('wishes', [])], limit=4)
@@ -229,7 +326,7 @@ def scene(state, ctx, extras):
         out.append('Things I wish for:\n' + '\n'.join('- ' + w for w in wishes))
     projects = distinct(ctx.get('projects', []), key=lambda p: p.get('title', ''), overlap=.75)
     if projects:
-        out.append("Something I'm working on:\n" + '\n'.join(f'- {p.get("title")}' + (f' (it has felt like {p["felt_lately"]} lately)' if p.get('felt_lately') else '')
+        out.append("Something I'm working on:\n" + '\n'.join(f'- {p.get("title")}' + (f' ({FELT[p["felt_lately"]]})' if p.get('felt_lately') in FELT else '')
                                                           for p in projects))
     half = distinct([clip(tidy(w.get('intention')), 160) for w in ctx.get('paused_work', [])], limit=2)
     if half:
@@ -259,7 +356,7 @@ def scene(state, ctx, extras):
         out.append(f"The nearest trees stand about {woods['nearest_standing_tree_m_from_clearing_centre']} m from the middle of the clearing. "
                    'Felled trees do not grow back by themselves; only planted ones grow.')
     if ctx.get('your_field_notebook'):
-        lines = [f'- {place}: ' + '; '.join(v) for place, v in ctx['your_field_notebook'].items()]
+        lines = [f'- {place}: ' + '; '.join(tidy(x) for x in v) for place, v in ctx['your_field_notebook'].items()]
         out.append("What I've found and noted in the woods:\n" + '\n'.join(lines[:8]))
     for p in ctx.get('people', []):
         line = f"{p['name']} keeps the trading post. We've talked many times." if p.get('times_talked', 0) > 3 else \
@@ -272,8 +369,21 @@ def scene(state, ctx, extras):
     if ctx.get('lit_after_dark'):
         out.append('From here I can see light in the reading cabin and the café.')
     if ctx.get('nearby'):
-        out.append('Near me: ' + ', '.join(re.sub(r'^([\w-]+) \((.+)\)$', r'\2', n) for n in ctx['nearby']) + '.')
+        near = [_near(n) for n in ctx['nearby']]
+        near = [('two trees' if x == 'a tree' else x) if near.count(x) > 1 else x for i, x in enumerate(near) if x not in near[:i]]
+        out.append('Near me: ' + ', '.join(near) + '.')
     return '\n\n'.join(x for x in out if x.strip())
+
+
+TREE = {'standing': 'a tree', 'felled': 'a felled tree and its stump', 'young': 'a young tree I planted'}
+
+
+def _near(n):
+    """'tree-69 standing' -> 'a tree'; 'spring (Spring and water basin)' -> 'Spring and water basin'."""
+    m = re.match(r'^tree-\d+ (\w+)$', n)
+    if m:
+        return TREE.get(m.group(1), 'a tree')
+    return tidy(re.sub(r'^([\w-]+) \((.+)\)$', r'\2', n))
 
 
 def choices(allowed):

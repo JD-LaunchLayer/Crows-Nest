@@ -61,3 +61,26 @@ assert len(inner.distinct(['Woodland Plant Sculpture','woodland plant interactio
 assert inner.clip('make another copy attempt likely to s',30).endswith('…') and 'likely to s' not in inner.clip('make another copy attempt likely to s',30)
 assert '115' not in inner.tidy('the cord bundle check promises (115–120) remain')
 print('PASS v0.30.1: runs remembered as one; near-repeats once; clean cuts; no stray numbers.')
+# v0.30.2: measurements told as he would perceive them; one promise per undertaking; patterns per activity; no mid-word cuts.
+t=inner.tidy('A bramble thicket at (2, -22) with arching thorny stems; ground light here is about 85% of open sky.')
+assert t=='A bramble thicket at the woodland edge to the north with arching thorny stems; the ground there is in open light.', t
+assert inner.tidy('Acorns lie under tree-34 near (3, 4).')=='Acorns lie under the tree near the south-east side of the clearing.'
+assert '%' not in inner.tidy('Observed the open clearing (ground light about 40% of open sky).')
+assert inner.tidy('page 5 (2026-12-06 15:34) "12-06 cord bundle"')=='Page 5 (6 Dec, 15:34) "12-06 cord bundle"'
+assert 'deer' not in inner.tidy('near deer-2')
+lo={'promises':[{'to':'Edda Thorne','text':"I'll read my remaining 12-03 lines against your book, one at a time, and mark any that don't match."},
+                {'to':'Edda Thorne','text':"I will read my 12-03 lines word for word and we'll compare them to your three entries together, noting any gaps plainly."},
+                {'to':'Edda Thorne','text':"I'll read my 12-03 cord bundle lines exactly as written and say plainly when one doesn't match your entries."},
+                {'to':'Edda Thorne','text':'I will bring you twenty kilos of wood tomorrow.'}]}
+v=inner.scene({'clock':{'iso':'2026-12-08T10:43:00','date':'Tue 08 Dec','time':'10:43'},'location':'cabin','daylight':.8},
+              {'left_open':lo,'projects':[{'title':'RootWeb Sculpture','felt_lately':'pull'}],
+               'patterns_in_your_record':[{'pattern':'Working with objects tends to leave me low.','status':'held'},
+                                          {'pattern':'Working with objects usually works out.','status':'held'}]},{})
+assert v.count('To Edda:')==2 and 'twenty kilos' in v and 'exactly as written' in v and 'word for word' not in v, v
+assert 'RootWeb Sculpture (it has been drawing me in lately)' in v and 'like pull' not in v
+assert 'Working with my hands usually works out, but it tends to leave me low.' in v
+assert app.cut('the result mixed rather than fully settled',32)=='the result mixed rather than…'
+v=inner.scene({'clock':{'iso':'2026-12-08T10:43:00','date':'Tue 08 Dec','time':'10:43'},'location':'cabin','daylight':.8},
+              {'nearby':['spring (Spring and water basin)','tree-69 standing','tree-70 standing']},{})
+assert 'Near me: Spring and water basin, two trees.' in v and 'tree-' not in v, v
+print('PASS v0.30.2: places, light and dates in plain words; each promise once; one line per activity; clean cuts.')

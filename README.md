@@ -1403,3 +1403,16 @@ eight things come to mind at once, two of each kind, with no near-repeats; near-
 promises, projects and half-done things are shown once; things he holds onto are the four
 strongest; nothing is cut off mid-word; and stray reference numbers like "(115–120)" are gone.
 Nothing stored is changed.
+
+## v0.30.2 — measurements in plain words
+
+From the second look at his real save. Places he remembers are told the way he would know them
+("at the woodland edge to the north", "near the spring", "to my cabin") instead of "(2, -22)";
+ground light is told by how it looks ("in open light", "shaded") instead of "85% of open sky";
+dates read "6 Dec, 15:34"; the labels the world keeps on things (tree-34, log-2) become "the tree",
+"the log", and nearby trees are just trees. The same promise to the same person, reworded several
+times, is remembered once in its newest wording. What he has learned of how things go is one line
+per activity ("Working with my hands usually works out, but it tends to leave me low"). How a
+project has felt reads in words ("it has been drawing me in lately", not "it has felt like pull").
+Text cut to fit is cut at a word, never mid-word. All of this is how his life comes back to him;
+the stored record, and Jordan's report, keep the exact numbers. Nothing stored is changed.

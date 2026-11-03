@@ -48,7 +48,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.30.1'
+APP_VERSION = '0.30.2'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -511,8 +511,15 @@ def available_actions():
     return allowed
 
 
+def cut(text,limit):
+    """Shorten at a word, never mid-word (v0.30.2: a memory ending 'rather than ful' reads as something broken)."""
+    if len(text)<=limit:return text
+    at=text.rfind(' ',0,limit)
+    return (text[:at].rstrip(',;:') if at>limit*.6 else text[:limit-1])+'…'
+
+
 def compact(value,limit=180):
-    if isinstance(value,str):return value[:limit]
+    if isinstance(value,str):return cut(value,limit)
     if isinstance(value,list):return [compact(x,limit) for x in value]
     if isinstance(value,dict):return {k:compact(v,limit) for k,v in value.items()}
     return value
@@ -594,7 +601,7 @@ def decision_context():
     context=compact(context)
     # Recent events are what just happened to him: give them room (180 characters cut most observations
     # to their first finding and hid any closing statement). The budget below still trims if needed.
-    context['recent_events']=[{k:m.get(k) for k in ['id','time']}|{'event':str(m.get('event',''))[:700 if WIDE else 320]} for m in recent]
+    context['recent_events']=[{k:m.get(k) for k in ['id','time']}|{'event':cut(str(m.get('event','')),700 if WIDE else 320)} for m in recent]
     return fit(context,CONTEXT_BUDGET,['nearby','your_field_notebook','interests','wishes','self_notes','research','projects','paused_work','patterns_in_your_record','left_open','held_most_strongly','your_ongoing_stories','recent_events','relevant_memories'])
 
 
