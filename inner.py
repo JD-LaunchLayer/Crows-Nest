@@ -67,12 +67,57 @@ def tidy(text):
     """Remove the bookkeeping his own words sometimes picked up: thread and promise numbers, memory IDs."""
     t = str(text or '')
     t = re.sub(r'\s*\((?:threads?|promises?|memor(?:y|ies)|events?|lessons?|ids?)\s*[\d–\-, /and]+\)', '', t, flags=re.I)
+    t = re.sub(r'(\b(?:threads?|promises?)\s*)\(\s*\d+\s*(?:[–\-/,]\s*\d+\s*)*\)', r'\1', t, flags=re.I)   # "promises (115–120)"
+    t = re.sub(r'\s*\(\s*\d+\s*(?:[–\-/,]\s*\d+\s*)+\)', '', t)
     ref = r'\b(?:threads?|promises?|memor(?:y|ies)|events?|lessons?)\s*\d+(?:\s*[–\-/]\s*\d+)?(?:\s*(?:,|and)\s*\d+)*'
     t = re.sub(ref + r'\s*:\s*', '', t, flags=re.I)           # "Lesson 4002: ..." -> "..."
     t = re.sub(r'(^|[.;]\s+)' + ref + r'\s+(says|said|shows?)\s+', r'\1', t, flags=re.I)
     t = re.sub(ref, 'that', t, flags=re.I)
     t = re.sub(r'\s+', ' ', t).strip()
     return t[:1].upper() + t[1:]
+
+
+def clip(text, n=180):
+    """Shorten at the end of a sentence, or at a word, never mid-word."""
+    t = str(text or '').strip()
+    if len(t) <= n:
+        return t
+    cut = max(t.rfind('. ', 0, n), t.rfind('; ', 0, n))
+    if cut > n * .45:
+        return t[:cut + 1]
+    return t[:t.rfind(' ', 0, n)].rstrip(',;:') + '…'
+
+
+def _words(t):
+    return {w for w in re.findall(r'[a-z]{4,}', str(t).lower())}
+
+
+def alike(a, b, overlap=.6):
+    """The same thing in other words: most of the shorter one's words appear in the other."""
+    x, y = _words(a), _words(b)
+    return bool(x and y) and len(x & y) / min(len(x), len(y)) >= overlap
+
+
+def distinct(items, key=lambda x: x, limit=None, overlap=.6):
+    out = []
+    for it in items:
+        if not any(alike(key(it), key(o), overlap) for o in out):
+            out.append(it)
+    return out[:limit] if limit else out
+
+
+def runs(events):
+    """Recent events as a person remembers them: a stretch of the same thing is one memory."""
+    out = []
+    for e in events:
+        text = first_person(tidy(e.get('event', '')))
+        if out and out[-1]['text'] == text:
+            out[-1]['n'] += 1
+            out[-1]['to'] = e.get('time', '')
+        else:
+            out.append({'text': text, 'n': 1, 'from': e.get('time', ''), 'to': e.get('time', '')})
+    return [f"{r['from']} {clip(r['text'], 320)}" if r['n'] == 1 else
+            f"{r['from']}{'–' + r['to'] if r['to'] != r['from'] else ''} {clip(r['text'], 200).rstrip('.')}, again and again ({r['n']} times)." for r in out]
 
 
 def when(at, now):
@@ -111,18 +156,21 @@ def light(daylight, hour):
 
 
 def memory_line(item, now):
-    t, text, w = item.get('type', ''), tidy(item.get('text', '')), when(item.get('when', ''), now)
+    t, text, w = item.get('type', ''), clip(tidy(item.get('text', '')), 200), when(item.get('when', ''), now)
     if t == 'event':
         line = f'I remember ({w}): {first_person(text)}'
         for a in item.get('around_it', []):
             side, _, rest = a.partition(': ')
-            line += f' ({"Just before" if side == "before" else "Just after"}: {first_person(tidy(rest))})'
+            line += f' ({"Just before" if side == "before" else "Just after"}: {clip(first_person(tidy(rest)), 120)})'
         return line
     lead = {'observed': f'I remember seeing ({w}):', 'lesson': 'Something I took from it:', 'appraisal': 'It mattered to me:',
             'reading': f'I read ({w}):', 'trial': f'When I carved ({w}):', 'procedure_result': f'When I worked with my hands ({w}):',
             'self_report': 'How something felt to me:', 'search_miss': 'A search that did not help:', 'note': 'In my notebook:'}
     if t.startswith('held_'):
         return f'Something I hold onto: {text}'
+    if t == 'self_report' and ': ' in text:
+        topic, _, felt = text.partition(': ')
+        return f'How I felt about {topic.lower()}: {felt}'
     return f'{lead.get(t, "I remember:")} {text}'
 
 
@@ -143,34 +191,49 @@ def scene(state, ctx, extras):
     if ctx.get('intention'):
         out.append('What I meant to do: ' + tidy(ctx['intention']).rstrip('.') + '.' + (f' After that, I thought I would: {tidy(ctx["next_step"])}' if ctx.get('next_step') else ''))
     if ctx.get('recent_events'):
-        out.append("What I've done most recently:\n" + '\n'.join(f'- {e.get("time", "")} {first_person(tidy(e.get("event", "")))}' for e in ctx['recent_events']))
+        out.append("What I've done most recently:\n" + '\n'.join('- ' + r for r in runs(ctx['recent_events'])))
     if ctx.get('relevant_memories'):
-        out.append('What comes to mind:\n' + '\n'.join('- ' + memory_line(m, now) for m in ctx['relevant_memories']))
+        # A handful of things come to mind, not a file: at most two of each kind, no near-repeats.
+        per, chosen = {}, []
+        for m in distinct(ctx['relevant_memories'], key=lambda m: m.get('text', '')):
+            kind = 'feeling' if m.get('type') in ('appraisal', 'self_report') else m.get('type', '')
+            if per.get(kind, 0) < (2 if kind in ('feeling', 'lesson') or kind.startswith('held_') else 3):
+                per[kind] = per.get(kind, 0) + 1
+                chosen.append(m)
+        out.append('What comes to mind:\n' + '\n'.join('- ' + memory_line(m, now) for m in chosen[:8]))
     if extras.get('portrait'):
         out.append('Who I am, as I would put it: ' + extras['portrait'])
     elif ctx.get('self_notes'):
         out.append("Things I've noticed about myself:\n" + '\n'.join('- ' + tidy(n) for n in ctx['self_notes']))
     held = [re.sub(r'\s*\((life|skills|world)\)$', '', h) for h in ctx.get('held_most_strongly', [])]
+    held = distinct(held, limit=4)
     if held:
-        out.append('Things I hold onto:\n' + '\n'.join('- ' + tidy(h) for h in held))
+        out.append('Things I hold onto:\n' + '\n'.join('- ' + clip(tidy(h), 160) for h in held))
     pats = [p for p in ctx.get('patterns_in_your_record', []) if p.get('status') != 'doubted']
     if pats:
         out.append("How things tend to go for me:\n" + '\n'.join('- ' + p['pattern'] for p in pats))
     stories = [s['story'] for s in ctx.get('your_ongoing_stories', []) if s.get('stage') not in ('done', 'answered', 'left')]
+    stories = distinct([clip(tidy(s), 130) for s in reversed(stories)], limit=3)
     if stories:
-        out.append("What I've been in the middle of:\n" + '\n'.join('- ' + tidy(s) for s in stories[-4:]))
+        out.append("What I've been in the middle of:\n" + '\n'.join('- ' + s for s in stories))
     lo = ctx.get('left_open') or {}
-    if lo.get('threads'):
-        out.append('Still on my mind:\n' + '\n'.join('- ' + tidy(t['text']) for t in lo['threads']))
-    if lo.get('promises'):
-        out.append("Promises I've made:\n" + '\n'.join(f'- To {p.get("to", "someone").split()[0]}: ' + tidy(p['text']) for p in lo['promises']))
-    if ctx.get('wishes'):
-        out.append('Things I wish for:\n' + '\n'.join('- ' + tidy(w['wish']) for w in ctx['wishes']))
-    if ctx.get('projects'):
+    threads = distinct([clip(tidy(t['text']), 200) for t in reversed(lo.get('threads', []))], limit=3)
+    if threads:
+        out.append('Still on my mind:\n' + '\n'.join('- ' + t for t in threads))
+    promises = distinct([(p.get('to', 'someone').split()[0], clip(tidy(p['text']), 200)) for p in reversed(lo.get('promises', []))],
+                        key=lambda x: x[1], limit=3)
+    if promises:
+        out.append("Promises I've made:\n" + '\n'.join(f'- To {to}: {text}' for to, text in promises))
+    wishes = distinct([clip(tidy(w['wish']), 160) for w in ctx.get('wishes', [])], limit=4)
+    if wishes:
+        out.append('Things I wish for:\n' + '\n'.join('- ' + w for w in wishes))
+    projects = distinct(ctx.get('projects', []), key=lambda p: p.get('title', ''), overlap=.75)
+    if projects:
         out.append("Something I'm working on:\n" + '\n'.join(f'- {p.get("title")}' + (f' (it has felt like {p["felt_lately"]} lately)' if p.get('felt_lately') else '')
-                                                          for p in ctx['projects']))
-    if ctx.get('paused_work'):
-        out.append('Things I left half-done:\n' + '\n'.join(f'- {tidy(w.get("intention"))}' for w in ctx['paused_work']))
+                                                          for p in projects))
+    half = distinct([clip(tidy(w.get('intention')), 160) for w in ctx.get('paused_work', [])], limit=2)
+    if half:
+        out.append('Things I left half-done:\n' + '\n'.join('- ' + h for h in half))
     have = []
     have.append(f"In my purse: {ctx.get('money_in_your_purse', 'nothing')}.")
     sup = ctx.get('supplies') or {}

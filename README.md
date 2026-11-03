@@ -1394,3 +1394,12 @@ his place could perceive, remember or feel. The bookkeeping still runs; it stays
 - **For you.** The report gains "In his own words" (who he is, last dream); the journal's Crow
   today page shows them too. `python3 tools/preview_mind.py` prints exactly what he sees now,
   from a copy of his save, at no cost.
+
+## v0.30.1 — a tidier mind
+
+From the first look at what he sees on his real save: a stretch of the same thing (nine rests in
+a row) is now one memory ("from 00:26 to 02:59 I rested in my cabin, again and again"); at most
+eight things come to mind at once, two of each kind, with no near-repeats; near-identical
+promises, projects and half-done things are shown once; things he holds onto are the four
+strongest; nothing is cut off mid-word; and stray reference numbers like "(115–120)" are gone.
+Nothing stored is changed.

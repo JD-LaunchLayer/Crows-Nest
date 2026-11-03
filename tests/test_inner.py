@@ -53,3 +53,11 @@ with tempfile.TemporaryDirectory() as td:
     except app.MindAway:pass
     assert not asked
 print('PASS v0.30: first-person life with no machinery; feelings in words; dreams and who he is; dozing, never a stand-in.')
+# v0.30.1: a stretch of the same thing is one memory; near-repeats shown once; nothing cut mid-word; stray numbers gone.
+r=inner.runs([{'time':'00:26','event':'Finished a quiet rest in his cabin.'},{'time':'00:45','event':'Finished a quiet rest in his cabin.'},
+              {'time':'01:04','event':'Finished a quiet rest in his cabin.'},{'time':'01:10','event':'Drank 0.40 litres from the spring basin.'}])
+assert r==['00:26–01:04 I finished a quiet rest in my cabin, again and again (3 times).','01:10 I drank 0.40 litres from the spring basin.'], r
+assert len(inner.distinct(['Woodland Plant Sculpture','woodland plant interactions sculpture','RootWeb Sculpture (Day 6)'],overlap=.75))==2
+assert inner.clip('make another copy attempt likely to s',30).endswith('…') and 'likely to s' not in inner.clip('make another copy attempt likely to s',30)
+assert '115' not in inner.tidy('the cord bundle check promises (115–120) remain')
+print('PASS v0.30.1: runs remembered as one; near-repeats once; clean cuts; no stray numbers.')
