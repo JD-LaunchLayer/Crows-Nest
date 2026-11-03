@@ -1314,3 +1314,18 @@ soil settles and packs down again over a few weeks. A bed with plants in it cann
   has the last three days in front of her and any day he mentions.
 - His threads and promises are now kept for the long run too (the last 500 of each, instead
   of 80 and 40). Open ones still lapse or fade as before; the record stays.
+
+## v0.29.0 — remembering more like a person
+
+What comes to mind when he decides is still chosen from his own saved life by fixed,
+readable rules, and still never changes it. Four things now work more like human memory:
+
+- **Vivid moments stand out.** How much a moment mattered to him and how strongly he felt it
+  (from his own appraisal of it), and the first time he did something, make it come back
+  more easily, however long ago it was.
+- **Places bring things back.** Where he is, or where he is about to go, brings up what
+  happened there before: heading to the post recalls past dealings at the post.
+- **Remembering strengthens memory.** Each time a moment is recalled for a decision it
+  becomes a little easier to recall again; what he never recalls slowly gives way.
+- **Moments come with their surroundings.** A recalled moment brings what happened just
+  before and just after it (in the cloud model's larger context).

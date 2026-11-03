@@ -46,7 +46,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.28.3'
+APP_VERSION = '0.29.0'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -457,6 +457,12 @@ def tidy_non_wishes(state):
 
 
 tidy_non_wishes(state)
+if not state.get('felt_backfilled'):  # v0.29: how strongly past moments were felt, from his own appraisals of them
+    _ap={a.get('source_id'):a for a in state.get('appraisals',[])}
+    for _m in state.get('memories',[]):
+        _a=_ap.get(_m.get('id'))
+        if _a and 'felt' not in _m:_m['felt']={'valence':_a.get('valence',0),'importance':_a.get('importance',0)}
+    state['felt_backfilled']=True
 
 
 def available_actions():
@@ -953,6 +959,10 @@ def start_action(d, seconds, reading=None):
         ('Started reading a web page at the café: '+reading['title']+'.') if action=='browse' and reading else 'Started '+action+'.'
     details={'action':action,'intention':intention,'next_step':state['next_step']}
     if action=='read':details['research_question']=d.get('research_question','')[:240]
+    rs=state.setdefault('recall_strength',{})  # v0.29: what he recalled to choose this gets easier to recall again
+    for i in (d.get('recalled_ids') or [])[:8]:rs[str(i)]=rs.get(str(i),0)+1
+    if len(rs)>4000:
+        for k in sorted(rs,key=rs.get)[:len(rs)-4000]:rs.pop(k)
     for key in ['recalled_ids','memory_ids_used','project_choice']:
         if key in d:details[key]=d[key]
     if action=='interact':details.update(verb=d['verb'],hypothesis=d.get('hypothesis',''),prediction=d.get('prediction',''),procedure_id=d.get('procedure_id',''))
@@ -1246,6 +1256,7 @@ def reflect(memory):
         signal=life.appraise(state,memory,result)
         appraisal={'at':now().isoformat(),'source_id':memory['id'],'feeling':result['feeling'][:350],'topic':result['topic'][:60],'enjoyment':clamp(result['enjoyment'],-2,2),'meaning':signal['meaning'],'concern':signal['concern'],'valence':signal['valence'],'importance':signal['importance']}
         state['appraisals'].append(appraisal);state['appraisals']=state['appraisals'][-400:]
+        memory['felt']={'valence':appraisal['valence'],'importance':appraisal['importance']}  # v0.29: how vividly it stays
         experience.record(state,memory,appraisal)
         lesson=result['lesson'].strip()
         repeated_lesson=any(memory_recall.similar(x['interpretation'],lesson) for x in state['long_term'][-30:])

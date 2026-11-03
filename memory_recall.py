@@ -42,15 +42,34 @@ def _short(text, limit):
     return text if len(text) <= limit else text[:limit - 1] + '…'
 
 
+# Where each kind of activity happens, so a place can bring back what happened there (v0.29).
+PLACE = {'rest': 'cabin', 'sleep': 'cabin', 'eat': 'cabin', 'drink': 'spring', 'reflect': 'cabin', 'play_music': 'cabin',
+         'butcher': 'cabin', 'preserve': 'cabin', 'practise': 'range', 'explore': 'woods', 'observe': 'woods', 'gather': 'woods',
+         'fell_tree': 'woods', 'plant_tree': 'woods', 'hunt': 'woods', 'put_out_food': 'woods', 'craft': 'workbench',
+         'plan': 'workbench', 'construct': 'workbench', 'interact': 'workbench', 'move_object': 'workbench', 'inspect': 'workbench',
+         'use_item': 'workbench', 'read': 'library', 'browse': 'cafe', 'trade': 'shop', 'talk': 'shop', 'garden': 'garden'}
+
+
+def vividness(m, first_of_kind=False):
+    """How strongly a moment stays with him: how much it mattered and how strongly he felt it, and firsts. 0..~1.6"""
+    felt = m.get('felt') or {}
+    return (float(felt.get('importance') or 0) + .6 * abs(float(felt.get('valence') or 0))
+            + (.35 if first_of_kind else 0))
+
+
 def candidates(state):
     """Every recallable item, labelled by evidence type. Nothing is generated."""
     items = []
+    seen_kinds = set()
     for m in state.get('memories', []):
         if m.get('kind') in ('started', 'resumed', 'consolidated'):
             continue  # "Started X." carries little; its outcome event is recalled instead.
+        first = m.get('kind') == 'experience' and m.get('action') not in seen_kinds
+        seen_kinds.add(m.get('action'))
         items.append({'type': 'event', 'id': m.get('id'), 'order': m.get('id') or 0,
                       'text': _short(m.get('event'), 220), 'why': _short(m.get('reason'), 120),
-                      'when': m.get('at', '')[:16], 'importance': 0})
+                      'when': m.get('at', '')[:16], 'importance': 0, 'vivid': vividness(m, first),
+                      'place': PLACE.get(m.get('action'))})
         found = (m.get('world_result') or {}).get('findings') or []
         for f in found:  # each thing he actually noticed is recallable on its own
             items.append({'type': 'observed', 'id': m.get('id'), 'order': m.get('id') or 0,
@@ -138,6 +157,13 @@ def recall(state, budget_chars=1700, exclude_ids=(), limit=8, focus=None):
             df[w] = df.get(w, 0) + 1
     n = len(items)
     newest = max((i['order'] for i in items), default=0) or 1
+    # v0.29: where he is (or is about to be) brings back what happened there; what he has recalled before comes back
+    # more easily (rehearsal); vivid moments stand out. Read-only: the rehearsal counts are kept by the caller.
+    pending = (state.get('pending') or {}).get('decision') or {}
+    here = PLACE.get(pending.get('action')) or {'shop': 'shop', 'cafe': 'cafe', 'library': 'library', 'range': 'range',
+                                                 'woods': 'woods', 'workbench': 'workbench', 'garden': 'garden',
+                                                 'cabin': 'cabin'}.get(state.get('location'))
+    rehearsed = state.get('recall_strength', {})
     scored = []
     for item, d in zip(items, docs):
         if item['type'] == 'event' and item['id'] in exclude:
@@ -146,7 +172,9 @@ def recall(state, budget_chars=1700, exclude_ids=(), limit=8, focus=None):
         if overlap <= 0:
             continue
         recency = .5 * (item['order'] / newest) if item['order'] else 0
-        scored.append((overlap + item['importance'] + recency, item))
+        extra = (.8 * item.get('vivid', 0) + (.5 if here and item.get('place') == here else 0)
+                 + (.25 * math.log(1 + rehearsed.get(str(item['id']), 0)) if item['type'] == 'event' else 0))
+        scored.append((overlap + item['importance'] + recency + extra, item))
     scored.sort(key=lambda pair: pair[0], reverse=True)
     chosen, seen, used, per_type = [], {}, 2, {}
     out_terms = {}
@@ -178,6 +206,28 @@ def recall(state, budget_chars=1700, exclude_ids=(), limit=8, focus=None):
         chosen.append(out)
         if len(chosen) >= limit:
             break
+    # v0.29: a recalled moment comes back with what happened just before and after it, as memories do.
+    by_id = {m.get('id'): i for i, m in enumerate(state.get('memories', []))}
+    mems = state.get('memories', [])
+    shown = {c.get('id') for c in chosen if c['type'] == 'event'}
+    for c in ([c for c in chosen if c['type'] == 'event'][:3] if budget_chars >= 3000 else []):  # room only in the larger cloud context
+        i = by_id.get(c.get('id'))
+        if i is None:
+            continue
+        around = []
+        for j in (i - 1, i + 1):
+            while 0 <= j < len(mems) and mems[j].get('kind') != 'experience':
+                j += -1 if j < i else 1
+            if 0 <= j < len(mems) and mems[j].get('id') not in shown and mems[j].get('id') not in exclude:
+                around.append(('before' if j < i else 'after', mems[j]))
+        for side, m in around:
+            text = _short(m.get('event'), 120)
+            size = len(text) + 40
+            if used + size > budget_chars:
+                break
+            used += size
+            c.setdefault('around_it', []).append(f"{side}: {text}")
+            shown.add(m.get('id'))
     return chosen
 
 
