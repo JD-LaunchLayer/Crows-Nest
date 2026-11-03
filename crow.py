@@ -48,7 +48,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.30.5'
+APP_VERSION = '0.30.6'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -284,6 +284,8 @@ def conform(value, schema):
                     fitted = []
                 elif 'none' in options:
                     fitted = 'none'
+                elif '' in options:   # v0.30.6: an unclear choice of project is no particular project, never a stalled life
+                    fitted = ''
                 elif 'not_applicable' in options:
                     fitted = 'not_applicable'
                 elif 0 in options and sub.get('type') == 'integer':
@@ -323,9 +325,14 @@ def conform(value, schema):
         # v0.30.5: a title written a little differently is still that title (one clear match only)
         if isinstance(value, str) and value.strip():
             import inner
-            near = [o for o in schema['enum'] if isinstance(o, str) and o and (o.casefold() == value.strip().casefold() or inner.alike(o, value, .75))]
-            if len(near) == 1:
-                return near[0]
+            exact = [o for o in schema['enum'] if isinstance(o, str) and o.casefold() == value.strip().casefold()]
+            if exact:
+                return exact[0]
+            v = inner._words(value)
+            score = lambda o: len(inner._words(o) & v) / max(1, len(inner._words(o) | v))
+            near = sorted((o for o in schema['enum'] if isinstance(o, str) and o and inner.alike(o, value, .6)), key=score, reverse=True)
+            if near and (len(near) == 1 or score(near[0]) > score(near[1])):
+                return near[0]   # the closest title, when one is clearly closest
         return MISSING
     return value
 

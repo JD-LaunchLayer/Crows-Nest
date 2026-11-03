@@ -1450,3 +1450,10 @@ shown back to him. Now a talk lasts until he leaves (up to eight exchanges); a p
 only when a line promises something new; and the same promise said again is kept as one promise,
 said again, rather than a new one. A project title written slightly differently is taken as that
 title instead of failing his whole choice (which made him doze). Stored history is unchanged.
+
+## v0.30.6 — an unclear project name never stalls him
+
+After v0.30.5 his world stood still at 14:02: every choice named his woodland sculpture project in
+slightly different words, two of his titles were close to it, the choice was refused, and he dozed
+and tried again. Now the clearly closest title is taken, and if none is clearly closest the choice
+goes ahead with no particular project. A choice is never thrown away over a project name.

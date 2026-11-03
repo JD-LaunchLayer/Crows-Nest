@@ -66,3 +66,15 @@ form=_c.fields_schema({'enjoyment':{'type':'integer'},'answer_status':{'type':'s
 assert _c.conform({'enjoyment':3.5,'valence':.2},form)=={'enjoyment':4,'answer_status':'not_applicable','valence':.2}
 assert _c.conform({'enjoyment':1,'valence':'warm'},form) is _c.MISSING and _c.CONFORM_FAILURE.startswith('valence=')
 print('PASS v0.21.2 cloud answers: rounding, neutral reading status, named failures.')
+# v0.30.6: a project named a little differently never stalls his life: the clearly closest title, else no particular project.
+import contextlib as _c, importlib.util as _iu, io as _io, shutil as _sh, tempfile as _tf
+from pathlib import Path as _P
+with _tf.TemporaryDirectory() as td:
+    _sh.copy(ROOT/'crow.py',_P(td)/'crow.py')
+    sp=_iu.spec_from_file_location('crow_enum',_P(td)/'crow.py');app=_iu.module_from_spec(sp)
+    with _c.redirect_stdout(_io.StringIO()):sp.loader.exec_module(app)
+    sc={'type':'object','required':['which_project'],'properties':{'which_project':{'type':'string','enum':['','Woodland Plant Sculpture','Woodland Plant Interactions Study','RootWeb Sculpture (Day 6)']}}}
+    assert app.conform({'which_project':'Woodland plant interactions sculpture'},sc)['which_project'] in ('Woodland Plant Sculpture','Woodland Plant Interactions Study')
+    assert app.conform({'which_project':'woodland plant sculpture'},sc)['which_project']=='Woodland Plant Sculpture'
+    assert app.conform({'which_project':'A boat'},sc)['which_project']==''
+print('PASS v0.30.6: an unclear project name never stalls his choice.')
