@@ -98,6 +98,19 @@ export function createDiary({document,player=null}){
     if((t.requests||[]).length){trade.append(el('p','Things he has asked the post to stock:'));for(const r of [...t.requests].reverse().slice(0,8))trade.append(el('p',`“${r.item}”${r.times>1?` (asked ${r.times} times)`:''}`,'thought'));}
     else trade.append(el('p','He has not asked for anything to be stocked.','muted'));
     const last=(t.ledger||[]).at(-1);if(last)trade.append(el('p','Last at the post: '+last.text,'muted'));}}
+  const shelves=$('diaryShelves');if(shelves){shelves.replaceChildren();const t=s.trading;
+   if(t){const stock=Object.entries(t.stock||{});const inStock=stock.filter(([,v])=>v.qty>0),out=stock.filter(([,v])=>!(v.qty>0));
+    shelves.append(el('p',`In stock: ${inStock.length} lines · sold out: ${out.length}`,'muted'));
+    for(const [,v] of inStock.sort((a,b)=>a[1].name.localeCompare(b[1].name)))shelves.append(el('p',`${v.name} — ${Math.round(v.qty*100)/100} left · ${v.price} credit`));
+    if(out.length)shelves.append(el('p','Sold out: '+out.map(([,v])=>v.name).join(', '),'muted'));
+    const today=(s.clock?.iso||'').slice(0,10),done=t.jobs_done||{};
+    const sweep=done.sweep_post?.slice(0,10)===today?'done today':'needs doing today';
+    const crates=t.last_delivery&&!(done.carry_crates&&done.carry_crates>=t.last_delivery)?'crates waiting from the last delivery':'no crates until the next delivery';
+    shelves.append(el('p',`Jobs: sweeping ${sweep} · ${crates}`));
+    const fav=s.keeper?.favours||[];if(fav.length)shelves.append(el('p','Favours agreed with Edda: '+fav.map(f=>`${f.task} (${f.credit} credit)`).join('; '),'muted'));
+    if(t.last_delivery)shelves.append(el('p','Last delivery: '+t.last_delivery.slice(0,16).replace('T',' '),'muted'));
+    for(const l of (t.ledger||[]).slice(-6).reverse())shelves.append(el('p',`${(l.at||'').slice(5,16).replace('T',' ')} · ${l.text}`,'thought'));}
+   else shelves.append(el('p','The trading post has not opened yet.','muted'));}
   const musicBox=$('diaryMusic');if(musicBox){musicBox.replaceChildren();const pieces=[...(s.music?.pieces||[])].reverse();
    if(s.music&&pieces.length)musicBox.append(el('p',`${Math.round((s.music.hours||0)*10)/10} hours at the harp · ${s.music.sessions||0} sessions`,'muted'));
    for(const pc of pieces.slice(0,10)){const box=el('div',undefined,'story');
@@ -172,6 +185,8 @@ export function createDiary({document,player=null}){
   L.push('','SELF-NOTES');for(const n of (s.personality_notes||[]).slice(-4))L.push('- '+cut(n.text,160));
   const k=s.keeper;L.push('','EDDA & TRADE',`Talked ${k?.talks||0} times · warmth ${(k?.warmth||0).toFixed(2)} · last ledger: ${cut((s.trading?.ledger||[]).at(-1)?.text||'none',120)}`);
   const lastTalk=[...(s.memories||[])].reverse().find(m=>m.world_result&&m.world_result.conversation);if(lastTalk)L.push('Last talk: '+cut(lastTalk.world_result.conversation.map(c=>c.who+': '+c.text).join(' / '),400));
+  {const st=Object.values(s.trading?.stock||{}).filter(v=>v.qty>0);if(st.length)L.push('Shelves: '+st.map(v=>`${cut(v.name,40)} ${Math.round(v.qty*100)/100}@${v.price}`).join(' · '));
+   const dn=s.trading?.jobs_done||{};if(Object.keys(dn).length)L.push('Jobs last done: '+Object.entries(dn).map(([j,a])=>`${j} ${String(a).slice(5,16).replace('T',' ')}`).join(' · '));}
   L.push('','GARDEN');for(const b of (s.garden?.beds||[]))L.push(`- bed ${b.n}: ${b.crop||'empty'}${b.item?' ('+b.item+')':''} growth ${Math.round((b.growth||0)*100)}% health ${Math.round((b.health??1)*100)}%`);
   L.push('','WHERE THE WORLD RAN OUT (top)');for(const g of [...(s.world_gaps||[])].sort((a,b)=>b.times-a.times).slice(0,8))L.push(`- ${g.kind} ${g.target||''} ×${g.times}: ${cut((g.focuses||[]).at(-1)||'',120)}`);
   if(s.music?.pieces?.length){L.push('','MUSIC',`${(s.music.hours||0).toFixed(1)} h at the harp`);for(const pc of s.music.pieces.slice(-5))L.push(`- ${pc.title} (${pc.source}) ×${pc.times_played}, last slips ${pc.last_slips??'-'}`);}

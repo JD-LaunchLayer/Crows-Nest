@@ -1186,3 +1186,16 @@ new things fell to list order, plants and trees first. With about 150 unrecorded
 the deeper woods, the deer and birds there were never the ones noticed. Now something alive
 and moving is noticed before one more still tree, as it would be by anyone. If he says he is
 not looking for animals, they come last as before. Nothing about them is explained.
+
+## v0.26.2 — posted jobs are real work; Edda's shelves
+
+- **Posted jobs are real work.** The post is swept once a day, and the crates come only
+  with the weekly delivery, so each posted job pays once until it is needed again. The
+  board says plainly which jobs are needed now ("already done today; needed again
+  tomorrow", "no crates waiting; they come with the weekly delivery"). Going for a job that
+  is not needed costs a short visit, not the job's time. Favours agreed with Edda are hers
+  to offer and are unchanged.
+- **Edda's shelves** (journal): everything in stock with how many are left and the price,
+  what is sold out, which jobs are needed today, favours agreed, the last delivery and the
+  latest ledger entries. The copied report gains a Shelves line and when each job was last
+  done. For watching only; Crow does not see it.
