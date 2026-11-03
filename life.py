@@ -81,7 +81,9 @@ def advance(state, seconds, action):
         body['hydration']=clamp(body['hydration']-(2+4*work)*dt)
         # Sleepiness comes mostly from what he does (v0.27): hard outdoor work tires him far more than sitting,
         # talking or reading; being awake a long time adds a little whatever he does. Sleep clears it.
-        body['sleep_debt']=clamp(body['sleep_debt']+(-SLEEP_RECOVERY if sleeping else .3+.7*work)*dt,0,24)
+        # v0.28 body clock: awake in the dark late hours, drowsiness builds faster, as it does for anyone.
+        late=(not sleeping) and state.get('daylight',1)<.12 and (state.get('minute',720)>=20*60 or state.get('minute',720)<5*60)
+        body['sleep_debt']=clamp(body['sleep_debt']+(-SLEEP_RECOVERY if sleeping else .3+.7*work+(.5 if late else 0))*dt,0,24)
         body['exertion']=clamp(body['exertion']+(work*.16-(.32 if resting else .04))*dt,0,1)
         body['active_hours']+=dt
         supplies=state['provisions']

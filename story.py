@@ -122,8 +122,25 @@ def settle_need(state, memory, sensations):
         story['ended_by'] = 'the body no longer reported the need'
 
 
+PROMISE_LAPSE_DAYS = 5
+
+
 def age(state):
-    """Stories left alone go dormant, and eventually are counted as left behind."""
+    """Stories left alone go dormant, and eventually are counted as left behind.
+    Promises not kept within about five days lapse (v0.28): kept in his history, no longer open."""
+    from datetime import datetime
+    try:
+        today = datetime.fromisoformat(state['clock']['iso'])
+        for p in state.get('promises', []):
+            if p['status'] == 'open':
+                try:
+                    old = (today - datetime.fromisoformat(p['at'])).total_seconds() > PROMISE_LAPSE_DAYS * 86400
+                except (ValueError, TypeError):
+                    continue
+                if old:
+                    p.update(status='lapsed (left behind)', lapsed_at=today.isoformat())
+    except (KeyError, ValueError, TypeError):
+        pass
     now = _hours(state)
     for s in state.get('stories', []):
         idle = now - s.get('updated_hours', now)

@@ -478,6 +478,7 @@ def board(state):
                        'things you own': 'about half what the post sells them for'},
             'note': 'What the post buys goes on its shelves and is sold on at the posted price.',
             'what_you_owe': 'nothing: the post keeps no tab; every deal is paid in full when it is made, and goods are handed over then',
+            'ledger_latest_entries': [f"{str(l.get('at',''))[5:16].replace('T',' ')} · {l['text']}" for l in post['ledger'][-6:]],
             'jobs': {**{k: {'name': v['name'], 'minutes': v['minutes'], 'pays': money(v['credit']),
                             'now': job_open(state, k, (state.get('clock') or {}).get('iso', ''))[1]} for k, v in JOBS.items()},
                      **{f['id']: {'name': 'Favour for Edda: ' + f['task'], 'minutes': f['minutes'], 'pays': money(f['credit'])}

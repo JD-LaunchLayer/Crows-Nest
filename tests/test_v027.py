@@ -11,7 +11,7 @@ with tempfile.TemporaryDirectory() as td:
     with contextlib.redirect_stdout(io.StringIO()):spec.loader.exec_module(app)
     app.CLOCK_OVERRIDE=lambda:datetime(2026,11,28,11,0,tzinfo=app.TZ);app.clock();st=app.state
     ctx=app.decision_context();assert 'night' not in ctx['clock'] and 'gold' in json.dumps(ctx['notes_from_the_world'])
-    assert 'gold' in json.dumps(town.board(st)) and 'credit' not in json.dumps(town.board(st))
+    bd={k:v for k,v in town.board(st).items() if k!='ledger_latest_entries'};assert 'gold' in json.dumps(bd) and 'credit' not in json.dumps(bd)
     st['trading']['credit']=1.5;r=town.trade(st,'buy','provisions_bundle',1,'2026-11-28T11:00')
     assert 'Not enough money' in r['text'] and '1 gold 5 silver' in r['text'], r
     assert 'gold' in st['trading']['ledger'][0]['text'] or any('gold and silver' in l['text'] for l in st['trading']['ledger'])

@@ -1270,3 +1270,20 @@ gets the same note beside it. His words are unchanged.
 - He had come to believe he owed Edda a balance on the bundle. The post keeps no tab: every
   deal is paid in full when it is made. The board now says so plainly (he owes nothing), and
   Edda is told she never holds goods back or says anyone owes her a balance.
+
+## v0.28.0 — a body clock, lit windows, his own books
+
+- **A natural body clock.** Awake in the dark late hours (about 20:00 to 05:00), drowsiness
+  builds faster, as it does for anyone; and a sleep begun in the dark runs on until first
+  light unless he is up sooner (at most 11 hours). He is still never told it is night; naps
+  by day still last only as long as he needs. Before, a quiet day left him so little tired
+  that he woke at 2am rested, with nothing to do but rest in the dark until morning.
+- **Lit windows.** After dark he can see which buildings have light: the reading cabin's lamp
+  and the café, which is open at all hours. Nothing says to go there; it is only what is
+  visible from his door.
+- **His books.** The post's latest ledger entries (what he paid, earned and bought) are on
+  the board he sees there, so he can check his own figures. He had been trying to find a
+  "5 silver gap" with no way to look.
+- **Promises lapse.** A promise not kept within about five days is marked "lapsed (left
+  behind)": still in his history, no longer open. Eighteen were open, several about days
+  long past.

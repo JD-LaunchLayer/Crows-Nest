@@ -46,7 +46,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.27.2'
+APP_VERSION = '0.28.0'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -194,6 +194,7 @@ def clock(at=None):
     noon = 12 - equation_of_time / 60 - 0.52 / 15 + (dt.dst().total_seconds()/3600 if dt.dst() else 0)
     hour = dt.hour + dt.minute / 60
     state['daylight'] = max(0, math.sin(math.pi * (hour-(noon-half)) / (2*half))) if noon-half < hour < noon+half else 0
+    state['clock']['first_light'] = round(noon-half+.4, 2)   # when usable light returns (daylight about .12), for his body clock
     return dt
 
 
@@ -535,6 +536,8 @@ def decision_context():
         'held_most_strongly':consolidation.strongest(state,8 if WIDE else 3),
         'your_ongoing_stories':story.context(state,10 if WIDE else 4),'left_open':grouped_open_items(),
         **({'notes_from_the_world':state['world_notes'][-2:]} if state.get('world_notes') else {}),
+        # v0.28: what anyone could see from his door after dark: which buildings have light in them.
+        **({'lit_after_dark':['the reading cabin: its lamp is lit','the internet café: lit and open at all hours']} if state.get('daylight',1)<.12 else {}),
         'patterns_in_your_record':story.belief_context(state,8 if WIDE else 4),
         'relevant_memories':memory,'recent_pattern':memory_recall.recent_pattern(state),
         'paused_work':[{'id':w['id'],'action':w['pending']['decision']['action'],'intention':w['pending']['decision']['intention'],
@@ -912,6 +915,11 @@ def start_action(d, seconds, reading=None):
     state.pop('posture',None)
     if action=='sleep':
         duration=life.sleep_needed_seconds(state)  # v0.27: he wakes when rested, whatever the hour
+        # v0.28 body clock: a sleep begun in the dark runs on until first light if he is not up sooner (at most 11 hours).
+        if state.get('daylight',1)<.12:
+            hour=dt.hour+dt.minute/60;light=state['clock'].get('first_light',7.5)
+            until=((light-hour)%24)*3600
+            if until<=11*3600:duration=max(duration,int(until))
     else: duration=DURATIONS[action]
     if action=='interact':duration=interactions.duration(d)
     if action == 'read' and d.get('reading_mode', 'lookup') == 'lookup':
