@@ -18,6 +18,7 @@ import music
 import birds
 import foods
 import wildlife
+import notebook
 import web
 import sys
 import world_state
@@ -46,7 +47,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.29.0'
+APP_VERSION = '0.29.1'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -74,8 +75,8 @@ def pass_time(seconds):
         own['virtual'] = (datetime.fromisoformat(own['virtual']) + timedelta(seconds=seconds)).isoformat()
 
 
-ACTIONS = {'rest': 'cabin', 'sleep': 'cabin', 'practise': 'range', 'explore': 'woods', 'craft': 'workbench', 'read': 'library', 'observe': 'woods', 'reflect': 'cabin', 'gather': 'woods', 'plan': 'workbench', 'construct': 'workbench', 'move_object': 'workbench', 'inspect': 'workbench', 'fell_tree': 'woods', 'eat':'cabin', 'drink':'cabin', 'resume_work':'cabin', 'browse':'cafe', 'trade':'shop', 'talk':'shop', 'use_item':'workbench', 'interact':'workbench', 'garden':'garden', 'plant_tree':'woods', 'play_music':'cabin', 'hunt':'woods', 'butcher':'cabin', 'preserve':'cabin', 'put_out_food':'woods'}
-DURATIONS = {'rest': 900, 'practise': 1800, 'explore': 1200, 'craft': 2700, 'read': 900, 'observe': 600, 'reflect': 600, 'gather': 1200, 'plan': 600, 'construct': 1800, 'move_object': 300, 'inspect': 60, 'fell_tree': 5400, 'eat':300, 'drink':120, 'browse':900, 'trade':300, 'talk':600, 'use_item':300, 'interact':600, 'garden':900, 'plant_tree':1200, 'play_music':1800, 'hunt':7200, 'butcher':10800, 'preserve':14400, 'put_out_food':2400}
+ACTIONS = {'rest': 'cabin', 'sleep': 'cabin', 'practise': 'range', 'explore': 'woods', 'craft': 'workbench', 'read': 'library', 'observe': 'woods', 'reflect': 'cabin', 'gather': 'woods', 'plan': 'workbench', 'construct': 'workbench', 'move_object': 'workbench', 'inspect': 'workbench', 'fell_tree': 'woods', 'eat':'cabin', 'drink':'cabin', 'resume_work':'cabin', 'browse':'cafe', 'trade':'shop', 'talk':'shop', 'use_item':'workbench', 'interact':'workbench', 'garden':'garden', 'plant_tree':'woods', 'play_music':'cabin', 'hunt':'woods', 'butcher':'cabin', 'preserve':'cabin', 'put_out_food':'woods', 'notebook':'cabin'}
+DURATIONS = {'rest': 900, 'practise': 1800, 'explore': 1200, 'craft': 2700, 'read': 900, 'observe': 600, 'reflect': 600, 'gather': 1200, 'plan': 600, 'construct': 1800, 'move_object': 300, 'inspect': 60, 'fell_tree': 5400, 'eat':300, 'drink':120, 'browse':900, 'trade':300, 'talk':600, 'use_item':300, 'interact':600, 'garden':900, 'plant_tree':1200, 'play_music':1800, 'hunt':7200, 'butcher':10800, 'preserve':14400, 'put_out_food':2400, 'notebook':900}
 CONFIG = ROOT / 'crow-config.json'
 if CONFIG.exists():
     config = json.loads(CONFIG.read_text())
@@ -413,29 +414,30 @@ DECISION_DEFAULTS={'wish':'','wish_reason':'','object_id':'','plan_id':0,'destin
     'reading_mode':'lookup','research_question':'','next_step':'','creation_name':'','creation_shape':'orb',
     'project_id':-1,'project_title':'','project_status':'active','target_action':'rest','target_sessions':1,
     'observe_area':'woodland_edge','focus':'','trade_mode':'ask','trade_item':'','trade_quantity':1,'opening':'','hope':'','use_item':'','use_on':'','use_how':'',
-    'verb':'','other_id':'','procedure_id':'','hypothesis':'','prediction':'','bed':1,'garden_task':'look','sow_item':'','sapling':'','music_mode':'practise','title':'','notes':'','tempo':80,'piece_id':0,'songbook':'','explore_area':'woodland_edge','hunt_area':'deeper_woods','food':'','put_area':'clearing'}
+    'verb':'','other_id':'','procedure_id':'','hypothesis':'','prediction':'','bed':1,'garden_task':'look','sow_item':'','sapling':'','music_mode':'practise','title':'','notes':'','tempo':80,'piece_id':0,'songbook':'','explore_area':'woodland_edge','hunt_area':'deeper_woods','food':'','put_area':'clearing','notebook_mode':'read','note_title':'','note_text':'','note_query':''}
 # One neutral line per action. Details are requested only after an action is chosen.
 ACTION_MENU={'rest':'quiet rest in the cabin','sleep':'sleep in the cabin until you wake',
     'eat':'eat from an available food source','drink':'drink from the spring',
     'observe':'look closely at one part of the woodland or clearing and notice what is actually there','reflect':'think quietly in the cabin',
-    'explore':'walk through a part of the woodland, noticing what is there along the way and picking up a little loose wood','practise':'archery practice at the range; each session counts where the arrows land',
+    'explore':'walk through part of the woodland, noticing what is there and picking up loose wood','practise':'archery practice at the range; each session counts where the arrows land',
     'read':'look something up on Wikipedia, or read at leisure','inspect':'examine one object, tree or plant closely',
     'gather':'carry 3 kg of wood or stone into inventory','fell_tree':'fell a standing tree with the axe; timber stays at the site',
     'craft':'carve a small piece from 1 kg wood with a measured outcome','plan':'draft a construction blueprint (builds nothing)',
-    'construct':'work on an existing blueprint if materials allow','move_object':'carry one of the loose objects that can be picked up somewhere else',
+    'construct':'work on an existing blueprint if materials allow','move_object':'carry a loose object somewhere else',
     'resume_work':'resume one of your paused jobs with its saved progress',
     'browse':'use the terminal at the internet café to search the wider web and read pages',
     'trade':'go to the trading post: buy, sell, do a posted job or a favour you agreed with Edda, or ask for something',
     'talk':'talk with Edda Thorne, who keeps the trading post: chat, bargain, barter, ask or offer favours',
     'use_item':'use something you own, in whatever way you choose',
-    'interact':'work material, divide or arrange solids, place objects on surfaces, or choose a supported posture',
+    'interact':'work material, divide or arrange solids, place things on surfaces, or sit or lie on something',
     'garden':'work at the garden beds beside the cabin',
     'plant_tree':'plant a young tree you own somewhere in the woodland; it grows slowly over years',
     'play_music':'sit and play the harp you own: make up a piece, change one of yours, play one again, or learn one from sheet music you have seen',
     'hunt':'go out with the bow and arrows you own after an animal',
     'butcher':'cut up the carcass beside the cabin with your knife',
     'preserve':'smoke fresh meat slowly over a wood fire so it keeps',
-    'put_out_food':'put a little of your food down somewhere outdoors and wait quietly nearby'}
+    'put_out_food':'put a little of your food down somewhere outdoors and wait quietly nearby',
+    'notebook':'write in or read back your notebook'}
 # The local 4,096-token model needs a tight context; the cloud model gets roughly three times the room.
 WIDE=PROVIDER=='anthropic'
 CONTEXT_BUDGET=int(os.environ.get('CROW_CONTEXT_CHARS','16000' if WIDE else '5600'))
@@ -687,6 +689,11 @@ def parameter_request(d):
                  'piece_id':{'type':'integer','enum':[0]+[p['id'] for p in m['pieces']]},
                  'songbook':{'type':'string','enum':['']+([t['title'] for t in music.SONGBOOK] if m['songbook_seen'] else [])}},
                 {'harp':music.context(state),'body':life.perceive(state)['sensations']})
+    if a=='notebook':
+        return ('notebook_mode write: note_title and note_text are what you write, in your own words. '
+                'notebook_mode read: note_query is a word or a day (such as 12-03) to look for, or empty for the latest pages.',
+                {'notebook_mode':{'type':'string','enum':['write','read']},'note_title':STRING,'note_text':STRING,'note_query':STRING},
+                {'your_notebook':notebook.summary(state)})
     if a=='hunt':
         return ('Choose where to go with the bow. You will be out about two hours.',
                 {'hunt_area':{'type':'string','enum':list(ecology.AREAS)}},
@@ -1148,6 +1155,9 @@ def finish_action(geometry=None):
         description='Talked with Edda Thorne at the trading post. '+lines+' '+deal['text']
     elif a=='trade':
         result=town.trade(state,d.get('trade_mode','ask'),d.get('trade_item',''),d.get('trade_quantity',1),now().isoformat());description=result['text']
+    elif a=='notebook':
+        result=(notebook.write(state,d.get('note_title',''),d.get('note_text',''),now().isoformat()) if d.get('notebook_mode')=='write'
+                else notebook.read(state,d.get('note_query','')));description=result['text']
     elif a=='hunt':
         result=wildlife.hunt(state,ecology,d.get('hunt_area') or 'deeper_woods',state.get('daylight',0),life.fatigue(state),
                              state['decisions']*7907+state.get('completed',0));description=result['text']

@@ -58,7 +58,7 @@ def effort(action):
             'eat':.1,'drink':.05,'inspect':.12,'test_object':.2,'plan':.25,
             'craft':.55,'construct':.75,'gather':.65,'explore':.45,
             'practise':.65,'move_object':.8,'fell_tree':1.,'plant_tree':.6,'play_music':.2,'browse':.08,'trade':.3,'garden':.45,'talk':.05,'use_item':.2,
-            'hunt':.5,'butcher':.55,'preserve':.3,'put_out_food':.08}.get(action,.15)
+            'hunt':.5,'butcher':.55,'preserve':.3,'put_out_food':.08,'notebook':.06}.get(action,.15)
 
 
 SLEEP_RECOVERY = 1.1  # per hour asleep: a long day's tiredness takes a full night to sleep off

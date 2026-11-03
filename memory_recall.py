@@ -112,6 +112,9 @@ def candidates(state):
         items.append({'type': 'search_miss', 'id': None, 'order': 0,
                       'text': _short(f"Search '{f.get('query')}' found nothing relevant: {f.get('reason')}", 200),
                       'why': _short(f.get('question'), 120), 'when': '', 'importance': .1})
+    for p in state.get('notebook', []):  # v0.29.1: what he has written down can come back to mind too
+        items.append({'type': 'note', 'id': None, 'order': 0, 'text': _short(f"{p.get('title')}: {p.get('text')}", 220),
+                      'why': 'from his notebook', 'when': str(p.get('at', ''))[:16], 'importance': .25})
     import consolidation  # local import: consolidation itself uses this module
     if state.get('mind'):
         items += consolidation.recall_items(state)

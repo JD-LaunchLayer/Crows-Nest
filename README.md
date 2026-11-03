@@ -1329,3 +1329,12 @@ readable rules, and still never changes it. Four things now work more like human
   becomes a little easier to recall again; what he never recalls slowly gives way.
 - **Moments come with their surroundings.** A recalled moment brings what happened just
   before and just after it (in the cloud model's larger context).
+
+## v0.29.1 — a notebook
+
+He kept planning to "write my notes out" and compare "my 12-03 notes" with Edda's book, but
+nothing in his world let him write, so every attempt became quiet reflection, and his
+"notes" were only half-remembered (including a "cord bundle" that never existed). He now has
+a notebook: he can write pages in his own words and read them back by a word or a day. It
+starts empty, as it truly is. Pages are kept for good and can come back to mind like other
+memories. The journal's Crow today page shows his latest page.

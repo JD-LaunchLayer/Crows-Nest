@@ -19,7 +19,7 @@ export function createDiary({document,player=null}){
  }
  const VERB={rest:'resting',sleep:'asleep',eat:'eating',drink:'drinking',observe:'watching the woodland',reflect:'thinking quietly',
   explore:'exploring',practise:'practising archery',read:'reading',inspect:'examining something',gather:'gathering materials',
-  fell_tree:'felling a tree',craft:'carving',plan:'drafting a plan',construct:'building',move_object:'carrying something',resume_work:'returning to his work',interact:'working with an object',browse:'browsing the web',talk:'talking with Edda',trade:'at the trading post',use_item:'using something',garden:'gardening',plant_tree:'planting a tree',play_music:'playing the harp',hunt:'out with the bow',butcher:'cutting up a carcass',preserve:'smoking meat',put_out_food:'putting food out and waiting quietly'};
+  fell_tree:'felling a tree',craft:'carving',plan:'drafting a plan',construct:'building',move_object:'carrying something',resume_work:'returning to his work',interact:'working with an object',browse:'browsing the web',talk:'talking with Edda',trade:'at the trading post',use_item:'using something',garden:'gardening',plant_tree:'planting a tree',play_music:'playing the harp',hunt:'out with the bow',butcher:'cutting up a carcass',preserve:'smoking meat',put_out_food:'putting food out and waiting quietly',notebook:'writing in his notebook'};
  function summary(s){
   const parts=[];const twin=s.twin;
   parts.push(s.pending?`He is ${VERB[s.action]||s.action}.`:'He is between activities.');
@@ -44,12 +44,12 @@ export function createDiary({document,player=null}){
   inspect:'taking a close look at something',gather:'gathering wood',fell_tree:'felling a tree',craft:'carving something',plan:'sketching out a plan',construct:'building',
   move_object:'carrying something across the clearing',interact:'working on something at the bench',browse:'at the café, searching the web',talk:'chatting with Edda',
   trade:'at the trading post',use_item:'using one of his things',garden:'pottering in the garden',plant_tree:'planting a young tree',play_music:'playing his harp',
-  hunt:'out with his bow',butcher:'cutting up a carcass',preserve:'smoking meat over a slow fire',put_out_food:'putting a little food out and waiting quietly',resume_work:'getting back to his work'};
+  hunt:'out with his bow',butcher:'cutting up a carcass',preserve:'smoking meat over a slow fire',put_out_food:'putting a little food out and waiting quietly',resume_work:'getting back to his work',notebook:'writing in his notebook'};
  const DID={rest:'had a rest',sleep:'slept',eat:'had something to eat',drink:'had a drink at the spring',observe:'watched the woods',reflect:'sat and thought',
   explore:'went for a walk in the woods',practise:'practised archery',read:'did some reading',inspect:'looked closely at something',gather:'gathered wood',fell_tree:'felled a tree',
   craft:'carved something',plan:'sketched a plan',construct:'did some building',move_object:'carried something',interact:'worked on something',browse:'searched the web at the café',
   talk:'chatted with Edda',trade:'went to the trading post',use_item:'used one of his things',garden:'worked in the garden',plant_tree:'planted a young tree',play_music:'played his harp',
-  hunt:'went out with his bow',butcher:'cut up a carcass',preserve:'smoked some meat',put_out_food:'put a little food out and waited',resume_work:'got back to his work'};
+  hunt:'went out with his bow',butcher:'cut up a carcass',preserve:'smoked some meat',put_out_food:'put a little food out and waited',resume_work:'got back to his work',notebook:'wrote in his notebook'};
  function feelWords(v,a){const tone=v>.35?'happy and content':v>.1?'in good spirits':v<-.35?'quite down':v<-.1?'a little low':'steady';return tone+(a>.6?', if a bit wound up':a>.3?' and alert':' and calm');}
  function bodyFriendly(b){const out=[];if(!b)return out;
   if(b.reserve<35&&b.stomach<8)out.push("he's hungry");else if(b.reserve<65&&b.stomach<8)out.push("he's a bit peckish");
@@ -91,6 +91,7 @@ export function createDiary({document,player=null}){
   if(open.length||prom.length){head("On his mind");
    for(const t of open){para(`“${first(t.text,200)}”`,'thought');if(t.world_note)para('A note from the world: '+t.world_note,'muted');}
    for(const p of prom){para(`He promised ${p.to.split(' ')[0]}: “${first(p.text,200)}”`,'thought');if(p.world_note)para('A note from the world: '+p.world_note,'muted');}}
+  const page=(s.notebook||[]).at(-1);if(page){head('From his notebook');para(`Page ${page.id}, “${page.title}”: ${first(page.text,300)}`,'thought');}
   const notes=(s.personality_notes||[]).slice(-2).reverse();
   if(notes.length){head("What he's noticed about himself");for(const n of notes)para(`“${first(n.text,220)}”`,'thought');}
   // Edda.
