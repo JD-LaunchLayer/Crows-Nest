@@ -46,7 +46,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.26.4'
+APP_VERSION = '0.26.5'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -981,6 +981,9 @@ def finish_action(geometry=None):
         result=world_state.collect(state,d.get('material','wood'),3,d.get('object_id',''));description=result['text']
     elif a=='plan':
         try:
+            # v0.26.5: say plainly why a drawing failed. Before, any bad drawing came out as "A plan needs 1–16 solid
+            # parts", which he took for a rule about materials and searched for for a day.
+            if isinstance(geometry,dict) and 'invalid_geometry' in geometry:raise ValueError(world_state.plain_drawing_problem(geometry['invalid_geometry']))
             plan=world_state.propose(state,d['creation_name'],d.get('plan_operation','new'),d.get('object_id',''),d.get('destination_x',0),d.get('destination_z',0),geometry,d.get('part_id',''))
             description=f'Prepared construction plan {plan["id"]}: {plan["name"]}. Required inventory: {plan["bill"]} kg; estimated work {plan["minutes"]} real minutes. Not built yet.'
         except ValueError as exc:

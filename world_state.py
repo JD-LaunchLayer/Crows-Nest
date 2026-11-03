@@ -127,7 +127,7 @@ def collect(state, material, requested=3, source_id=''):
 
 def validate_parts(parts):
     import re
-    if not isinstance(parts,list) or not 1<=len(parts)<=16:raise ValueError('A plan needs 1–16 solid parts')
+    if not isinstance(parts,list) or not 1<=len(parts)<=16:raise ValueError('A plan needs 1–16 solid parts')  # reworded for him by plain_drawing_problem
     clean=[]
     for i,p in enumerate(parts):
         if not isinstance(p,dict) or p.get('shape') not in SHAPES:raise ValueError('Unsupported part shape')
@@ -141,6 +141,24 @@ def validate_parts(parts):
         if c['y']-c['height']/2 < -.1:raise ValueError('A part would be buried below ground')
         clean.append(c)
     return clean
+
+
+def plain_drawing_problem(reason):
+    """What went wrong with a blueprint drawing, in plain words. A blueprint is only a drawing: no materials are needed to make one."""
+    r=str(reason)
+    if 'solid parts' in r or 'parts' in r.lower() and 'dimension' not in r:
+        why='no usable shapes were drawn (a blueprint is a drawing of something to build, made of 1 to 16 shapes such as boxes, cylinders or wedges)'
+    elif 'dimension' in r:
+        k=r.rsplit(' ',1)[-1]
+        why={'x':'a shape was drawn too far to the side (within 12 m of the spot)','z':'a shape was drawn too far forward or back (within 12 m of the spot)',
+             'y':'a shape was drawn too high (no higher than 8 m)','width':'a shape was drawn too wide or too thin (3 cm to 8 m)',
+             'depth':'a shape was drawn too deep or too thin (3 cm to 8 m)','height':'a shape was drawn too tall or too thin (3 cm to 6 m)'}.get(k,'a shape was drawn outside the sizes a blueprint allows')
+    elif 'buried' in r:why='a shape was drawn partly below the ground'
+    elif 'colour' in r.lower():why='a shape was given a colour that could not be read'
+    elif 'shape' in r.lower():why='a shape was drawn that is not one of box, cylinder, cone, sphere, wedge or arch'
+    elif 'material' in r.lower():why='a shape was given a material other than wood or stone'
+    else:why='the drawing could not be read'
+    return 'the drawing did not work out: '+why+'. Nothing was planned. Drawing a blueprint needs no materials in hand'
 
 
 def propose(state, name, operation, target_id, x, z, parts=None, remove_part=''):

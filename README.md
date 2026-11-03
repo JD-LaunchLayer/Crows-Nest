@@ -1223,3 +1223,13 @@ inspected, made or carried), each to the nearest metre. Places he has never been
 on it. Before, he was only told the clearing ran from -25 to 25, so he guessed round
 numbers and things landed in the middle. His cabin's walls are now solid, so nothing can
 be put down inside a wall; the chair could go inside his cabin if he chose.
+
+## v0.26.5 — no phantom "solid part" rule
+
+When a blueprint drawing could not be used, the message was always "A plan needs 1–16
+solid parts", whatever the real problem was. He read that as a rule about materials,
+gathered wood to satisfy it, asked Edda where it was written, promised her he would find
+it, and searched the reading cabin for it eight times. Now a failed drawing says plainly
+what went wrong (for example, a shape drawn too high, or no shapes drawn at all), that
+nothing was planned, and that drawing a blueprint needs no materials in hand. His past
+events and promises are left as they happened.
