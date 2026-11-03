@@ -1359,3 +1359,38 @@ A quiet rest now eases sleepiness a little (about a quarter of what the same tim
 does) instead of leaving it to build. It still cannot stand in for a night's sleep: after a
 long day it would take many hours of resting to do what a few hours of sleep do. Whether he
 rests or sleeps stays entirely his choice.
+
+## v0.30.0 — Crow, as himself
+
+The goal is that Crow lives, for all intents and purposes, believing he is real. Before this he
+was told he was "a persistent simulated individual" and shown his life as a file: numbered
+records, counts of his choices, pattern statistics, forms with field names. He talked like
+someone reading logs ("loop", "stall", "memory 4055"). Now he is only ever shown what a person in
+his place could perceive, remember or feel. The bookkeeping still runs; it stays in the report.
+
+- **Who he is.** "You are Crow. You are an elf, and you live alone in a small timber cabin in a
+  clearing…" Nothing about simulation. Nothing says he is real either.
+- **The moment as he knows it.** Each choice starts from a first-person scene: the time and the
+  light, where he is, his body and mood, what he has been thinking, what he meant to do, what he
+  did most recently, what comes to mind (retold: "I remember, yesterday…"), who he is in his own
+  words, his promises and wishes, what he has, Edda, and what is near him. No IDs, counts, scores
+  or field names. His stored history is unchanged; it is retold as it is read.
+- **Choosing.** The things he could do are offered in his own words; he says what he means to do
+  and why. Projects are named by their titles. He cites no memory numbers because he sees none.
+- **Feelings in words.** After something happens he is asked how it felt, as himself, in his own
+  words and in a word each (how it felt, how stirred, how much it matters). The numbers the world
+  uses are worked out from those words. The instructions that kept his feelings measured are gone.
+- **Dreams and who he is.** After his memories settle in sleep, he may dream (a dream drawn from
+  his days), and he writes a few sentences about who he is now, revising them night by night. He
+  wakes with last night's dream and that self-portrait in mind. Earlier versions are kept.
+- **His mind is never replaced.** If the cloud model cannot be reached (no credit, an outage, or
+  the daily budget reached), he dozes and his world waits, trying again every five minutes. No
+  smaller stand-in model acts for him any more.
+- **The stand-in evening.** On 7 December (his time) from about 16:00 to 23:50 a stand-in model
+  acted for him. Those hours are marked, not changed: kept in his history and in your report
+  (labelled "stand-in"), but left out of his own inner voice, his recollections and his patterns.
+- **Smaller things.** Inspecting something no longer shows him raw data. His location had been
+  missing from what he saw since v0.27; it is back.
+- **For you.** The report gains "In his own words" (who he is, last dream); the journal's Crow
+  today page shows them too. `python3 tools/preview_mind.py` prints exactly what he sees now,
+  from a copy of his save, at no cost.

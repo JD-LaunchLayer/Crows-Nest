@@ -26,13 +26,16 @@ with tempfile.TemporaryDirectory() as td:
     assert data=={'answer':'cloud'} and body['tool_choice']=={'type':'tool','name':'respond'} and body['tools'][0]['input_schema']==schema
     assert body['model']=='claude-haiku-5-5' and headers.get('X-api-key')==KEY
     ledger=app.state['model_spend'];assert abs(ledger['usd']-(1000/1e6*.10+200/1e6*.50))<1e-9 and ledger['calls']==1
-    # Outage: the call falls back to the local model instead of stopping his life.
-    mode['cloud']='down';data,_=app.model_call('Again.',schema,100,'test')
-    assert data=={'answer':'local'} and app.state['model_spend']['fallbacks']==1 and '11434' in sent[-1][0]
-    # Budget: once today's spend reaches the cap, no cloud request is even made.
+    # Outage (v0.30): no stand-in mind acts for him; he dozes (MindAway) and no local model is asked.
+    mode['cloud']='down';count=len(sent)
+    try:app.model_call('Again.',schema,100,'test');raise AssertionError('should doze')
+    except app.MindAway:pass
+    assert app.state['model_spend']['fallbacks']==1 and not any('11434' in x[0] for x in sent[count:])
+    # Budget: once today's spend reaches the cap, no request at all is made; he dozes until the day turns.
     mode['cloud']='ok';app.state['model_spend']['usd']=1.0;count=len(sent)
-    data,_=app.model_call('Third.',schema,100,'test')
-    assert data=={'answer':'local'} and len(sent)==count+1 and '11434' in sent[-1][0]
+    try:app.model_call('Third.',schema,100,'test');raise AssertionError('should doze')
+    except app.MindAway:pass
+    assert len(sent)==count
     # A new real day resets the daily figure but keeps the running total.
     app.state['model_spend']['date']='2000-01-01';total=app.state['model_spend']['total_usd']
     app.model_call('Fourth.',schema,100,'test');assert app.state['model_spend']['usd']>0 and app.state['model_spend']['total_usd']>total
@@ -53,7 +56,7 @@ with tempfile.TemporaryDirectory() as td:
     app.urllib.request.urlopen=cut;app.PROVIDER='ollama'
     data,_=app.model_call('Answer.',schema,100,'test')
     assert data=={'answer':'complete'} and sent[-1][1]['options']['num_predict']==200 and app.runtime['model_usage']['test']['retried']
-print('PASS: cloud slips fitted or fallen back; cut-off local replies retried; Haiku via forced structured tool call; real token cost ledger; outage and over-budget fall back to local; daily reset; key never saved in his life.')
+print('PASS: cloud slips fitted or fallen back; cut-off local replies retried; Haiku via forced structured tool call; real token cost ledger; outage and over-budget doze rather than use a stand-in; daily reset; key never saved in his life.')
 
 # v0.21.2: a whole-number field given as 3.5 is rounded; a missing reading status is "not applicable";
 # a failure names the field that did not fit.

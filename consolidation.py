@@ -203,14 +203,15 @@ def schema(section_ids, digest_ids):
 
 def prompt(section, entries, digest):
     held = [{'id': e['id'], 'text': e['text'][:160], 'strength': round(e['strength'], 2)} for e in entries]
-    return ('You are asleep, consolidating memory. Below is what actually happened since you last slept, and what you '
-            f'currently hold about {SECTIONS[section]}. Space is limited to {CAPACITY} memories; weaker ones fade and can be lost. '
-            'Return only what is worth carrying in this section: new memories (each citing evidence_ids of today\'s events), '
-            'revisions (revises = the id of a held memory whose wording today\'s events change), held ids today reinforced, and '
-            'held ids today contradicted. Fewer, sharper memories are better than many. Do not restate a held memory in new '
-            'words; reinforce it instead. Nothing new is a valid result. Do not record what you did not experience, and do not '
-            'turn an absence of information into an insight. These entries are your interpretations, not certified facts or skills. '
-            'Reading can suggest a method but cannot demonstrate competence. Only executor-recorded attempts test a procedure. '
+    # v0.30: plain words. The ids are only how a memory points back to the day it came from.
+    return ('You are asleep, and the day is settling in your mind. Below is what really happened since you last slept, and what '
+            f'you already carry about {SECTIONS[section]}. You can carry only {CAPACITY} such memories; weaker ones fade. '
+            'Keep what is worth carrying: new memories (each pointing to the events of today it comes from, by their evidence_ids), '
+            'revisions (revises = the id of something you carry that today changes), things you carry that today bore out (reinforced), '
+            'and things you carry that today went against (contradicted). Fewer, clearer memories are better than many. Do not keep the '
+            'same memory twice in new words; strengthen the old one instead. Nothing new is fine. Keep only what you lived, not what you '
+            'imagine, and do not make a gap in what you know into an insight. These are how you see things, not proven facts; reading '
+            'about how to do something is not the same as having done it. '
             + 'TODAY: ' + str(digest) + ' HELD: ' + str(held))
 
 

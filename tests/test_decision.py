@@ -29,11 +29,15 @@ with tempfile.TemporaryDirectory() as td:
     calls=[];app.model_call=stub(calls,base);d,_=app.choose()
     assert len(calls)==1 and not ACTION_SPECIFIC & set(calls[0]['schema']['properties'])
     assert len(calls[0]['schema']['properties'])<=9 and calls[0]['limit']<=400
-    prompt=calls[0]['prompt'];context=json.loads(prompt[prompt.index(' State: ')+8:])
+    prompt=calls[0]['prompt'];context=app.decision_context()
     # 2. Memory survives pressure: recent events and relevant memories are present on a busy life.
     assert context['recent_events'] and context['relevant_memories'] and context['body']
     texts=' '.join(m['text'] for m in context['relevant_memories'])
     assert 'split the bowl rim' in texts, 'old specific lesson should be recalled for a matching intention'
+    # v0.30: he sees his life in the first person, retold, with no machinery.
+    assert 'split the bowl rim' in prompt and 'What comes to mind' in prompt and 'Things I could do now' in prompt
+    import re
+    assert not re.search(r'memory_ids_used|recent_pattern|relevant_memories|"id"|\bmemory \d+|simulated|executor', prompt), prompt[:400]
     assert len(prompt)+len(app.BASELINE)<8600  # ~2,900 tokens: room for the 320-token reply inside the local 4,096 window
     # Recall and context building never rewrite his saved life.
     life_only=lambda s:{k:v for k,v in s.items() if k not in ('minute','day','clock','daylight')}
@@ -41,10 +45,9 @@ with tempfile.TemporaryDirectory() as td:
     app.start_action(d,1);started=app.state['memories'][-1]
     assert started['recalled_ids'] and started['memory_ids_used']==[]
 
-    # 3. A cited memory ID that was not shown is discarded, not trusted.
-    shown=context['relevant_memories'][0]['id']
-    calls=[];app.model_call=stub(calls,{**base,'memory_ids_used':[shown,999999]});d,_=app.choose()
-    assert d['memory_ids_used']==[shown]
+    # 3. v0.30: he sees no IDs, so he cites none; anything claimed is dropped.
+    calls=[];app.model_call=stub(calls,{**base,'memory_ids_used':[1,999999]});d,_=app.choose()
+    assert d['memory_ids_used']==[]
 
     # 4. Details step sees only its own fields and cannot change the action.
     calls=[];app.model_call=stub(calls,{**base,'action':'read','intention':'Find how woodland plants compete'},

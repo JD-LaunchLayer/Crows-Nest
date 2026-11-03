@@ -301,6 +301,8 @@ def update_beliefs(state, at):
     events = {m['id']: m for m in state.get('memories', [])}
     by_action = {}
     for a in state.get('appraisals', [])[-400:]:
+        if a.get('stand_in'):
+            continue  # v0.30: hours lived by the stand-in mind do not shape his patterns
         m = events.get(a.get('source_id'))
         if not m or m.get('action') not in PHRASE:
             continue

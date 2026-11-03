@@ -81,7 +81,7 @@ export function createDiary({document,player=null}){
    ul.append(el('li',`${when} · ${what} ${g.items.length===1?detail(a):''}`.trim()));}
   if(groups.length)box.append(ul);
   // How he's been feeling, in his own words.
-  const thoughts=(s.diary||[]).slice(-3).reverse();
+  const thoughts=(s.diary||[]).filter(t=>!t.stand_in).slice(-3).reverse();
   if(thoughts.length){head("How he's been feeling");for(const d of thoughts)para(`${String(d.at||'').slice(11,16)} · “${first(d.text,220)}”`,'thought');}
   // Wishes, newest first, each once.
   const ws=[];for(const w of [...(s.wishes||[])].filter(w=>w.status!=='withdrawn').reverse()){if(!ws.some(x=>x.text===w.text))ws.push(w);if(ws.length>=5)break;}
@@ -92,6 +92,8 @@ export function createDiary({document,player=null}){
    for(const t of open){para(`“${first(t.text,200)}”`,'thought');if(t.world_note)para('A note from the world: '+t.world_note,'muted');}
    for(const p of prom){para(`He promised ${p.to.split(' ')[0]}: “${first(p.text,200)}”`,'thought');if(p.world_note)para('A note from the world: '+p.world_note,'muted');}}
   const page=(s.notebook||[]).at(-1);if(page){head('From his notebook');para(`Page ${page.id}, “${page.title}”: ${first(page.text,300)}`,'thought');}
+  if(s.self_portrait?.text){head('Who he is, in his own words');para(`“${first(s.self_portrait.text,600)}”`,'thought');}
+  {const dr=(s.dreams||[]).at(-1);if(dr&&String(dr.at||'').slice(0,10)>=String(s.clock?.iso||'').slice(0,10).replace(/\d\d$/,m=>String(Math.max(1,+m-1)).padStart(2,'0'))){head('Last night he dreamt');para(`“${first(dr.text,500)}”`,'thought');}}
   const notes=(s.personality_notes||[]).slice(-2).reverse();
   if(notes.length){head("What he's noticed about himself");for(const n of notes)para(`“${first(n.text,220)}”`,'thought');}
   // Edda.
@@ -212,6 +214,9 @@ export function createDiary({document,player=null}){
   const v=document.querySelector?.('meta[name="crow-version"]')?.content||'';
   L.push(`CROW REPORT · v${v} · ${s.clock?.date||''} ${s.clock?.time||''}${s.crow_clock?' (his own time)':''}`);
   L.push('','HOW HE IS',summary(s));
+  {const pt=s.self_portrait,dr=(s.dreams||[]).at(-1);L.push('','IN HIS OWN WORDS');
+   L.push(pt?`Who he is (${String(pt.at||'').slice(5,16).replace('T',' ')}): ${cut(pt.text,600)}`:'Who he is: not written yet (comes with his first sleep since v0.30)');
+   if(dr)L.push(`Last dream (${String(dr.at||'').slice(5,16).replace('T',' ')}): ${cut(dr.text,400)}`);}
   const p=s.provisions||{};L.push(`Food: pantry ${(p.pantry??0).toFixed(1)} · fruit ${(p.berries??0).toFixed(1)} · water ${(p.water_litres??0).toFixed(1)} L · purse ${money(s.trading?.credit??0)} · owns: ${Object.entries(s.possessions||{}).filter(([,n])=>n).map(([k,n])=>n>1?k+'×'+n:k).join(', ')||'nothing'}`);
   {const lots=p.larder||[];if(lots.length){const by={};for(const l of lots)by[l.food]=(by[l.food]||0)+l.servings;L.push('Larder: '+Object.entries(by).map(([k,n])=>`${k} ${n.toFixed(1)}`).join(' · '));}
    const w=s.wildlife;if(w){const alive=(w.deer||[]).filter(d=>d.alive).length;const tr=Object.entries(w.trust||{}).filter(([,t])=>t>=.05).sort((a,b)=>b[1]-a[1]).slice(0,4);
@@ -222,7 +227,7 @@ export function createDiary({document,player=null}){
   const started=(s.memories||[]).filter(m=>m.kind==='started').slice(-30),counts={};for(const m of started)counts[m.action]=(counts[m.action]||0)+1;
   L.push('Last 30 choices: '+Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([a,n])=>`${a} ${n}`).join(', '));
   L.push('','RECENT EVENTS (newest last)');
-  for(const m of (s.memories||[]).filter(m=>m.kind==='experience').slice(-15))L.push(`- ${(m.at||'').slice(5,16).replace('T',' ')} ${m.action}: ${cut(m.event,190)}${m.reason?' | why: '+cut(m.reason,120):''}`);
+  for(const m of (s.memories||[]).filter(m=>m.kind==='experience').slice(-15))L.push(`- ${(m.at||'').slice(5,16).replace('T',' ')} ${m.action}${m.stand_in?' (stand-in)':''}: ${cut(m.event,190)}${m.reason?' | why: '+cut(m.reason,120):''}`);
   L.push('','RECENT THOUGHTS');for(const d of (s.diary||[]).slice(-8))L.push(`- ${(d.at||'').slice(5,16).replace('T',' ')} ${cut(d.text,160)}`);
   L.push('','STORIES');for(const st of (s.stories||[]).filter(x=>x.count>1&&x.stage!=='left').sort((a,b)=>(b.updated_hours||0)-(a.updated_hours||0)).slice(0,5))L.push(`- [${st.stage}, ${st.count} steps, ${st.feel?.last||'-'}] ${cut(st.title,140)}`);
   L.push('','LEFT OPEN');for(const t of (s.threads||[]).filter(t=>t.status==='open').slice(-5))L.push('- '+cut(t.text,160));

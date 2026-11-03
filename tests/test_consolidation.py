@@ -67,7 +67,8 @@ with tempfile.TemporaryDirectory() as td:
         return {'memories':[{'text':'Wasps visit ivy flowers.' if purpose.endswith('life') else 'Ivy flowers exist on tree-3.','revises':0,'evidence_ids':ids[-1:],'importance':.5}],'reinforced_ids':[],'contradicted_ids':[]},1
     app.model_call=model
     reports=app.consolidate_after_sleep()
-    assert calls==['consolidate:life','consolidate:skills','consolidate:world'] and reports['life']['added']
+    assert calls[:3]==['consolidate:life','consolidate:skills','consolidate:world'] and reports['life']['added']
+    assert calls[3:]==['dream'], 'v0.30: after consolidating, a dream and who he is now, in his own words'
     assert app.state['memories'][-1]['kind']=='consolidated' and app.state['mind']['nights']==1
     assert not app.consolidate_after_sleep(), 'nothing new since last sleep means nothing to consolidate'
     def broken(*a):raise ConnectionError('Ollama down')

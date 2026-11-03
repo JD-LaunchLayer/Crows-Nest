@@ -62,8 +62,8 @@ def candidates(state):
     items = []
     seen_kinds = set()
     for m in state.get('memories', []):
-        if m.get('kind') in ('started', 'resumed', 'consolidated'):
-            continue  # "Started X." carries little; its outcome event is recalled instead.
+        if m.get('kind') in ('started', 'resumed', 'consolidated') or m.get('stand_in'):
+            continue  # "Started X." carries little; its outcome event is recalled instead. Stand-in hours are not his (v0.30).
         first = m.get('kind') == 'experience' and m.get('action') not in seen_kinds
         seen_kinds.add(m.get('action'))
         items.append({'type': 'event', 'id': m.get('id'), 'order': m.get('id') or 0,
