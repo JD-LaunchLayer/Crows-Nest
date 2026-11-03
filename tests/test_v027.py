@@ -36,3 +36,15 @@ with tempfile.TemporaryDirectory() as td:
     p2=story.add_promise(st,'I will look for Tam tomorrow','Edda Thorne','t');assert 'no Tam' in p2['world_note']
     assert 'world_note' not in story.add_thread(st,'Whether the glossy black bird returns to the spring','spring',3,'t')
 print('PASS v0.27: gold and silver; plain notes beside the phantoms; tiredness from what he does; waking when rested; no night label.')
+# v0.27.2: "none" is not a wish; the post keeps no tab.
+with tempfile.TemporaryDirectory() as td:
+    shutil.copy(ROOT/'crow.py',Path(td)/'crow.py')
+    spec=importlib.util.spec_from_file_location('crow_v0272',Path(td)/'crow.py');app=importlib.util.module_from_spec(spec)
+    with contextlib.redirect_stdout(io.StringIO()):spec.loader.exec_module(app)
+    app.CLOCK_OVERRIDE=lambda:datetime(2026,11,30,11,0,tzinfo=app.TZ);app.clock();st=app.state
+    st['wishes'].append({'id':999,'text':'none','mentions':19,'status':'expressed'});st['non_wishes_tidied']=False;app.tidy_non_wishes(st)
+    assert st['wishes'][-1]['status']=='withdrawn' and 'no wish' in st['wishes'][-1]['note']
+    n=len(st['wishes']);d={**app.DECISION_DEFAULTS,'action':'rest','intention':'rest','reason':'r','wish':'None.'};st['paused']=False
+    app.start_action(d,1);assert len(st['wishes'])==n, 'a "none" wish is not stored'
+    assert 'no tab' in town.board(st)['what_you_owe'] and 'no tab' in town.KEEPER_PERSONA
+print('PASS v0.27.2: "none" is no wish; the post keeps no tab.')

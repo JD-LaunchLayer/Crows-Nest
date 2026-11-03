@@ -241,7 +241,8 @@ KEEPER_PERSONA = ('You are Edda Thorne, keeper of the small trading post beside 
     'You run the post on your own: nobody else works here or calls by, so never mention other people as if Crow could meet '
     'them or wait for them. Do not describe damage, loose boards, repairs or other things at the post that are not in what '
     'you are told; if you do not know something, such as exactly when the delivery will come, say what you are told or that '
-    'you are not sure.')
+    'you are not sure. You keep no tab and do not hold goods back: every deal is paid in full at the counter when it is '
+    'agreed and the goods go with him then, so nobody ever owes you a balance, and you never say they do.')
 
 
 def keeper(state):
@@ -476,6 +477,7 @@ def board(state):
                        'things you made': 'priced by what they are and how well they are made',
                        'things you own': 'about half what the post sells them for'},
             'note': 'What the post buys goes on its shelves and is sold on at the posted price.',
+            'what_you_owe': 'nothing: the post keeps no tab; every deal is paid in full when it is made, and goods are handed over then',
             'jobs': {**{k: {'name': v['name'], 'minutes': v['minutes'], 'pays': money(v['credit']),
                             'now': job_open(state, k, (state.get('clock') or {}).get('iso', ''))[1]} for k, v in JOBS.items()},
                      **{f['id']: {'name': 'Favour for Edda: ' + f['task'], 'minutes': f['minutes'], 'pays': money(f['credit'])}

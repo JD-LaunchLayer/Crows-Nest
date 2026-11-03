@@ -46,7 +46,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.27.1'
+APP_VERSION = '0.27.2'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -441,6 +441,21 @@ CONTEXT_BUDGET=int(os.environ.get('CROW_CONTEXT_CHARS','16000' if WIDE else '560
 MEMORY_BUDGET=int(os.environ.get('CROW_MEMORY_CHARS','6000' if WIDE else '1700'))
 RECALL_LIMIT=16 if WIDE else 8
 consolidation.DIGEST_BUDGET=6000 if WIDE else 2000
+
+
+NO_WISH={'none','no','n/a','na','nothing','no wish','none right now','none for now','nothing new','null'}
+
+
+def tidy_non_wishes(state):
+    """Once (v0.27.2): a stored wish that only says "none" was a slip in reading his answer, not a wish. It is set aside with a note."""
+    if state.get('non_wishes_tidied'):return
+    for w in state.get('wishes',[]):
+        if str(w.get('text','')).strip(' .!-').casefold() in NO_WISH and w.get('status')!='withdrawn':
+            w.update(status='withdrawn',note='Set aside in v0.27.2: this was his way of saying he had no wish, stored by mistake as one.')
+    state['non_wishes_tidied']=True
+
+
+tidy_non_wishes(state)
 
 
 def available_actions():
@@ -866,6 +881,7 @@ def start_action(d, seconds, reading=None):
     state['current_intention'] = intention
     state['next_step'] = d.get('next_step', '').strip()[:300]
     wish = d['wish'].strip()[:200]
+    if wish.strip(' .!-').casefold() in NO_WISH:wish=''   # v0.27.2: "none" means no wish, not a wish called "none"
     if wish:
         # The same wish in new words counts as another mention, not a new wish (v0.23.1).
         w = next((w for w in reversed(state['wishes']) if w.get('status')!='withdrawn' and

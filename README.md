@@ -1261,3 +1261,12 @@ The plain notes from the world (no Tam, no cracked board, no "solid part" rule) 
 once, to threads and promises that already existed. He kept writing new ones about the same
 things, which appeared without the note. Now any new thread or promise that mentions them
 gets the same note beside it. His words are unchanged.
+
+## v0.27.2 — "none" is not a wish; the post keeps no tab
+
+- When he had no wish he sometimes answered "none", and that was stored as a wish called
+  "none" (nineteen times). It is now read as no wish, and the stored one is set aside with a
+  note saying why.
+- He had come to believe he owed Edda a balance on the bundle. The post keeps no tab: every
+  deal is paid in full when it is made. The board now says so plainly (he owes nothing), and
+  Edda is told she never holds goods back or says anyone owes her a balance.
