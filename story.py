@@ -94,7 +94,9 @@ def settle(state, memory, answer_status=None):
 # so "drink at the spring first" stayed open and kept being followed after the thirst had gone.
 NEEDS = {'drink': (('thirst', 'drink', 'spring'), ('thirst',)),
          'eat': (('hunger', 'hungry', 'eat', 'food', 'meal', 'provisions'), ('hunger',)),
-         'sleep': (('sleep', 'sleepiness', 'sleepy', 'tired'), ('sleepiness', 'sleepy'))}
+         'sleep': (('sleep', 'sleepiness', 'sleepy', 'tired'), ('sleepiness', 'sleepy')),
+         # Resting while a meal settles (v0.26.3): done once nothing is still digesting.
+         'rest': (('digest', 'digesting', 'digestion', 'meal', 'eaten', 'eating'), ('digesting', 'full'))}
 
 
 def settle_need(state, memory, sensations):

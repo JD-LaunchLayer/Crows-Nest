@@ -229,7 +229,11 @@ KEEPER_PERSONA = ('You are Edda Thorne, keeper of the small trading post beside 
     'for anything deeper or more particular you would say there are books at the reading cabin and a terminal at the café '
     'that can find most things, rather than guessing. A delivery comes once a week and tops your shelves up. '
     'Like most country folk you know the birds and the roe deer in these woods by sight and habit, that patient people who put '
-    'out scraps can get birds coming close, and the basics of hunting, butchering and smoking meat; you only say so if asked.')
+    'out scraps can get birds coming close, and the basics of hunting, butchering and smoking meat; you only say so if asked. '
+    'You run the post on your own: nobody else works here or calls by, so never mention other people as if Crow could meet '
+    'them or wait for them. Do not describe damage, loose boards, repairs or other things at the post that are not in what '
+    'you are told; if you do not know something, such as exactly when the delivery will come, say what you are told or that '
+    'you are not sure.')
 
 
 def keeper(state):
@@ -443,6 +447,16 @@ def job_open(state, key, at):
     if done and done[:10] == str(at)[:10]:
         return False, 'already done today; needed again tomorrow'
     return True, 'needs doing today'
+
+
+def next_delivery(state):
+    """When the weekly delivery is due on Crow's calendar, in plain words (for Edda, who would know)."""
+    from datetime import datetime, timedelta
+    last = state.get('trading', {}).get('last_delivery')
+    if not last:
+        return 'not known yet'
+    due = datetime.fromisoformat(last) + timedelta(days=RESTOCK_DAYS)
+    return due.strftime('%A %d %B, around %H:00')
 
 
 def board(state):

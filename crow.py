@@ -46,7 +46,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.26.2'
+APP_VERSION = '0.26.3'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -1419,7 +1419,7 @@ def talk_session(opening, hope):
             'quantity in kg or 1), favour (task, minutes 15-180, credit up to about 1.5 per 30 minutes; you may ask him for help or '
             'accept help he offers), or gift (at most 1 credit, rarely). note_about_crow is what you would remember about him from this; '
             'warmth -1..1 is how you feel towards him now. '+json.dumps({'board':board,'his_credit':credit,'what_you_remember':kp['notes'][-10:],
-            'open_favours':kp['favours'],'what_your_goods_are_for':town.ITEM_KNOWLEDGE,'conversation':convo},ensure_ascii=False),keeper_schema,350,'keeper',system=town.KEEPER_PERSONA)
+            'open_favours':kp['favours'],'next_delivery_due':town.next_delivery(state),'what_your_goods_are_for':town.ITEM_KNOWLEDGE,'conversation':convo},ensure_ascii=False),keeper_schema,350,'keeper',system=town.KEEPER_PERSONA)
         reply=' '.join(str(last.get('reply','')).split())[:400]
         convo.append({'who':'Edda','text':reply})
         prop=last.get('proposal') or {'kind':'none'}

@@ -1199,3 +1199,17 @@ not looking for animals, they come last as before. Nothing about them is explain
   what is sold out, which jobs are needed today, favours agreed, the last delivery and the
   latest ledger entries. The copied report gains a Shelves line and when each job was last
   done. For watching only; Crow does not see it.
+
+## v0.26.3 — only what is there
+
+- **Darkness shows only what is there.** A walk or look in the dark always said "outlines
+  of trunks and shrubs", even in the deeper woods where no shrubs grow. He took that as a
+  shrub near tree-205 and went back to look for it about thirty times. Now the dark shows
+  the outlines of tree trunks, low bushy shapes (only where bushes or ferns grow), or open
+  ground, as the place really is.
+- **Edda stays within the world.** She runs the post alone and is told so plainly: no
+  other people he could meet or wait for, no loose boards or repairs that are not there,
+  and "not sure" when she does not know. She is now told when the weekly delivery is
+  actually due, instead of guessing a day.
+- **A rest while a meal settles** ends its story once nothing is still digesting, like
+  the eating, drinking and sleeping stories.

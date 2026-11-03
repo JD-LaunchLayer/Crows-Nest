@@ -387,7 +387,13 @@ def observe(state, area, focus, doy, daylight, limit=5, lamp=False):
     # The edge is a ring; a single centre measurement would be meaningless, so light is reported per finding there.
     light = ground_light(state, a['x'], a['z'], doy) if 'r' in a else None
     if daylight < .12 and not lamp:
-        text = f'Observed {a["name"]} in darkness. Only outlines of trunks and shrubs were visible; no plant detail could be made out.'
+        # Only outlines of what is actually there (v0.26.3): before, this always said "trunks and shrubs",
+        # including in the deeper woods where no shrubs grow, and he went looking for shrubs that were not there.
+        trunks = any(t['stage'] == 'standing' and in_area(area, t['x'], t['z']) for t in state['built_world']['trees'].values())
+        bushes = any(in_area(area, p['x'], p['z']) and p.get('host') is None and PLANT_KIND.get(p['species'], '').split()[:1] in (['shrub'], ['fern'])
+                     for p in eco['plants'])
+        shapes = ' and '.join(x for x, has in (('tree trunks', trunks), ('low bushy shapes', bushes)) if has) or 'the open ground'
+        text = f'Observed {a["name"]} in darkness. Only the outlines of {shapes} could be made out; no plant detail was visible.'
         return {'success': True, 'text': text, 'findings': [], 'area': area, 'dark': True}
     if daylight < .12:
         limit = 2  # a lantern's small circle of light
