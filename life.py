@@ -62,6 +62,7 @@ def effort(action):
 
 
 SLEEP_RECOVERY = 1.1  # per hour asleep: a long day's tiredness takes a full night to sleep off
+REST_RECOVERY = .25  # per hour of quiet rest: a little, about a quarter of what sleep does
 
 
 def advance(state, seconds, action):
@@ -83,7 +84,9 @@ def advance(state, seconds, action):
         # talking or reading; being awake a long time adds a little whatever he does. Sleep clears it.
         # v0.28 body clock: awake in the dark late hours, drowsiness builds faster, as it does for anyone.
         late=(not sleeping) and state.get('daylight',1)<.12 and (state.get('minute',720)>=20*60 or state.get('minute',720)<5*60)
-        body['sleep_debt']=clamp(body['sleep_debt']+(-SLEEP_RECOVERY if sleeping else .3+.7*work+(.5 if late else 0))*dt,0,24)
+        # v0.29.3: a quiet rest takes a little of the edge off sleepiness (much less than sleep), instead of adding to it.
+        rate=-SLEEP_RECOVERY if sleeping else -REST_RECOVERY if action=='rest' else .3+.7*work+(.5 if late else 0)
+        body['sleep_debt']=clamp(body['sleep_debt']+rate*dt,0,24)
         body['exertion']=clamp(body['exertion']+(work*.16-(.32 if resting else .04))*dt,0,1)
         body['active_hours']+=dt
         supplies=state['provisions']

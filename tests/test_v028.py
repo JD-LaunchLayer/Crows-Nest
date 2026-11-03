@@ -11,9 +11,9 @@ with tempfile.TemporaryDirectory() as td:
     with contextlib.redirect_stdout(io.StringIO()):spec.loader.exec_module(app)
     # Late evening in the dark: drowsier than the same idle hours by day.
     app.CLOCK_OVERRIDE=lambda:datetime(2026,12,2,22,0,tzinfo=app.TZ);app.clock();st=app.state;b=st['body']
-    b['sleep_debt']=0;life.advance(st,3*3600,'rest');night=b['sleep_debt']
+    b['sleep_debt']=0;life.advance(st,3*3600,'reflect');night=b['sleep_debt']
     app.CLOCK_OVERRIDE=lambda:datetime(2026,12,2,11,0,tzinfo=app.TZ);app.clock()
-    b['sleep_debt']=0;life.advance(st,3*3600,'rest');day=b['sleep_debt']
+    b['sleep_debt']=0;life.advance(st,3*3600,'reflect');day=b['sleep_debt']
     assert night>day+1, (night,day)
     # A sleep begun at 23:00, even if he needs little, runs on until first light; a daytime nap does not.
     app.CLOCK_OVERRIDE=lambda:datetime(2026,12,2,23,0,tzinfo=app.TZ);app.clock();st['paused']=False;b['sleep_debt']=1
@@ -51,3 +51,14 @@ with tempfile.TemporaryDirectory() as td:
     assert 'purse' in app.parameter_request({'action':'inspect'})[1]['object_id']['enum']
     app.start_action(d,1);app.tick(120);ev=app.finish_action()['event'];assert 'Opened his purse' in ev and '1 gold' in ev, ev
 print('PASS v0.28.1: none touches nothing; the purse opens and counts.')
+# v0.29.3: a quiet rest eases sleepiness a little (far less than sleep); sitting awake doing nothing still adds to it.
+with tempfile.TemporaryDirectory() as td:
+    shutil.copy(ROOT/'crow.py',Path(td)/'crow.py')
+    spec=importlib.util.spec_from_file_location('crow_v0293',Path(td)/'crow.py');app=importlib.util.module_from_spec(spec)
+    with contextlib.redirect_stdout(io.StringIO()):spec.loader.exec_module(app)
+    app.CLOCK_OVERRIDE=lambda:datetime(2026,12,7,3,0,tzinfo=app.TZ);app.clock();st=app.state;b=st['body']
+    b['sleep_debt']=9;life.advance(st,3600,'rest');rested=b['sleep_debt']
+    b['sleep_debt']=9;life.advance(st,3600,'sleep');slept=b['sleep_debt']
+    b['sleep_debt']=9;life.advance(st,3600,'reflect');awake=b['sleep_debt']
+    assert slept<rested<9<awake, (slept,rested,awake)
+print('PASS v0.29.3: rest eases sleepiness a little; sleep far more.')

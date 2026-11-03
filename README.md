@@ -1352,3 +1352,10 @@ memories. The journal's Crow today page shows his latest page.
   strengthened that way; reflecting, writing and resting are not, so an idea nothing has
   confirmed (like the cord bundle) stops growing by repetition. Counts already built up that
   way are set aside.
+
+## v0.29.3 — a rest takes the edge off
+
+A quiet rest now eases sleepiness a little (about a quarter of what the same time asleep
+does) instead of leaving it to build. It still cannot stand in for a night's sleep: after a
+long day it would take many hours of resting to do what a few hours of sleep do. Whether he
+rests or sleeps stays entirely his choice.
