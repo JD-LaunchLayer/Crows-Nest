@@ -430,6 +430,21 @@ def remember(state, note, warmth, at):
     kp['talks'] += 1
 
 
+def job_open(state, key, at):
+    """Posted jobs are real work (v0.26.2): the post is swept once a day; crates come only with the weekly delivery.
+    Returns (open, plain words for the board)."""
+    post = state.get('trading', {})
+    done = post.get('jobs_done', {}).get(key)
+    if key == 'carry_crates':
+        last = post.get('last_delivery')
+        if not last or (done and done >= last):
+            return False, 'no crates waiting; they come with the weekly delivery'
+        return True, 'crates from the last delivery are waiting in the yard'
+    if done and done[:10] == str(at)[:10]:
+        return False, 'already done today; needed again tomorrow'
+    return True, 'needs doing today'
+
+
 def board(state):
     """What the posted board at the trading post shows."""
     post = ensure(state)
@@ -439,7 +454,8 @@ def board(state):
                        'things you made': 'priced by what they are and how well they are made',
                        'things you own': 'about half what the post sells them for'},
             'note': 'What the post buys goes on its shelves and is sold on at the posted price.',
-            'jobs': {**{k: {'name': v['name'], 'minutes': v['minutes'], 'pays': v['credit']} for k, v in JOBS.items()},
+            'jobs': {**{k: {'name': v['name'], 'minutes': v['minutes'], 'pays': v['credit'],
+                            'now': job_open(state, k, (state.get('clock') or {}).get('iso', ''))[1]} for k, v in JOBS.items()},
                      **{f['id']: {'name': 'Favour for Edda: ' + f['task'], 'minutes': f['minutes'], 'pays': f['credit']}
                         for f in keeper(state)['favours']}}}
 
@@ -500,6 +516,10 @@ def trade(state, mode, item, quantity, at):
             return {'success': True, 'text': text, 'credit': post['credit']}
         if not job:
             return {'success': False, 'text': 'There is no such posted job.'}
+        open_, why = job_open(state, item, at)
+        if not open_:
+            return {'success': False, 'text': f'The posted job "{job["name"]}" is not needed now: {why}.'}
+        post.setdefault('jobs_done', {})[item] = at
         post['credit'] = round(post['credit'] + job['credit'], 2)
         text = f'Finished the posted job "{job["name"]}" and earned {job["credit"]} credit. Credit now: {post["credit"]:g}.'
     elif mode == 'ask':

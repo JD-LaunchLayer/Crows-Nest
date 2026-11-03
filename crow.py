@@ -46,7 +46,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.26.1'
+APP_VERSION = '0.26.2'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -917,7 +917,7 @@ def start_action(d, seconds, reading=None):
             state['pending']['music']={'error':str(exc)};state['pending']['remaining']=state['pending']['duration']=300
     if action=='use_item' and d.get('use_item')=='whetstone' and d.get('use_on'):
         state['pending']['remaining']=state['pending']['duration']=1200
-    if action=='trade' and d.get('trade_mode')=='job' and d.get('trade_item') in town.JOBS:
+    if action=='trade' and d.get('trade_mode')=='job' and d.get('trade_item') in town.JOBS and town.job_open(state,d['trade_item'],dt.isoformat())[0]:
         duration=town.JOBS[d['trade_item']]['minutes']*60;state['pending']['remaining']=state['pending']['duration']=duration
     description = ('Started researching a Wikipedia excerpt: '+reading['title']+'.') if action=='read' and reading else \
         ('Started reading a web page at the café: '+reading['title']+'.') if action=='browse' and reading else 'Started '+action+'.'
