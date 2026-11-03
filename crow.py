@@ -46,7 +46,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.28.0'
+APP_VERSION = '0.28.1'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -630,7 +630,7 @@ def parameter_request(d):
         eco=ecology.ensure(state)
         return ('Choose an object, tree or plant to examine. Trees and plants are named in your memories or observations.',
                 {'object_id':{'type':'string','enum':list(objects)+[p['id'] for p in eco['plants']]+list(world['trees'])+
-                              ['axe','carving_knife']+[k for k,v in state.get('possessions',{}).items() if v]}},
+                              ['axe','carving_knife','purse']+[k for k,v in state.get('possessions',{}).items() if v]}},
                 {'objects':[o['id']+' ('+o['name']+')' for o in world_state.nearby(state)['objects']]})
     if a=='observe':
         return ('Choose where to look. focus is what you are looking for, or empty for open attention. '
@@ -810,9 +810,9 @@ def choose_interaction(d, verb):
                 width_m={'type':'number','minimum':.05,'maximum':2},depth_m={'type':'number','minimum':.05,'maximum':2},
                 support={'type':'string','enum':['hand','bench']},passes={'type':'string','enum':['light','deep']})
         else:
-            props['object_id']={'type':'string','enum':list(objects)}
+            props['object_id']={'type':'string','enum':list(objects)+['none']}
             if verb=='split':props.update(fraction={'type':'number','minimum':.1,'maximum':.9},creation_name=STRING)
-            if verb in ('stack','place_on'):props['other_id']={'type':'string','enum':list(objects)}
+            if verb in ('stack','place_on'):props['other_id']={'type':'string','enum':list(objects)+['none']}
             if verb!='split':props['part_id']=STRING
             if verb=='stack':props['creation_name']=STRING
         context={'objects':interactions.context(state,8 if WIDE else 4),'methods':methods,
@@ -821,7 +821,7 @@ def choose_interaction(d, verb):
         context['memories']=memory_recall.recall(state,900,limit=3,focus=d['intention'])
         context=fit(context,12000 if WIDE else 5700,['objects','methods'])
     prompt=('You chose '+verb+' for '+d['intention']+'. Choose its targets and parameters. '
-            'object_id is the object worked or placed; other_id is its supporting object. part_id names a flat face on the support '
+            'object_id is the object worked or placed; other_id is its supporting object; choose none if the thing you mean is not among them, and nothing is touched. part_id names a flat face on the support '
             '(on object_id for sit/lie). A saved procedure_id reuses its recorded parameters on your selected targets; '
             'leave it empty to try new parameters. A tested method can still fail in different circumstances. '
             'hypothesis and prediction are your own expectations BEFORE acting, and can be empty if none. '
@@ -1038,7 +1038,9 @@ def finish_action(geometry=None):
         obj=world_state.ensure(state)['objects'].get(ident)
         lamp=bool(state.get('possessions',{}).get('lantern'))
         if ident=='sheet_music':music.ensure(state)['songbook_seen']=True
-        if ident in town.TOOLS:
+        if ident=='purse':  # v0.28.1: his money is in a purse he carries, and he can open it and count it
+            living={'success':True,'text':'Opened his purse and counted what is in it: '+town.money(state.get('trading',{}).get('credit',0))+'.'}
+        elif ident in town.TOOLS:
             living={'success':True,'text':'Inspected the '+ident.replace('_',' ')+'. '+life.tool_feel(state,ident)}
         elif state.get('possessions',{}).get(ident):
             living={'success':True,'text':'Inspected the '+ident.replace('_',' ')+'. '+town.POSSESSION_LOOKS.get(ident,'Something he owns.')}

@@ -284,6 +284,10 @@ def execute(state, d, seconds):
     ensure(state)
     staged={**state,'built_world':copy.deepcopy(state['built_world']),
             'practical':copy.deepcopy(state['practical'])}
+    if d.get('object_id')=='none' or (d.get('verb') in ('stack','place_on') and d.get('other_id')=='none'):
+        # v0.28.1: none of the objects listed was the one he meant, so nothing is touched.
+        names=[o['name'] for o in state['built_world']['objects'].values() if o.get('parts')][:14]
+        return {'success':False,'text':'Nothing was done: none of the objects here was the one meant. The objects here are: '+', '.join(names)+'.','changed_ids':[]}
     try:
         result=_execute(staged,d,seconds)
     except (ValueError,KeyError,TypeError) as exc:

@@ -1287,3 +1287,12 @@ gets the same note beside it. His words are unchanged.
 - **Promises lapse.** A promise not kept within about five days is marked "lapsed (left
   behind)": still in his history, no longer open. Eighteen were open, several about days
   long past.
+
+## v0.28.1 — a purse he can open
+
+He wanted to open his purse and count his coins, but money had no purse in the world: the
+only way to "do something" with his hands was working objects, and that forced a choice
+among the objects there, so he placed a carving on the workbench five times and split three
+carvings instead. Now his purse can be examined like anything else ("Opened his purse and
+counted what is in it: 1 gold"), and working objects offers "none", which touches nothing
+and names what is there, as carrying already does.
