@@ -48,7 +48,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.30.4'
+APP_VERSION = '0.30.5'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -320,6 +320,12 @@ def conform(value, schema):
         if leak:  # tool-call markup leaked into a text field; keep only the words before it
             value = value[:leak.start()].rstrip()
     if 'enum' in schema and value not in schema['enum']:
+        # v0.30.5: a title written a little differently is still that title (one clear match only)
+        if isinstance(value, str) and value.strip():
+            import inner
+            near = [o for o in schema['enum'] if isinstance(o, str) and o and (o.casefold() == value.strip().casefold() or inner.alike(o, value, .75))]
+            if len(near) == 1:
+                return near[0]
         return MISSING
     return value
 
@@ -403,6 +409,9 @@ def model_call(prompt, schema, limit=650, purpose='other', system=None):
     with LOCK:
         runtime.setdefault('model_usage', {})[purpose] = usage
     return data, seconds
+
+
+TALK_TURNS = 8   # v0.30.5: a talk lasts until he leaves (up to eight exchanges); three cut him off mid-page
 
 
 class MindAway(Exception):
@@ -1569,7 +1578,7 @@ def talk_session(opening, hope):
     convo=[{'who':'Crow','text':' '.join(opening.split())[:400] or '…'}];agreed=None;last={};promises=[]
     keeper_schema=fields_schema({'reply':STRING,'proposal':town.proposal_schema(),'note_about_crow':STRING,
                                  'warmth':{'type':'number','minimum':-1,'maximum':1}})
-    for turn in range(3):
+    for turn in range(TALK_TURNS):
         last,_=model_call('It is '+clock_now+'. Crow, the elf who lives in the clearing, is at your counter. Reply to him in character. '
             'Money here is gold and silver: ten silver make one gold. In a proposal, the credit field is the amount in gold (0.5 = 5 silver). '
             'proposal is ONE optional deal (kind none if you are just talking): sell_item (item = a stock id, credit = total price in gold; you '
@@ -1587,7 +1596,7 @@ def talk_session(opening, hope):
         offer=prop if ok and prop.get('kind')!='none' else None
         answer,_=model_call('You are talking with Edda Thorne at the trading post. Say your next line naturally (or a brief goodbye). '
             'accept_offer agrees to the offer on the table, if any; leave ends the conversation. Deals are settled when you leave. '
-            'promise is something you are promising Edda in this line, in your words, or empty. '
+            'promise: only if this line promises her something new, in your words; otherwise empty. '
             +json.dumps({'your_hope':hope[:200],'your_money':town.money(credit),'your_goods':goods,'offer_on_the_table':describe_offer(offer) if offer else 'none',
                          'conversation':convo},ensure_ascii=False),
             fields_schema({'say':STRING,'accept_offer':{'type':'boolean'},'leave':{'type':'boolean'},'promise':STRING}),250,'talk')

@@ -1439,3 +1439,14 @@ wooden box, a hand count was not possible, and a meal that could not happen said
 empty or the stomach is full" without saying which. Now inspecting the provisions chest opens it
 and counts what is inside (in the dark too, by hand), and a meal that cannot happen says plainly
 whether the chest is empty or his stomach is full. His memories of the evening are untouched.
+
+## v0.30.5 — talks that can finish
+
+He spent a hungry morning in twelve short talks with Edda, trying to go through her book for 3
+December line by line. Each talk was cut off after three exchanges, so they never reached the end
+and he came back to start again; and every line he spoke was asked for a promise, so the same
+promise ("I'll check each line before agreeing to any figure") was stored over fifty times and
+shown back to him. Now a talk lasts until he leaves (up to eight exchanges); a promise is asked for
+only when a line promises something new; and the same promise said again is kept as one promise,
+said again, rather than a new one. A project title written slightly differently is taken as that
+title instead of failing his whole choice (which made him doze). Stored history is unchanged.

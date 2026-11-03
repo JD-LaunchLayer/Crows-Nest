@@ -74,3 +74,12 @@ with tempfile.TemporaryDirectory() as td:
     ctx=app.decision_context();assert ctx['your_ongoing_stories'][0]['story'].startswith('Watch which insects')
 print('PASS: pull, grind and doubt per story and project; patterns form, hold and are revised from his record; matching intentions continue one story; single steps are not stories; dormant and answered only by time or evidence; '
       'threads deduped and followed; promises kept by his account; stories reach his decisions.')
+# v0.30.5: the same promise said again is one promise, said again; a slightly different title is still that title.
+import inner as _inner
+_st={'promises':[],'next_promise_id':1}
+story.ensure(_st)
+a=story.add_promise(_st,"I'll check each line against my copy, one at a time, before agreeing to any figure.",'Edda Thorne','t1')
+b=story.add_promise(_st,"I'll check each line against my copy with you, one at a time, before we settle any figure.",'Edda Thorne','t2')
+c=story.add_promise(_st,'I will bring you twenty kilos of wood tomorrow.','Edda Thorne','t3')
+assert a is b and a['times_said']==2 and a['last_said']=='t2' and c is not a and len(_st['promises'])==2
+print('PASS v0.30.5: a promise said again is the same promise.')

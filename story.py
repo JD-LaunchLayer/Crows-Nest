@@ -194,6 +194,13 @@ def add_promise(state, text, to, at):
     text = ' '.join(str(text).split())[:200]
     if not text:
         return None
+    import inner
+    same = next((p for p in reversed(state['promises']) if p['status'] == 'open' and p.get('to') == to and
+                 (memory_recall.similar(p['text'], text) or inner.same_promise(p['text'], text))), None)
+    if same:   # v0.30.5: saying the same promise again is the same promise, said again, not a new one
+        same['times_said'] = same.get('times_said', 1) + 1
+        same['last_said'] = at
+        return same
     promise = {'id': state['next_promise_id'], 'text': text, 'to': to, 'at': at, 'status': 'open', **_phantom(text)}
     state['next_promise_id'] += 1
     state['promises'] = (state['promises'] + [promise])[-500:]  # v0.28.3: kept for the long run
