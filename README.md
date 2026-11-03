@@ -1296,3 +1296,11 @@ among the objects there, so he placed a carving on the workbench five times and 
 carvings instead. Now his purse can be examined like anything else ("Opened his purse and
 counted what is in it: 1 gold"), and working objects offers "none", which touches nothing
 and names what is there, as carrying already does.
+
+## v0.28.2 — digging over a bed
+
+The garden had no way to work bare soil: only sow, water, weed, harvest or look, so his wish
+to "work the bare soil" kept turning into looking at bed 1. A bed can now be dug over (about
+40 minutes of real work). It turns the soil and the weeds in, the bed shows as freshly dug,
+and whatever is sown there soon after gets an easier start (up to a quarter faster). Dug
+soil settles and packs down again over a few weeks. A bed with plants in it cannot be dug.

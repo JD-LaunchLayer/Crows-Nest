@@ -46,7 +46,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.28.1'
+APP_VERSION = '0.28.2'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -666,9 +666,9 @@ def parameter_request(d):
                 {'research':reading_journal.research_context(state)})
     if a=='garden':
         owned=[k for k in garden.CROPS if state.get('possessions',{}).get(k)]
-        return ('Choose a bed (1-3) and what to do there: sow, water, weed, harvest, or just look. '
+        return ('Choose a bed (1-3) and what to do there: dig it over, sow, water, weed, harvest, or just look. '
                 'sow_item is what you sow or plant if sowing, from what you own, or empty.',
-                {'bed':{'type':'integer','enum':[1,2,3]},'garden_task':{'type':'string','enum':['sow','water','weed','harvest','look']},
+                {'bed':{'type':'integer','enum':[1,2,3]},'garden_task':{'type':'string','enum':['dig','sow','water','weed','harvest','look']},
                  'sow_item':{'type':'string','enum':['']+owned}},
                 {'beds':garden.summary(state),'what_you_can_sow':{k:state['possessions'][k] for k in owned},
                  'spring_water_litres':round(state['provisions']['water_litres'],1)})

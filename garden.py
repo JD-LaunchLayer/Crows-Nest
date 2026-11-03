@@ -37,7 +37,7 @@ CROPS = {
     'garlic_bulbs': ('garlic', 150, 3., True),
     'onion_sets': ('onions', 110, 3., True),
 }
-DURATIONS = {'sow': 900, 'water': 600, 'weed': 1200, 'harvest': 900, 'look': 300}
+DURATIONS = {'sow': 900, 'water': 600, 'weed': 1200, 'harvest': 900, 'look': 300, 'dig': 2400}
 
 
 def ensure(state):
@@ -66,13 +66,15 @@ def advance(state, hours, doy):
         w = warmth(doy)  # winter rain and cold keep beds damp and weeds slow; summer dries them fast
         b['moisture'] = round(max(0., b['moisture'] - days * (.04 + .3 * w)), 4)
         b['weeds'] = round(min(1., b['weeds'] + days * (.01 + .15 * w)), 4)
+        b['tilth'] = round(max(0., b.get('tilth', 0.) - days * .015), 4)   # dug soil slowly settles and packs down again
         if b['crop'] == 'growing':
             _, ripe_days, _, hardy = CROPS.get(b.get('item', 'seeds'), CROPS['seeds'])
             w = warmth(doy)
             # Tender crops grow from about mid-April to late October; hardy ones creep on through winter.
             pace = w if w >= .4 else (max(w, .15) if hardy else 0.)
             if b['moisture'] > .3 and b['weeds'] < .6 and pace:
-                b['growth'] = round(min(1., b['growth'] + days * pace / ripe_days), 4)
+                # v0.28.2: soil dug over before sowing gives the plants an easier start (up to a quarter faster).
+                b['growth'] = round(min(1., b['growth'] + days * pace / ripe_days * (1 + .25 * b.get('tilth_at_sow', 0.))), 4)
             if not hardy and w < .25:  # frosts from about late November to mid-March damage tender plants
                 b['health'] = round(max(0., b['health'] - days * .25), 4)
             if b['moisture'] < .1:
@@ -95,6 +97,10 @@ def stage(b):
 def look(b):
     """What can be seen at a bed: no advice, no numbers he could not perceive."""
     soil = 'soaked' if b['moisture'] > .7 else 'damp' if b['moisture'] > .3 else 'dry and pale' if b['moisture'] > .1 else 'cracked and dusty'
+    if b.get('tilth', 0) > .5:
+        soil = 'freshly dug and crumbly, ' + soil
+    elif b.get('tilth', 0) > .2:
+        soil = 'dug over, ' + soil
     weeds = 'no weeds' if b['weeds'] < .15 else 'a few weeds' if b['weeds'] < .45 else 'weeds spreading' if b['weeds'] < .75 else 'thick weeds'
     name = CROPS.get(b.get('item', 'seeds'), CROPS['seeds'])[0]
     plants = {'empty': 'bare soil', 'sown': f'{name} sown, no shoots yet', 'sprouting': f'small {name} shoots',
@@ -123,6 +129,13 @@ def work(state, bed, task, item=''):
         state['provisions']['water_litres'] = round(water - 2, 2)
         b['moisture'] = 1.
         return {'success': True, 'text': f'Carried 2 litres from the spring and watered bed {bed}. ' + look(b)}
+    if task == 'dig':
+        if stage(b) not in ('empty', 'withered'):
+            return {'success': False, 'text': f'Bed {bed} has plants in it; digging would uproot them. ' + look(b)}
+        b.update(tilth=round(min(1., b.get('tilth', 0.) + .55), 3), weeds=0.)
+        if b['crop'] == 'withered':
+            b.update(crop=None, item=None, growth=0., health=1.)
+        return {'success': True, 'text': f'Dug over bed {bed} with the spade, turning the soil and working in what was on top. ' + look(b)}
     if task == 'weed':
         b['weeds'] = 0.
         return {'success': True, 'text': f'Pulled the weeds from bed {bed}. ' + look(b)}
@@ -134,7 +147,7 @@ def work(state, bed, task, item=''):
         if not item:
             return {'success': False, 'text': 'He has nothing to sow or plant.'}
         owned[item] -= 1
-        b.update(crop='growing', growth=0., health=1., item=item)
+        b.update(crop='growing', growth=0., health=1., item=item, tilth_at_sow=b.get('tilth', 0.))
         return {'success': True, 'text': f'Sowed {CROPS[item][0]} in bed {bed}. ' + look(b)}
     if task == 'harvest':
         if stage(b) != 'ripe':
