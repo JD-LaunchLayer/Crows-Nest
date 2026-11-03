@@ -1431,3 +1431,11 @@ favour whose work has already been done lapses unpaid. Deals are made in whole s
 is no smaller coin. His own memories and notebook are untouched.
 
     python3 tools/books_check.py "5 silver"   # also shows where a worry first came up in his life
+
+## v0.30.4 — he can open his own food chest
+
+He spent an evening unable to tell whether his chest held food: looking at it only described the
+wooden box, a hand count was not possible, and a meal that could not happen said "the source is
+empty or the stomach is full" without saying which. Now inspecting the provisions chest opens it
+and counts what is inside (in the dark too, by hand), and a meal that cannot happen says plainly
+whether the chest is empty or his stomach is full. His memories of the evening are untouched.

@@ -208,7 +208,9 @@ def consume(state, action, ident, food=''):
             if key=='berries' and stock[key]<=.001:
                 bare='The fruit bushes are bare.'+('' if 196<=_day_of_year(state)<=288 else ' Their fruiting season is over for the year.')
                 return {'success':False,'text':bare}
-            return {'success':False,'text':'No food was consumed; the source is empty or the stomach is full.'}
+            if avail<=.001:   # v0.30.4: say which, plainly
+                return {'success':False,'text':'Nothing was eaten: the provisions chest is empty.' if key=='pantry' else 'Nothing was eaten: there is none left.'}
+            return {'success':False,'text':'Nothing was eaten: his stomach is too full for more just now.'}
         if key=='pantry':foods.take(state,kind,amount)
         else:stock[key]-=amount
         b['stomach']+=per*amount

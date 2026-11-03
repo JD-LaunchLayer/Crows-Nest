@@ -48,7 +48,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.30.3'
+APP_VERSION = '0.30.4'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -1106,6 +1106,10 @@ def finish_action(geometry=None):
         if ident=='sheet_music':music.ensure(state)['songbook_seen']=True
         if ident=='purse':  # v0.28.1: his money is in a purse he carries, and he can open it and count it
             living={'success':True,'text':'Opened his purse and counted what is in it: '+town.money(state.get('trading',{}).get('credit',0))+'.'}
+        elif ident=='food_store':  # v0.30.4: he can open his own chest and count what is in it, by hand in the dark too
+            inside=foods.view(state)
+            living={'success':True,'text':'Opened the provisions chest and counted what is inside: '+
+                    ('; '.join(f'{v:g} serving{"s" if v!=1 else ""} of {k}' for k,v in inside.items()) if inside else 'it is empty')+'.'}
         elif ident in town.TOOLS:
             living={'success':True,'text':'Inspected the '+ident.replace('_',' ')+'. '+life.tool_feel(state,ident)}
         elif state.get('possessions',{}).get(ident):

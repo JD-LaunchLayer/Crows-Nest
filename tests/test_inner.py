@@ -84,3 +84,18 @@ v=inner.scene({'clock':{'iso':'2026-12-08T10:43:00','date':'Tue 08 Dec','time':'
               {'nearby':['spring (Spring and water basin)','tree-69 standing','tree-70 standing']},{})
 assert 'Near me: Spring and water basin, two trees.' in v and 'tree-' not in v, v
 print('PASS v0.30.2: places, light and dates in plain words; each promise once; one line per activity; clean cuts.')
+# v0.30.4: he can open his own food chest and count it; a meal that cannot happen says why.
+with tempfile.TemporaryDirectory() as td:
+    shutil.copy(ROOT/'crow.py',Path(td)/'crow.py')
+    spec=importlib.util.spec_from_file_location('crow_chest',Path(td)/'crow.py');app=importlib.util.module_from_spec(spec)
+    with contextlib.redirect_stdout(io.StringIO()):spec.loader.exec_module(app)
+    app.CLOCK_OVERRIDE=lambda:datetime(2026,12,8,19,0,tzinfo=app.TZ);app.clock();st=app.state
+    st['provisions']['pantry']=0.;st['provisions']['larder']=[]
+    r=app.life.consume(st,'eat','food_store');assert 'chest is empty' in r['text'], r
+    app.foods.add(st,'provisions',2);st['body']['stomach']=60
+    r=app.life.consume(st,'eat','food_store');assert 'too full' in r['text'], r
+    st['paused']=False
+    d={**app.DECISION_DEFAULTS,'action':'inspect','object_id':'food_store','intention':'count','reason':'r'}
+    app.start_action(d,1);st['pending']['remaining']=0;m=app.finish_action(None)
+    assert '2 servings of bread, cheese and dried fruit' in m['event'], m['event']
+print('PASS v0.30.4: the chest can be opened and counted; a meal that cannot happen says why.')
