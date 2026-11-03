@@ -227,9 +227,8 @@ def furnish(objects):
 
 
 KEEPER_PERSONA = ('You are Edda Thorne, keeper of the small trading post beside the clearing. You are warm, chatty and fair-minded, '
-    'but shrewd: you drive a decent bargain, you notice who keeps their word, and you remember debts and kindnesses. '
-    'You have your own small concerns: the store-room roof leaks when it rains, deliveries arrive irregularly, and the post is '
-    'often quiet. You speak naturally and briefly, as a person, never as an assistant or narrator. You know only what Crow says '
+    'but shrewd: you drive a decent bargain, you notice who keeps their word, and you remember kindnesses. '
+    'Your own small concern is that the post is often quiet. You speak naturally and briefly, as a person, never as an assistant or narrator. You know only what Crow says '
     'to you and what has happened between you; you cannot read his thoughts. Do not invent events in the world. You can only '
     'change anything through the single proposal you return; the posted board shows normal prices. '
     'You keep a kitchen garden yourself and know the ordinary practical basics of growing food and planting trees '
@@ -242,7 +241,9 @@ KEEPER_PERSONA = ('You are Edda Thorne, keeper of the small trading post beside 
     'them or wait for them. Do not describe damage, loose boards, repairs or other things at the post that are not in what '
     'you are told; if you do not know something, such as exactly when the delivery will come, say what you are told or that '
     'you are not sure. You keep no tab and do not hold goods back: every deal is paid in full at the counter when it is '
-    'agreed and the goods go with him then, so nobody ever owes you a balance, and you never say they do.')
+    'agreed and the goods go with him then, so nobody ever owes you a balance, and you never say they do. '
+    'Your book is what you are told of it: when he asks about a day, go by those entries exactly, read him every one if he '
+    'wants them, and never agree that something is in your book, or that money is missing or owed, when it is not.')
 
 
 def keeper(state):
@@ -364,6 +365,8 @@ def check_proposal(state, p, day):
     """Is a proposed deal within the world's limits right now? Returns (ok, reason)."""
     post = ensure(state)
     kind = p.get('kind', 'none')
+    if 'credit' in p:   # v0.30.3: money changes hands in whole silver; there is no smaller coin
+        p['credit'] = round(float(p['credit'] or 0) * 10) / 10
     if kind == 'none':
         return True, ''
     if kind == 'sell_item':
@@ -385,6 +388,13 @@ def check_proposal(state, p, day):
     if kind == 'favour':
         if not 15 <= p['minutes'] <= 180 or not p['task'].strip():
             return False, 'a favour needs a task and 15–180 minutes'
+        job = same_work(p['task'])
+        if job:
+            open_, why = job_open(state, job, (state.get('clock') or {}).get('iso', ''))
+            if not open_:
+                return False, f'that work is not needed now: {why}'
+            if any(same_work(f['task']) == job for f in keeper(state)['favours']):
+                return False, 'he has already agreed to do that work for her'
         if p['credit'] > p['minutes'] / 30 * 1.5 + 1e-9:
             return False, 'more pay than the post can give for that work'
         return True, ''
@@ -441,6 +451,15 @@ def remember(state, note, warmth, at):
     if isinstance(warmth, (int, float)) and math.isfinite(warmth):
         kp['warmth'] = round(max(-1., min(1., .8 * kp['warmth'] + .2 * warmth)), 3)
     kp['talks'] += 1
+
+
+JOB_WORDS = {'sweep_post': ('sweep',), 'carry_crates': ('crate',)}
+
+
+def same_work(task):
+    """The posted job a favour really is, if any (v0.30.3): sweeping the post is sweeping the post, whoever asks for it."""
+    t = str(task or '').lower()
+    return next((k for k, words in JOB_WORDS.items() if any(w in t for w in words)), None)
 
 
 def job_open(state, key, at):
@@ -563,6 +582,14 @@ def trade(state, mode, item, quantity, at):
         favour = next((f for f in keeper(state)['favours'] if f['id'] == item), None)
         if favour:
             keeper(state)['favours'].remove(favour)
+            work = same_work(favour['task'])
+            if work:
+                open_, why = job_open(state, work, at)
+                if not open_:   # the floor was swept or the crates carried in already: nothing left to do
+                    text = f'Went to do the favour for Edda, "{favour["task"]}", but that work is already done ({why}); nothing was paid and the favour lapses.'
+                    _record(post, text, at)
+                    return {'success': False, 'text': text, 'credit': post['credit']}
+                post.setdefault('jobs_done', {})[work] = at
             post['credit'] = round(post['credit'] + favour['credit'], 2)
             text = f'Did the favour for Edda: "{favour["task"]}" and earned {money(favour["credit"])}. In his purse: {money(post["credit"])}.'
             _record(post, text, at)

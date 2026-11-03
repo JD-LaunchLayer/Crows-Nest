@@ -3,7 +3,8 @@
 
     python3 tools/books_check.py            # the whole book checked, then 3 December in detail
     python3 tools/books_check.py 12-05      # a different day in detail
-    python3 tools/books_check.py cord       # entries, notebook pages and Edda's notes containing a word
+    python3 tools/books_check.py cord       # entries, notebook pages and Edda's notes containing a word,
+    python3 tools/books_check.py "5 silver" #   and where it first came up in his life
 
 Every change to his purse goes through the post and is written in its book with what he had after.
 This walks the book in order and reports any entry where the purse moved by a different amount
@@ -106,6 +107,31 @@ def main():
         print(f"  page {p['id']} ({str(p.get('at', ''))[:16].replace('T', ' ')}) \"{p.get('title', '')}\": " + p.get('text', '').replace('\n', ' / ')[:400])
     if len(pages) > 12:
         print(f'  … and {len(pages) - 12} more')
+
+    # Where it first comes up in his life: the earliest happenings that mention it (talks with Edda included).
+    if not key:
+        events = []
+        log = save.parent / 'crow-events.jsonl'
+        if log.exists():
+            with log.open() as f:
+                for line in f:
+                    if query.lower() in line.lower():
+                        try:
+                            events.append(json.loads(line))
+                        except ValueError:
+                            pass
+                    if len(events) >= 5:
+                        break
+        if not events:
+            events = [m for m in state.get('memories', []) if query.lower() in json.dumps(m, ensure_ascii=False).lower()][:5]
+        print(f'\nWhere "{query}" first comes up in his life:')
+        for m in events:
+            text = str(m.get('event', ''))
+            i = text.lower().find(query.lower())
+            bit = text[max(0, i - 220):i + 180] if i >= 0 else (text[:300] + ' | why: ' + str(m.get('reason', ''))[:200])
+            print(f"  {str(m.get('at', ''))[:16].replace('T', ' ')} {m.get('action', '')}: …{bit}…")
+        if not events:
+            print('  nowhere in his recorded life.')
 
     notes = [n for n in state.get('keeper', {}).get('notes', []) if any(w in n.get('text', '').lower() for w in words + ['silver', 'gap', 'owe'])]
     print('\nWhat Edda has noted about it (her notes, not his):')

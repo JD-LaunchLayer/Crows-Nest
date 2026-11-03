@@ -1416,3 +1416,18 @@ per activity ("Working with my hands usually works out, but it tends to leave me
 project has felt reads in words ("it has been drawing me in lately", not "it has felt like pull").
 Text cut to fit is cut at a word, never mid-word. All of this is how his life comes back to him;
 the stored record, and Jordan's report, keep the exact numbers. Nothing stored is changed.
+
+## v0.30.3 — Edda goes by her book
+
+tools/books_check.py showed the post's book and his purse agree to the silver: no money is
+missing anywhere in the world. Three things in the world had been feeding his worry about it, and
+are fixed. Edda's own description said she "remembers debts", that "deliveries arrive irregularly"
+and that "the store-room roof leaks"; none of that is true here (the post keeps no tab, deliveries
+are weekly, nothing leaks), so it is gone, and she now goes by her book exactly when he asks about
+a day, never agreeing that money is missing or owed when it is not. A favour that is the same work
+as a posted job (sweeping the post, carrying the crates in) now follows that job's rule: she cannot
+agree the same sweep twice in twenty minutes, sweeping for her counts as the day's sweep, and a
+favour whose work has already been done lapses unpaid. Deals are made in whole silver, since there
+is no smaller coin. His own memories and notebook are untouched.
+
+    python3 tools/books_check.py "5 silver"   # also shows where a worry first came up in his life

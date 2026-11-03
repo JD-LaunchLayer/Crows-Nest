@@ -19,6 +19,9 @@ with tempfile.TemporaryDirectory() as td:
     out=run('12-03')
     assert 'none: every amount in the book matches' in out and 'they agree' in out and out.count('· ')>=5, out
     assert p.read_text()==before, 'read-only'
+    app.event('Talked with Edda Thorne. Crow: “I think there is a 5 silver gap.” Edda: “Let us look.”','checking',action='talk')
+    out=run('5 silver');assert 'first comes up' in out and '5 silver gap' in out, out
+    p.write_text(json.dumps(st));before=p.read_text()
     st['trading']['ledger'][-1]['credit_after']+=.5;st['trading']['credit']+=.5;p.write_text(json.dumps(st))
     out=run('12-03');assert 'the purse moved 2 gold, the entry says 1 gold 5 silver' in out, out
     st['trading']['credit']+=.3;p.write_text(json.dumps(st))
