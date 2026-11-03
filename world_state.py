@@ -236,6 +236,46 @@ def intersects_world(world, obj, x, z, ignore_id=None):
     return False
 
 
+# Fixed walls drawn in the scene that are not saved objects (v0.26.4): his cabin's three walls and the range target.
+# Nothing can be put down inside them. (x, z, width, depth)
+STATIC_SOLIDS = [(-10, -12.5, 6, .2), (-13, -10, .2, 5), (-7, -10, .2, 5), (10, -10, 2, .5)]
+# Places he can come to know by being there, and what he knows of them (centre, and a plain description).
+PLACES = {
+    'cabin': ((-10, -10), 'inside your cabin: floor from about x -12 to -8 and z -12 to -8, open on the south side'),
+    'workbench': (None, 'the workbench'), 'library': (None, 'the reading cabin'), 'range': ((10, -8), 'the archery range by the target'),
+    'shop': (None, 'the trading post'), 'cafe': (None, 'the internet café'), 'garden': ((-9, -15.6), 'the garden beds'),
+}
+PLACE_OBJECT = {'workbench': 'workbench', 'library': 'library', 'shop': 'trading_post', 'cafe': 'internet_cafe'}
+ACTION_OBJECTS = {'eat': ['food_store'], 'drink': ['spring'], 'read': ['library', 'library_chair'], 'sleep': ['cabin_bed'],
+                  'play_music': ['cabin_bed'], 'trade': ['trading_post'], 'talk': ['trading_post'], 'browse': ['internet_cafe']}
+
+
+def mental_map(state, action_places):
+    """Where things are, as he knows it from having been there and handled or looked at them.
+    Only places he has actually been and things that appear in his own experience; positions to the nearest metre."""
+    world = ensure(state)
+    mem = [m for m in state.get('memories', []) if m.get('kind') == 'experience']
+    been = {action_places.get(m.get('action')) for m in mem}
+    text = ' '.join(str(m.get('event', '')) for m in mem[-400:]).lower()
+    known = set()
+    for m in mem:
+        known.update(ACTION_OBJECTS.get(m.get('action'), []))
+    out = []
+    for key, (centre, words) in PLACES.items():
+        if key not in been:
+            continue
+        o = world['objects'].get(PLACE_OBJECT.get(key, ''))
+        cx, cz = centre if centre else ((o['x'], o['z']) if o else (None, None))
+        if cx is not None:
+            out.append(f'{words}: about ({cx:.0f}, {cz:.0f})' if key != 'cabin' else words)
+    for ident, o in world['objects'].items():
+        if not o.get('parts') or ident in PLACE_OBJECT.values():
+            continue
+        if ident in known or o.get('kind') in ('carving', 'workpiece') or ident in text or o['name'].lower() in text:
+            out.append(f"{o['name'].lower()}: at about ({o['x']:.0f}, {o['z']:.0f})")
+    return out
+
+
 def move(state, ident, x, z):
     world=ensure(state);o=world['objects'].get(ident)
     if not o or not o.get('parts'):return {'success':False,'text':'That object does not exist.'}
@@ -253,6 +293,10 @@ def move(state, ident, x, z):
         bottom=min(p['y']-p['height']/2 for p in moved['parts'])
         for p in moved['parts']:p['y']-=bottom
     if intersects_world(world,moved,x,z,ident):return {'success':False,'text':'The destination intersects another solid object; it was not moved.'}
+    for p in moved['parts']:
+        px,pz=x+p['x'],z+p['z']
+        if any(abs(px-sx)<(p['width']+sw)/2-.02 and abs(pz-sz)<(p['depth']+sd)/2-.02 for sx,sz,sw,sd in STATIC_SOLIDS):
+            return {'success':False,'text':'The destination is inside a wall; it was not moved.'}
     o.update(parts=moved['parts'],x=x,z=z,revision=o['revision']+1);o.pop('on',None);world['revision']+=1
     return {'success':True,'object_id':ident,'text':f'Carried {o["name"]} and put it down at ({x:g}, {z:g}).'}
 

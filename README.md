@@ -1213,3 +1213,13 @@ not looking for animals, they come last as before. Nothing about them is explain
   actually due, instead of guessing a day.
 - **A rest while a meal settles** ends its story once nothing is still digesting, like
   the eating, drinking and sleeping stories.
+
+## v0.26.4 — his own sense of where things are
+
+When he chooses to carry something, he now also has his own sense of where things are:
+only places he has actually been (his cabin, the reading cabin, the workbench and so on)
+and things that appear in his own experience (what he has eaten from, slept on,
+inspected, made or carried), each to the nearest metre. Places he has never been are not
+on it. Before, he was only told the clearing ran from -25 to 25, so he guessed round
+numbers and things landed in the middle. His cabin's walls are now solid, so nothing can
+be put down inside a wall; the chair could go inside his cabin if he chose.

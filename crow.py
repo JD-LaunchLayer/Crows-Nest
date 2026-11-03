@@ -46,7 +46,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.26.3'
+APP_VERSION = '0.26.4'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -619,7 +619,8 @@ def parameter_request(d):
                 '(x east, z south; clearing -25..25). These are the only loose objects that can be carried; '
                 'if none of them is what you meant, choose none and nothing is moved.',
                 {'object_id':{'type':'string','enum':portable+['none']},'destination_x':{'type':'number'},'destination_z':{'type':'number'}},
-                {'can_be_picked_up':[{k:objects[i][k] for k in ['id','name','x','z']} for i in portable[-20:]]})
+                {'can_be_picked_up':[{k:objects[i][k] for k in ['id','name','x','z']} for i in portable[-20:]],
+                 'where_things_are_as_you_know_them':world_state.mental_map(state,ACTIONS)})
     if a=='construct':
         open_plans=[p for p in world['plans'] if p['status'] in ['proposed','in_progress']]
         return ('Choose which blueprint to work on. Work only proceeds if inventory covers its bill; it may take several sessions.',
