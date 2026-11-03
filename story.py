@@ -177,7 +177,7 @@ def add_thread(state, text, place, source_id, at):
     opened = [t for t in state['threads'] if t['status'] == 'open']
     if len(opened) > 12:
         opened[0]['status'] = 'faded'
-    state['threads'] = state['threads'][-80:]
+    state['threads'] = state['threads'][-500:]  # v0.28.3: kept for the long run
     return thread
 
 
@@ -196,7 +196,7 @@ def add_promise(state, text, to, at):
         return None
     promise = {'id': state['next_promise_id'], 'text': text, 'to': to, 'at': at, 'status': 'open', **_phantom(text)}
     state['next_promise_id'] += 1
-    state['promises'] = (state['promises'] + [promise])[-40:]
+    state['promises'] = (state['promises'] + [promise])[-500:]  # v0.28.3: kept for the long run
     return promise
 
 

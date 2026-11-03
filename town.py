@@ -173,7 +173,7 @@ def weekly_delivery(state, now):
         item = post['stock'].setdefault(k, dict(v))
         item['qty'] = max(item['qty'], v['qty'])
     post['last_delivery'] = now.isoformat()
-    post['ledger'] = (post.get('ledger', []) + [{'at': now.isoformat(), 'text': 'The weekly delivery arrived; the shelves were topped up.'}])[-60:]
+    post['ledger'] = (post.get('ledger', []) + [{'at': now.isoformat(), 'text': 'The weekly delivery arrived; the shelves were topped up.'}])[-LEDGER_KEEP:]
     return True
 
 
@@ -485,8 +485,36 @@ def board(state):
                         for f in keeper(state)['favours']}}}
 
 
+LEDGER_KEEP = 5000   # v0.28.3: the post's book keeps its whole history (before, a weekly delivery cut it to the last 60 lines)
+MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december']
+
+
+def ledger_lookup(state, query, limit=15):
+    """Entries in the post's book for a day ("2026-12-03", "12-03", "3 December") or containing a word. Oldest first."""
+    import re
+    q = str(query).strip().lower()
+    book = ensure(state)['ledger']
+    day = None
+    m = re.search(r'(\d{4})-(\d{1,2})-(\d{1,2})', q) or re.search(r'\b(\d{1,2})-(\d{1,2})\b', q)
+    if m:
+        g = m.groups()
+        day = f'{int(g[-2]):02d}-{int(g[-1]):02d}'
+    else:
+        m = re.search(r'\b(\d{1,2})(?:st|nd|rd|th)?\s+(' + '|'.join(MONTHS) + r')', q) or re.search(r'(' + '|'.join(MONTHS) + r')\s+(\d{1,2})', q)
+        if m:
+            a, b = m.groups()
+            d, mon = (a, b) if a.isdigit() else (b, a)
+            day = f'{MONTHS.index(mon) + 1:02d}-{int(d):02d}'
+    if day:
+        hits = [l for l in book if str(l.get('at', ''))[5:10] == day]
+    else:
+        words = [w for w in re.findall(r'[a-z]+', q) if len(w) > 2]
+        hits = [l for l in book if words and all(w in l['text'].lower() for w in words)]
+    return [f"{str(l.get('at', ''))[:16].replace('T', ' ')} · {l['text']}" for l in hits[-limit:]]
+
+
 def _record(post, text, at):
-    post['ledger'] = (post['ledger'] + [{'at': at, 'text': text, 'credit_after': post['credit']}])[-200:]
+    post['ledger'] = (post['ledger'] + [{'at': at, 'text': text, 'credit_after': post['credit']}])[-LEDGER_KEEP:]
 
 
 def trade(state, mode, item, quantity, at):
@@ -547,6 +575,11 @@ def trade(state, mode, item, quantity, at):
         post.setdefault('jobs_done', {})[item] = at
         post['credit'] = round(post['credit'] + job['credit'], 2)
         text = f'Finished the posted job "{job["name"]}" and earned {money(job["credit"])}. In his purse: {money(post["credit"])}.'
+    elif mode == 'ledger':
+        lines = ledger_lookup(state, item)
+        if not lines:
+            return {'success': True, 'text': f'Looked through the post\'s ledger for "{str(item)[:60]}": there is no entry for that.'}
+        return {'success': True, 'text': f'Looked through the post\'s ledger for "{str(item)[:60]}": ' + ' | '.join(lines), 'ledger': lines}
     elif mode == 'ask':
         wanted = ' '.join(str(item).split())[:120]
         if not wanted:

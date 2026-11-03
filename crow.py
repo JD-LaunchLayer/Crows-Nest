@@ -46,7 +46,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.28.2'
+APP_VERSION = '0.28.3'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -715,9 +715,9 @@ def parameter_request(d):
     if a=='trade':
         carvings=[{'id':i,'name':o['name']} for i,o in objects.items() if o.get('kind')=='carving'][-8:]
         return ('Choose what to do at the trading post. trade_mode buy (trade_item = an item id for sale), sell (wood, stone, the id of '
-                'something you made, or something you own), job (a posted job id), or ask (trade_item = something you would like the post to stock, in your words). '
+                'something you made, or something you own), job (a posted job id), ledger (read the trading post ledger: trade_item = a day such as 2026-12-03, or a word such as sweep), or ask (trade_item = something you would like the post to stock, in your words). '
                 'trade_quantity is how many (1 if not relevant).',
-                {'trade_mode':{'type':'string','enum':['buy','sell','job','ask']},'trade_item':STRING,'trade_quantity':{'type':'integer','minimum':1,'maximum':20}},
+                {'trade_mode':{'type':'string','enum':['buy','sell','job','ledger','ask']},'trade_item':STRING,'trade_quantity':{'type':'integer','minimum':1,'maximum':20}},
                 {'board':town.board(state),'your_carvings':carvings,'inventory_kg':{'wood':state['materials'],'stone':state['stone']},
                  'possessions':state.get('possessions',{})})
     if a=='plan':
@@ -1455,7 +1455,9 @@ def talk_session(opening, hope):
             'quantity in kg or 1), favour (task, minutes 15-180, pay up to about 1 gold 5 silver per 30 minutes; you may ask him for help or '
             'accept help he offers), or gift (at most 1 gold, rarely). note_about_crow is what you would remember about him from this; '
             'warmth -1..1 is how you feel towards him now. '+json.dumps({'board':board,'his_money':town.money(credit),'what_you_remember':kp['notes'][-10:],
-            'open_favours':kp['favours'],'next_delivery_due':town.next_delivery(state),'what_your_goods_are_for':town.ITEM_KNOWLEDGE,'conversation':convo},ensure_ascii=False),keeper_schema,350,'keeper',system=town.KEEPER_PERSONA)
+            'open_favours':kp['favours'],'next_delivery_due':town.next_delivery(state),
+            'your_ledger_for_days_he_mentions':{q:town.ledger_lookup(state,q,20) for q in set(re.findall(r'\d{4}-\d{1,2}-\d{1,2}|\b\d{1,2}-\d{1,2}\b',' '.join(c['text'] for c in convo if c['who']=='Crow')))},
+            'your_ledger_last_three_days':[f"{str(l.get('at',''))[:16].replace('T',' ')} · {l['text']}" for l in state['trading']['ledger'] if str(l.get('at',''))[:10]>=(now()-timedelta(days=3)).date().isoformat()][-30:],'what_your_goods_are_for':town.ITEM_KNOWLEDGE,'conversation':convo},ensure_ascii=False),keeper_schema,350,'keeper',system=town.KEEPER_PERSONA)
         reply=' '.join(str(last.get('reply','')).split())[:400]
         convo.append({'who':'Edda','text':reply})
         prop=last.get('proposal') or {'kind':'none'}

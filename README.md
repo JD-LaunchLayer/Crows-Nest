@@ -1304,3 +1304,13 @@ to "work the bare soil" kept turning into looking at bed 1. A bed can now be dug
 40 minutes of real work). It turns the soil and the weeds in, the bed shows as freshly dug,
 and whatever is sown there soon after gets an easier start (up to a quarter faster). Dug
 soil settles and packs down again over a few weeks. A bed with plants in it cannot be dug.
+
+## v0.28.3 — the long memory of the trading post
+
+- **The post's book keeps everything.** Each weekly delivery used to cut the ledger down to
+  its last 60 lines, so older entries were simply gone. It now keeps its whole history.
+- **He can read it.** At the trading post he can look up any day ("2026-12-03", "12-03",
+  "3 December") or any word ("sweep") and see the matching entries. Edda, when they talk,
+  has the last three days in front of her and any day he mentions.
+- His threads and promises are now kept for the long run too (the last 500 of each, instead
+  of 80 and 40). Open ones still lapse or fade as before; the record stays.
