@@ -46,7 +46,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.26.5'
+APP_VERSION = '0.27.0'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -146,10 +146,18 @@ reading_journal.ensure(state, ROOT)
 world_state.ensure(state)
 life.ensure(state)
 life.annotate_overridden_trials(state)  # v0.21.1: labels, never rewrites, past trials
+story.annotate_phantoms(state)  # v0.27: a plain note beside threads about Tam, the board and the "solid part" rule
 ecology.ensure(state)
 ecology.backfill_recorded(state)  # v0.24.2: his field notebook, from what he already recorded
 consolidation.ensure(state)
 town.ensure(state)
+if not state['trading'].get('money_note'):
+    # v0.27: the post counts in gold and silver. Said once, plainly, in the post's ledger; his past entries keep their words.
+    state['trading']['money_note']=True
+    state['trading']['ledger'].append({'at':state.get('clock',{}).get('iso',''),'credit_after':state['trading']['credit'],
+        'text':'From now on the post counts money in gold and silver: what was one credit is one gold, and ten silver make a gold. '
+               f"He has {town.money(state['trading']['credit'])}."})
+    state.setdefault('world_notes',[]).append('The trading post now counts money in gold and silver; one credit became one gold, and ten silver make a gold.')
 interactions.ensure(state)
 experience.ensure(state)
 story.ensure(state)
@@ -406,7 +414,7 @@ DECISION_DEFAULTS={'wish':'','wish_reason':'','object_id':'','plan_id':0,'destin
     'observe_area':'woodland_edge','focus':'','trade_mode':'ask','trade_item':'','trade_quantity':1,'opening':'','hope':'','use_item':'','use_on':'','use_how':'',
     'verb':'','other_id':'','procedure_id':'','hypothesis':'','prediction':'','bed':1,'garden_task':'look','sow_item':'','sapling':'','music_mode':'practise','title':'','notes':'','tempo':80,'piece_id':0,'songbook':'','explore_area':'woodland_edge','hunt_area':'deeper_woods','food':'','put_area':'clearing'}
 # One neutral line per action. Details are requested only after an action is chosen.
-ACTION_MENU={'rest':'quiet rest in the cabin','sleep':'sleep (until 07:00 at night, 90 minutes by day)',
+ACTION_MENU={'rest':'quiet rest in the cabin','sleep':'sleep in the cabin until you wake',
     'eat':'eat from an available food source','drink':'drink from the spring',
     'observe':'look closely at one part of the woodland or clearing and notice what is actually there','reflect':'think quietly in the cabin',
     'explore':'walk through a part of the woodland, noticing what is there along the way and picking up a little loose wood','practise':'archery practice at the range; each session counts where the arrows land',
@@ -504,13 +512,14 @@ def decision_context():
     recent=[m for m in state['memories'] if m.get('kind') not in ('started','consolidated')][-(10 if WIDE else 4):]
     memory=memory_recall.recall(state,MEMORY_BUDGET,exclude_ids=[m['id'] for m in recent],limit=RECALL_LIMIT)
     near=world_state.nearby(state)
-    context={'clock':{k:state['clock'][k] for k in ['date','time','night']},'location':state['location'],
+    context={'clock':{k:state['clock'][k] for k in ['date','time']},  # v0.27: no 'night' label; he has the time and the light'location':state['location'],
         'body':life.perceive(state)['sensations'],
         'outside_light':'dark' if state.get('daylight',0)<.12 else 'dim' if state.get('daylight',0)<.35 else 'daylight','affect':{k:state['affect'][k] for k in ['valence','arousal']},
         'intention':state['current_intention'],'next_step':state['next_step'],
         'recent_events':[{k:m.get(k) for k in ['id','time','event']} for m in recent],
         'held_most_strongly':consolidation.strongest(state,8 if WIDE else 3),
         'your_ongoing_stories':story.context(state,10 if WIDE else 4),'left_open':grouped_open_items(),
+        **({'notes_from_the_world':state['world_notes'][-2:]} if state.get('world_notes') else {}),
         'patterns_in_your_record':story.belief_context(state,8 if WIDE else 4),
         'relevant_memories':memory,'recent_pattern':memory_recall.recent_pattern(state),
         'paused_work':[{'id':w['id'],'action':w['pending']['decision']['action'],'intention':w['pending']['decision']['intention'],
@@ -522,11 +531,11 @@ def decision_context():
         'wishes':grouped_wishes(8 if WIDE else 4),
         'interests':experience.summary(state,4 if WIDE else 2),
         'inventory_kg':near['inventory_kg'],'supplies':life.perceive(state)['supplies'],
-        'trade_credit':state.get('trading',{}).get('credit',0),'possessions':state.get('possessions',{}),
+        'money_in_your_purse':town.money(state.get('trading',{}).get('credit',0)),'possessions':state.get('possessions',{}),
         'garden_beds':garden.summary(state),'woods':world_state.forest_state(state),
         'your_field_notebook':ecology.notebook(state),
         'people':[{'name':'Edda Thorne','where':'trading post','times_talked':town.keeper(state)['talks'],
-                   'open_favours':[f"{f['id']}: {f['task']} ({f['minutes']} min, pays {f['credit']:g} credit). "
+                   'open_favours':[f"{f['id']}: {f['task']} ({f['minutes']} min, pays {town.money(f['credit'])}). "
                                    f"Done by working at the trading post: trade, job {f['id']}." for f in town.keeper(state)['favours']]}],
         'nearby':[o['id']+' ('+o['name']+')' for o in near['objects']]+[t['id']+' '+t['stage'] for t in near['trees'][:2]]}
     context=compact(context)
@@ -683,7 +692,7 @@ def parameter_request(d):
         kp=town.keeper(state)
         return ('opening is what you say first to Edda. hope is what you would like to come of it, or empty: conversation alone is fine.',
                 {'opening':STRING,'hope':STRING},
-                {'times_you_have_talked':kp['talks'],'open_favours':kp['favours'],'your_credit':state['trading']['credit'],
+                {'times_you_have_talked':kp['talks'],'open_favours':[{**f,'credit':town.money(f['credit'])} for f in kp['favours']],'your_money':town.money(state['trading']['credit']),
                  'board':town.board(state)})
     if a=='trade':
         carvings=[{'id':i,'name':o['name']} for i,o in objects.items() if o.get('kind')=='carving'][-8:]
@@ -886,11 +895,7 @@ def start_action(d, seconds, reading=None):
     action = d['action']
     state.pop('posture',None)
     if action=='sleep':
-        if dt.hour>=21 or dt.hour<7:
-            wake=dt.replace(hour=7,minute=0,second=0,microsecond=0)
-            if wake<=dt:wake+=timedelta(days=1)
-            duration=wake.timestamp()-dt.timestamp()
-        else:duration=5400
+        duration=life.sleep_needed_seconds(state)  # v0.27: he wakes when rested, whatever the hour
     else: duration=DURATIONS[action]
     if action=='interact':duration=interactions.duration(d)
     if action == 'read' and d.get('reading_mode', 'lookup') == 'lookup':
@@ -930,7 +935,7 @@ def start_action(d, seconds, reading=None):
     started_event=event(description,d['reason'],'started',**details)
     state['pending']['choice_id']=started_event['id']
     runtime['status']=('Processing a Wikipedia excerpt…' if action=='read' and duration==0 else
-                       'Sleeping until morning' if action=='sleep' and duration>5400 else 'Spending time on '+action)
+                       'Sleeping' if action=='sleep' else 'Spending time on '+action)
     persist()
 
 
@@ -1399,10 +1404,10 @@ def web_session(query, question):
 
 
 def describe_offer(p):
-    return {'sell_item':f"Edda would sell you {p['quantity']} × {p['item']} for {p['credit']:g} credit",
-            'buy_goods':f"Edda would take {p['quantity']} of your {p['item']} for {p['credit']:g} credit",
-            'favour':f"Edda asks/accepts a favour: {p['task']} ({p['minutes']} minutes) for {p['credit']:g} credit",
-            'gift':f"Edda offers you {p['credit']:g} credit as a gift"}.get(p.get('kind'),'')
+    return {'sell_item':f"Edda would sell you {p['quantity']} × {p['item']} for {town.money(p['credit'])}",
+            'buy_goods':f"Edda would take {p['quantity']} of your {p['item']} for {town.money(p['credit'])}",
+            'favour':f"Edda asks/accepts a favour: {p['task']} ({p['minutes']} minutes) for {town.money(p['credit'])}",
+            'gift':f"Edda offers you {town.money(p['credit'])} as a gift"}.get(p.get('kind'),'')
 
 
 def talk_session(opening, hope):
@@ -1418,11 +1423,12 @@ def talk_session(opening, hope):
                                  'warmth':{'type':'number','minimum':-1,'maximum':1}})
     for turn in range(3):
         last,_=model_call('It is '+clock_now+'. Crow, the elf who lives in the clearing, is at your counter. Reply to him in character. '
-            'proposal is ONE optional deal (kind none if you are just talking): sell_item (item = a stock id, credit = total price; you '
+            'Money here is gold and silver: ten silver make one gold. In a proposal, the credit field is the amount in gold (0.5 = 5 silver). '
+            'proposal is ONE optional deal (kind none if you are just talking): sell_item (item = a stock id, credit = total price in gold; you '
             'may haggle but not below 70% of the board), buy_goods (item = wood, stone or one of his carving ids he has mentioned; '
-            'quantity in kg or 1), favour (task, minutes 15-180, credit up to about 1.5 per 30 minutes; you may ask him for help or '
-            'accept help he offers), or gift (at most 1 credit, rarely). note_about_crow is what you would remember about him from this; '
-            'warmth -1..1 is how you feel towards him now. '+json.dumps({'board':board,'his_credit':credit,'what_you_remember':kp['notes'][-10:],
+            'quantity in kg or 1), favour (task, minutes 15-180, pay up to about 1 gold 5 silver per 30 minutes; you may ask him for help or '
+            'accept help he offers), or gift (at most 1 gold, rarely). note_about_crow is what you would remember about him from this; '
+            'warmth -1..1 is how you feel towards him now. '+json.dumps({'board':board,'his_money':town.money(credit),'what_you_remember':kp['notes'][-10:],
             'open_favours':kp['favours'],'next_delivery_due':town.next_delivery(state),'what_your_goods_are_for':town.ITEM_KNOWLEDGE,'conversation':convo},ensure_ascii=False),keeper_schema,350,'keeper',system=town.KEEPER_PERSONA)
         reply=' '.join(str(last.get('reply','')).split())[:400]
         convo.append({'who':'Edda','text':reply})
@@ -1432,7 +1438,7 @@ def talk_session(opening, hope):
         answer,_=model_call('You are talking with Edda Thorne at the trading post. Say your next line naturally (or a brief goodbye). '
             'accept_offer agrees to the offer on the table, if any; leave ends the conversation. Deals are settled when you leave. '
             'promise is something you are promising Edda in this line, in your words, or empty. '
-            +json.dumps({'your_hope':hope[:200],'your_credit':credit,'your_goods':goods,'offer_on_the_table':describe_offer(offer) if offer else 'none',
+            +json.dumps({'your_hope':hope[:200],'your_money':town.money(credit),'your_goods':goods,'offer_on_the_table':describe_offer(offer) if offer else 'none',
                          'conversation':convo},ensure_ascii=False),
             fields_schema({'say':STRING,'accept_offer':{'type':'boolean'},'leave':{'type':'boolean'},'promise':STRING}),250,'talk')
         if str(answer.get('promise','')).strip():promises.append(str(answer['promise']))

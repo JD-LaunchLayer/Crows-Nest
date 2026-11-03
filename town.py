@@ -109,6 +109,14 @@ def decorations():
     return [statue, dial, ring, chimes]
 
 
+def money(amount):
+    """Gold and silver (v0.27): one gold is ten silver. Stored internally as gold with tenths."""
+    tenths = int(round(float(amount) * 10))
+    g, s = divmod(abs(tenths), 10)
+    parts = ([f'{g} gold'] if g else []) + ([f'{s} silver'] if s else [])
+    return ('-' if tenths < 0 else '') + (' '.join(parts) or 'nothing')
+
+
 def ensure(state):
     world = state['built_world']
     post = state.setdefault('trading', {'credit': 0., 'stock': {k: dict(v) for k, v in STARTING_STOCK.items()},
@@ -123,7 +131,7 @@ def ensure(state):
                            'A notice reads: "Open. Search anything. Be patient with slow pages."']
         shop = _building(POST, 'Trading post', -3., -17., '#6b4e33', '#a99474')
         shop['details'] = ['Shelves, a counter and a slate board of posted rates.',
-                           'An honesty box and a ledger record trade credit. No one is behind the counter.']
+                           'An honesty box and a ledger record what is owed in gold and silver. No one is behind the counter.']
         for obj in [cafe, shop] + decorations():
             objects.setdefault(obj['id'], obj)
         world['town_added'] = True
@@ -214,7 +222,7 @@ def furnish(objects):
             _p('barrel', -1.9, .45, 1.1, .6, .9, .6, '#6d5136', 'cylinder'),
             _p('lamp', 0, 2.35, 0, .3, .3, .3, '#ffd98a', 'sphere', 'stone')]
         post['details'] = ['Shelves of jars, bundles and tins, a counter, crates and a barrel, and a slate board of posted rates.',
-                           'A ledger records trade credit. Edda Thorne keeps the post and is usually behind the counter.']
+                           'A ledger records his gold and silver. Edda Thorne keeps the post and is usually behind the counter.']
         post['revision'] += 1
 
 
@@ -364,7 +372,7 @@ def check_proposal(state, p, day):
         if p['credit'] < .7 * stock['price'] * p['quantity'] - 1e-9:
             return False, 'below what the post can afford to sell for'
         if post['credit'] + 1e-9 < p['credit']:
-            return False, 'he does not have that much credit'
+            return False, 'he does not have that much money'
         return True, ''
     if kind == 'buy_goods':
         value = _goods_value(state, p['item'], p['quantity'])
@@ -403,21 +411,21 @@ def apply_proposal(state, p, at, day):
         post['credit'] = round(post['credit'] - p['credit'], 2)
         stock['qty'] = round(stock['qty'] - p['quantity'], 2)
         _give(state, stock, p['quantity'])
-        text = f'Bought {p["quantity"]} × {stock["name"]} from Edda for {p["credit"]:g} credit (board price {stock["price"] * p["quantity"]:g}).'
+        text = f'Bought {p["quantity"]} × {stock["name"]} from Edda for {money(p["credit"])} (board price {money(stock["price"] * p["quantity"])}).'
     elif kind == 'buy_goods':
         what = _take(state, p['item'], p['quantity'], at)
         post['credit'] = round(post['credit'] + p['credit'], 2)
-        text = f'Edda took {what} for {p["credit"]:g} credit.'
+        text = f'Edda took {what} for {money(p["credit"])}.'
     elif kind == 'favour':
         fav = {'id': f'favour-{kp["next_favour"]}', 'task': p['task'].strip()[:160], 'minutes': p['minutes'], 'credit': p['credit'], 'agreed': at}
         kp['next_favour'] += 1
         kp['favours'] = (kp['favours'] + [fav])[-6:]
-        text = (f'Agreed a favour for Edda: "{fav["task"]}" ({fav["minutes"]} minutes, {fav["credit"]:g} credit). '
+        text = (f'Agreed a favour for Edda: "{fav["task"]}" ({fav["minutes"]} minutes, {money(fav["credit"])}). '
                 f'It is done by working at the trading post as job {fav["id"]}; whatever the work needs is there.')
     else:
         kp['last_gift'] = day
         post['credit'] = round(post['credit'] + p['credit'], 2)
-        text = f'Edda gave him {p["credit"]:g} credit as a gift.'
+        text = f'Edda gave him {money(p["credit"])} as a gift.'
     _record(post, text, at)
     return {'success': True, 'text': text, 'credit': post['credit']}
 
@@ -462,15 +470,15 @@ def next_delivery(state):
 def board(state):
     """What the posted board at the trading post shows."""
     post = ensure(state)
-    return {'your_credit': post['credit'],
-            'for_sale': {k: {'name': v['name'], 'price': v['price'], 'left': v['qty']} for k, v in post['stock'].items() if v['qty'] > 0},
-            'we_buy': {'wood': '1 credit per 3 kg', 'stone': '1 credit per 5 kg',
+    return {'your_money': money(post['credit']), 'money': 'gold and silver; ten silver make one gold',
+            'for_sale': {k: {'name': v['name'], 'price': money(v['price']), 'left': v['qty']} for k, v in post['stock'].items() if v['qty'] > 0},
+            'we_buy': {'wood': '1 gold per 3 kg', 'stone': '1 gold per 5 kg',
                        'things you made': 'priced by what they are and how well they are made',
                        'things you own': 'about half what the post sells them for'},
             'note': 'What the post buys goes on its shelves and is sold on at the posted price.',
-            'jobs': {**{k: {'name': v['name'], 'minutes': v['minutes'], 'pays': v['credit'],
+            'jobs': {**{k: {'name': v['name'], 'minutes': v['minutes'], 'pays': money(v['credit']),
                             'now': job_open(state, k, (state.get('clock') or {}).get('iso', ''))[1]} for k, v in JOBS.items()},
-                     **{f['id']: {'name': 'Favour for Edda: ' + f['task'], 'minutes': f['minutes'], 'pays': f['credit']}
+                     **{f['id']: {'name': 'Favour for Edda: ' + f['task'], 'minutes': f['minutes'], 'pays': money(f['credit'])}
                         for f in keeper(state)['favours']}}}
 
 
@@ -489,12 +497,12 @@ def trade(state, mode, item, quantity, at):
         quantity = min(quantity, stock['qty'])
         cost = stock['price'] * quantity
         if post['credit'] + 1e-9 < cost:
-            return {'success': False, 'text': f'Not enough trade credit: {stock["name"]} costs {cost:g} and he has {post["credit"]:g}.'}
+            return {'success': False, 'text': f'Not enough money: {stock["name"]} costs {money(cost)} and he has {money(post["credit"])}.'}
         post['credit'] = round(post['credit'] - cost, 2)
         stock['qty'] = round(stock['qty'] - quantity, 2)
         _give(state, stock, quantity)
         unit = ' kg' if stock['effect'].split(':')[0] in ('materials', 'stone') else ''
-        text = f'Bought {quantity}{unit} × {stock["name"]} for {cost:g} credit. Credit left: {post["credit"]:g}.'
+        text = f'Bought {quantity}{unit} × {stock["name"]} for {money(cost)}. Left in his purse: {money(post["credit"])}.'
     elif mode == 'sell':
         if item in SELL_RATES:
             key = 'materials' if item == 'wood' else 'stone'
@@ -502,10 +510,10 @@ def trade(state, mode, item, quantity, at):
             kg = min(state.get(key, 0), per * quantity)
             credits = int(kg // per)
             if credits < 1:
-                return {'success': False, 'text': f'Not enough {item} to sell: {per} kg are needed per credit.'}
+                return {'success': False, 'text': f'Not enough {item} to sell: {per} kg are needed for each gold.'}
             what = _take(state, item, credits * per, at)
             post['credit'] = round(post['credit'] + credits, 2)
-            text = f'Sold {what} for {credits} credit; it is on the post\'s shelves now. Credit now: {post["credit"]:g}.'
+            text = f'Sold {what} for {money(credits)}; it is on the post\'s shelves now. In his purse: {money(post["credit"])}.'
         else:
             owned = state.get('possessions', {}).get(item, 0)
             if owned:
@@ -518,14 +526,14 @@ def trade(state, mode, item, quantity, at):
                 return {'success': False, 'text': 'The trading post buys wood, stone, carvings he made, or things he owns; he has none of that.'}
             what = _take(state, item, quantity, at)
             post['credit'] = round(post['credit'] + credits, 2)
-            text = f'Sold {what} for {credits:g} credit; it belongs to the trading post now. Credit now: {post["credit"]:g}.'
+            text = f'Sold {what} for {money(credits)}; it belongs to the trading post now. In his purse: {money(post["credit"])}.'
     elif mode == 'job':
         job = JOBS.get(item)
         favour = next((f for f in keeper(state)['favours'] if f['id'] == item), None)
         if favour:
             keeper(state)['favours'].remove(favour)
             post['credit'] = round(post['credit'] + favour['credit'], 2)
-            text = f'Did the favour for Edda: "{favour["task"]}" and earned {favour["credit"]:g} credit. Credit now: {post["credit"]:g}.'
+            text = f'Did the favour for Edda: "{favour["task"]}" and earned {money(favour["credit"])}. In his purse: {money(post["credit"])}.'
             _record(post, text, at)
             return {'success': True, 'text': text, 'credit': post['credit']}
         if not job:
@@ -535,7 +543,7 @@ def trade(state, mode, item, quantity, at):
             return {'success': False, 'text': f'The posted job "{job["name"]}" is not needed now: {why}.'}
         post.setdefault('jobs_done', {})[item] = at
         post['credit'] = round(post['credit'] + job['credit'], 2)
-        text = f'Finished the posted job "{job["name"]}" and earned {job["credit"]} credit. Credit now: {post["credit"]:g}.'
+        text = f'Finished the posted job "{job["name"]}" and earned {money(job["credit"])}. In his purse: {money(post["credit"])}.'
     elif mode == 'ask':
         wanted = ' '.join(str(item).split())[:120]
         if not wanted:
@@ -612,7 +620,7 @@ def apply_stock_orders(state, root, at):
         item.update(name=str(o.get('name', item['name']))[:80], effect=effect,
                     price=max(0, float(o.get('price', item['price']))))
         item['qty'] += max(0, int(o.get('qty', 1)))
-        done.append(f"{item['name']} (now {item['qty']} at {item['price']:g} credit)")
+        done.append(f"{item['name']} (now {item['qty']} at {money(item['price'])})")
     if done:
         _record(post, 'New stock arrived: ' + '; '.join(done) + '.', at)
     return done

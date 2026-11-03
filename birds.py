@@ -138,4 +138,4 @@ def facts(state, ecology, area, daylight):
 def view(state, ecology, daylight):
     """For the 3D view: positions and how to draw each bird."""
     looks = {b['id']: b for b in BIRDS}
-    return [{**w, 'size': looks[w['id']]['size'], 'colours': looks[w['id']]['colours']} for w in where(state, ecology, daylight)]
+    return [{**w, 'size': looks[w['id']]['size'], 'colours': looks[w['id']]['colours'], 'look': looks[w['id']]['look']} for w in where(state, ecology, daylight)]

@@ -26,7 +26,7 @@ def main():
         print(f"His trade credit: {post.get('credit', 0)}")
         print('In stock:')
         for k, v in post.get('stock', {}).items():
-            print(f"  {k}: {v['name']} · {v['price']:g} credit · {v['qty']} left · {v['effect']}")
+            print(f"  {k}: {v['name']} · {v['price']:g} gold · {v['qty']} left · {v['effect']}")
         print('He has asked for:')
         for r in post.get('requests', []) or [{'item': '(nothing yet)', 'times': 0}]:
             print(f"  {r['item']}" + (f" ({r['times']}×)" if r.get('times', 0) > 1 else ''))

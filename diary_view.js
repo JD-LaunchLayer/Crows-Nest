@@ -36,33 +36,79 @@ export function createDiary({document,player=null}){
   if(twin)parts.push('This is the time-lapse twin, living on a fast-forward clock.');
   return parts.join(' ');
  }
- // Headlines: what is happening now and in his day so far, in a few short lines. The full journal is one click away.
+ // Crow today (v0.27): the friendly page. What he's doing, how he seems, what he hopes for, in plain words.
+ // Everything comes from his saved state by fixed rules; nothing here is written by a model. The detailed notes are one click away.
+ function money(x){const t=Math.round((+x||0)*10),g=Math.floor(Math.abs(t)/10),sv=Math.abs(t)%10;const out=[g?g+' gold':'',sv?sv+' silver':''].filter(Boolean).join(' ');return (t<0?'-':'')+(out||'nothing');}
+ const DOING={rest:'having a quiet rest in his cabin',sleep:'fast asleep in his cabin',eat:'having something to eat',drink:'having a drink at the spring',
+  observe:'watching the woods closely',reflect:'sitting and thinking',explore:'out walking in the woods',practise:'practising his archery',read:'reading in the reading cabin',
+  inspect:'taking a close look at something',gather:'gathering wood',fell_tree:'felling a tree',craft:'carving something',plan:'sketching out a plan',construct:'building',
+  move_object:'carrying something across the clearing',interact:'working on something at the bench',browse:'at the café, searching the web',talk:'chatting with Edda',
+  trade:'at the trading post',use_item:'using one of his things',garden:'pottering in the garden',plant_tree:'planting a young tree',play_music:'playing his harp',
+  hunt:'out with his bow',butcher:'cutting up a carcass',preserve:'smoking meat over a slow fire',put_out_food:'putting a little food out and waiting quietly',resume_work:'getting back to his work'};
+ const DID={rest:'had a rest',sleep:'slept',eat:'had something to eat',drink:'had a drink at the spring',observe:'watched the woods',reflect:'sat and thought',
+  explore:'went for a walk in the woods',practise:'practised archery',read:'did some reading',inspect:'looked closely at something',gather:'gathered wood',fell_tree:'felled a tree',
+  craft:'carved something',plan:'sketched a plan',construct:'did some building',move_object:'carried something',interact:'worked on something',browse:'searched the web at the café',
+  talk:'chatted with Edda',trade:'went to the trading post',use_item:'used one of his things',garden:'worked in the garden',plant_tree:'planted a young tree',play_music:'played his harp',
+  hunt:'went out with his bow',butcher:'cut up a carcass',preserve:'smoked some meat',put_out_food:'put a little food out and waited',resume_work:'got back to his work'};
+ function feelWords(v,a){const tone=v>.35?'happy and content':v>.1?'in good spirits':v<-.35?'quite down':v<-.1?'a little low':'steady';return tone+(a>.6?', if a bit wound up':a>.3?' and alert':' and calm');}
+ function bodyFriendly(b){const out=[];if(!b)return out;
+  if(b.reserve<35&&b.stomach<8)out.push("he's hungry");else if(b.reserve<65&&b.stomach<8)out.push("he's a bit peckish");
+  if(b.hydration<35)out.push("he's very thirsty");else if(b.hydration<65)out.push("he's thirsty");
+  if(b.sleep_debt>8)out.push("he's really tired");else if(b.sleep_debt>4)out.push("he's getting sleepy");
+  if(b.exertion>.45)out.push('his muscles are tired from work');return out;}
+ const tidy=t=>String(t||'').replace(/\s*\((?:threads?|promises?)\s*[\d–\-, and]+\)/gi,'').replace(/\b(?:threads?|promises?)\s*\d+(?:\s*[–\-]\s*\d+)?(?:\s*(?:,|and)\s*\d+)*\s*/gi,'').replace(/\s+/g,' ').trim();
+ const first=(t,n=150)=>{t=tidy(t);const c=t.search(/[.;](\s|$)/);t=c>15&&c<n?t.slice(0,c):t;return t.length>n?t.slice(0,n-1)+'…':t};
+ function detail(m){const r=m.world_result||{},ev=String(m.event||'');
+  if(m.action==='eat'){const f=ev.match(/serving of (.+?) from/);return f?`(${f[1]})`:'';}
+  if(['observe','explore'].includes(m.action)){const a=(r.findings||[]).map(f=>f.text||'').find(t=>/ bird | animal /.test(' '+t+' '));if(a)return '— spotted '+first(a,120).replace(/^A /,'a ').replace(/ is .*/,'');const n=(r.findings||[]).filter(f=>f.new).length;return n?`— noticed ${n} new thing${n>1?'s':''}`:'';}
+  if(m.action==='read'||m.action==='browse'){const t=(m.source||{}).title;return t?`(${t})`:'';}
+  if(['trade','hunt','butcher','preserve','put_out_food','garden','plant_tree','play_music','craft'].includes(m.action))return '— '+first(ev,120).toLowerCase().replace(/^(did|finished|bought|sold|played|picked|put|shot|walked|gutted|kept|sowed|watered|pulled|planted)/i,x=>x.toLowerCase());
+  return '';}
  function headlines(s){
-  const out=[],today=(s.memories||[]).filter(m=>m.day===s.day),done=today.filter(m=>m.kind==='experience'),short=(t,n=110)=>{t=String(t||'').replace(/\s+/g,' ').trim();const cut=t.search(/[.;](\s|$)/);t=cut>20&&cut<n?t.slice(0,cut):t;return t.length>n?t.slice(0,n-1)+'…':t};
-  const aff=s.affect||{},body=bodyWords(s.body);
-  out.push(['Right now',`${s.pending?(VERB[s.action]||s.action):'deciding what to do'} · ${mood(aff.valence||0,aff.arousal||0)} · ${body.length?body.join(', '):'body fine'}`]);
-  if(s.current_intention)out.push(['Aiming for',short(s.current_intention,140)]);
-  const counts={};for(const m of done)counts[m.action]=(counts[m.action]||0)+1;
-  out.push(['His day so far',done.length?`${done.length} things done: `+Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([a,n])=>`${VERB[a]||a} ${n}`).join(', '):'just begun']);
-  const hi=[];const seenBefore=new Set((s.memories||[]).filter(m=>m.kind==='experience'&&m.day<s.day).map(m=>m.action));
-  for(const m of done){const r=m.world_result||{};
-   if(!seenBefore.has(m.action)&&!hi.some(h=>h.startsWith('First')))hi.push(`First time ${VERB[m.action]||m.action}`);
-   if(['observe','explore'].includes(m.action)&&r.findings?.filter?.(f=>f.new).length)hi.push(`Noticed ${r.findings.filter(f=>f.new).length} new thing${r.findings.filter(f=>f.new).length>1?'s':''} (${m.time})`);
-   if(['talk','trade','play_music','garden','plant_tree','craft','practise','fell_tree','browse','read'].includes(m.action))hi.push(`${m.time} · ${short(m.event,100)}`);
-  }
-  const edges=done.filter(m=>/has been seen before|can be made out in|is not in /.test(m.event||'')).length;if(edges)hi.push(`Told ${edges}× today that there was nothing new where he looked`);
-  out.push(['Highlights',hi.length?hi.slice(-6):['nothing out of the ordinary']]);
-  const thought=(s.diary||[]).at(-1);if(thought)out.push(['Latest thought',`“${short(thought.text,150)}”`]);
-  const watch=[],p=s.provisions||{};
-  if((p.pantry||0)<1)watch.push(`no ready food${(p.berries||0)<10?`, ${(p.berries||0).toFixed(0)} servings of fruit left`:''}`);
-  if(s.trading)watch.push(`${s.trading.credit||0} trade credit`);
-  watch.push(s.keeper?.talks?`talked with Edda ${s.keeper.talks}×`:'has not met Edda');
-  const gaps=(s.world_gaps||[]).filter(g=>String(g.last||'').slice(0,10)===String(s.clock?.iso||'').slice(0,10));if(gaps.length)watch.push(`${gaps.length} place${gaps.length>1?'s':''} where the world ran out today`);
-  out.push(['Worth knowing',watch.join(' · ')]);
   const box=$('diaryHeadlines');if(!box)return;box.replaceChildren();
-  for(const [k,v] of out){if(Array.isArray(v)){const h=el('p');h.append(el('b',k+':'));box.append(h);const ul=el('ul');for(const x of v)ul.append(el('li',x));box.append(ul);}else{const pEl=el('p');const b=el('b',k+': ');pEl.append(b,document.createTextNode(v));box.append(pEl);}}
+  const para=(t,cls)=>box.append(el('p',t,cls)),head=t=>box.append(el('h3',t));
+  const aff=s.affect||{},body=bodyFriendly(s.body);
+  para(`${s.pending?`Crow is ${DOING[s.action]||s.action}.`:'Crow is deciding what to do next.'} He seems ${feelWords(aff.valence||0,aff.arousal||0)}${body.length?', and '+body.join(', '):''}.`,'lead');
+  if(s.current_intention)para(`What he's hoping to do: “${first(s.current_intention,200)}”`);
+  if(s.next_step&&s.next_step!==s.current_intention)para(`After that, he's thinking: “${first(s.next_step,200)}”`,'muted');
+  // His day so far, with runs of the same thing gathered together.
+  const today=(s.memories||[]).filter(m=>m.kind==='experience'&&m.day===s.day);
+  head('His day so far');
+  if(!today.length)para('His day has only just begun.','muted');
+  const groups=[];for(const m of today){const g=groups.at(-1);if(g&&g.action===m.action&&!['talk','trade','eat'].includes(m.action))g.items.push(m);else groups.push({action:m.action,items:[m]});}
+  const ul=el('ul');for(const g of groups.slice(-10)){const a=g.items[0],z=g.items.at(-1);
+   const when=g.items.length>1?`${a.time}–${z.time}`:a.time;const what=(DID[g.action]||g.action)+(g.items.length>1?` (${g.items.length} times)`:'');
+   ul.append(el('li',`${when} · ${what} ${g.items.length===1?detail(a):''}`.trim()));}
+  if(groups.length)box.append(ul);
+  // How he's been feeling, in his own words.
+  const thoughts=(s.diary||[]).slice(-3).reverse();
+  if(thoughts.length){head("How he's been feeling");for(const d of thoughts)para(`${String(d.at||'').slice(11,16)} · “${first(d.text,220)}”`,'thought');}
+  // Wishes, newest first, each once.
+  const ws=[];for(const w of [...(s.wishes||[])].filter(w=>w.status!=='withdrawn').reverse()){if(!ws.some(x=>x.text===w.text))ws.push(w);if(ws.length>=5)break;}
+  if(ws.length){head("What he's wishing for");const wl=el('ul');for(const w of ws)wl.append(el('li',`“${first(w.text,180)}”${(w.mentions||1)>=10?' — something he keeps coming back to':''}`));box.append(wl);}
+  // On his mind: things left open and promises, in plain words.
+  const open=(s.threads||[]).filter(t=>t.status==='open').slice(-3).reverse(),prom=(s.promises||[]).filter(p=>p.status==='open').slice(-3).reverse();
+  if(open.length||prom.length){head("On his mind");
+   for(const t of open){para(`“${first(t.text,200)}”`,'thought');if(t.world_note)para('A note from the world: '+t.world_note,'muted');}
+   for(const p of prom){para(`He promised ${p.to.split(' ')[0]}: “${first(p.text,200)}”`,'thought');if(p.world_note)para('A note from the world: '+p.world_note,'muted');}}
+  const notes=(s.personality_notes||[]).slice(-2).reverse();
+  if(notes.length){head("What he's noticed about himself");for(const n of notes)para(`“${first(n.text,220)}”`,'thought');}
+  // Edda.
+  const k=s.keeper;if(k&&k.talks){head('Him and Edda');
+   const feel=k.warmth>.5?'genuinely fond of him':k.warmth>.3?'fond of him':k.warmth>.05?'warming to him':k.warmth<-.3?'wary of him':k.warmth<-.05?'a little cool towards him':'still making her mind up about him';
+   para(`They've talked ${k.talks} time${k.talks===1?'':'s'}, and Edda seems ${feel}.`);
+   const talk=[...(s.memories||[])].reverse().find(m=>m.world_result&&m.world_result.conversation);
+   if(talk)for(const c of talk.world_result.conversation.slice(0,2))para(`${c.who}: “${first(c.text,220)}”`,'thought');}
+  // Birds that are getting used to him.
+  const looks=Object.fromEntries((s.birds_view||[]).map(b=>[b.id,b.look]).filter(([,l])=>l));
+  const tame=Object.entries(s.wildlife?.trust||{}).filter(([id,t])=>t>=.1&&looks[id]).sort((a,b)=>b[1]-a[1]).slice(0,3);
+  if(tame.length){head('Birds getting used to him');const bl=el('ul');
+   for(const [id,t] of tame)bl.append(el('li',`The ${looks[id]} ${t<.3?'is starting to get used to him':t<.6?'comes a little closer when he is quiet':t<.85?'will feed near him':'will take food from his hand'}.`));box.append(bl);}
+  // Purse and pantry.
+  const pv=s.provisions||{};head('Purse and pantry');
+  para(`He has ${money(s.trading?.credit||0)} in his purse and ${Math.round((pv.pantry||0)*10)/10} serving${(pv.pantry||0)===1?'':'s'} of food in the chest${(pv.berries||0)>=1?`, with fruit on the bushes`:''}.`);
  }
- if($('diaryMore'))$('diaryMore').onclick=()=>{const pages=$('diaryPages');const brief=pages.classList.toggle('brief');$('diaryMore').textContent=brief?'Show the full journal':'Show headlines only';};
+ if($('diaryMore'))$('diaryMore').onclick=()=>{const pages=$('diaryPages');const brief=pages.classList.toggle('brief');$('diaryMore').textContent=brief?'Show the detailed notes':'Back to Crow today';};
  function update(s){
   latest=s;
   if(!$('diary'))return;
@@ -93,7 +139,7 @@ export function createDiary({document,player=null}){
    if(!items.length)box.append(el('p','No interest history recorded yet.','muted'));
   }
   const trade=$('diaryTrade');if(trade){trade.replaceChildren();const t=s.trading;
-   if(t){trade.append(el('p',`Trade credit: ${t.credit}`));
+   if(t){trade.append(el('p',`In his purse: ${money(t.credit)}`));
     const owned=Object.entries(s.possessions||{}).filter(([,n])=>n);trade.append(el('p',owned.length?'He owns: '+owned.map(([k,n])=>n>1?`${k} ×${n}`:k).join(', '):'He has not bought anything yet.','muted'));
     if((t.requests||[]).length){trade.append(el('p','Things he has asked the post to stock:'));for(const r of [...t.requests].reverse().slice(0,8))trade.append(el('p',`“${r.item}”${r.times>1?` (asked ${r.times} times)`:''}`,'thought'));}
     else trade.append(el('p','He has not asked for anything to be stocked.','muted'));
@@ -101,13 +147,13 @@ export function createDiary({document,player=null}){
   const shelves=$('diaryShelves');if(shelves){shelves.replaceChildren();const t=s.trading;
    if(t){const stock=Object.entries(t.stock||{});const inStock=stock.filter(([,v])=>v.qty>0),out=stock.filter(([,v])=>!(v.qty>0));
     shelves.append(el('p',`In stock: ${inStock.length} lines · sold out: ${out.length}`,'muted'));
-    for(const [,v] of inStock.sort((a,b)=>a[1].name.localeCompare(b[1].name)))shelves.append(el('p',`${v.name} — ${Math.round(v.qty*100)/100} left · ${v.price} credit`));
+    for(const [,v] of inStock.sort((a,b)=>a[1].name.localeCompare(b[1].name)))shelves.append(el('p',`${v.name} — ${Math.round(v.qty*100)/100} left · ${money(v.price)}`));
     if(out.length)shelves.append(el('p','Sold out: '+out.map(([,v])=>v.name).join(', '),'muted'));
     const today=(s.clock?.iso||'').slice(0,10),done=t.jobs_done||{};
     const sweep=done.sweep_post?.slice(0,10)===today?'done today':'needs doing today';
     const crates=t.last_delivery&&!(done.carry_crates&&done.carry_crates>=t.last_delivery)?'crates waiting from the last delivery':'no crates until the next delivery';
     shelves.append(el('p',`Jobs: sweeping ${sweep} · ${crates}`));
-    const fav=s.keeper?.favours||[];if(fav.length)shelves.append(el('p','Favours agreed with Edda: '+fav.map(f=>`${f.task} (${f.credit} credit)`).join('; '),'muted'));
+    const fav=s.keeper?.favours||[];if(fav.length)shelves.append(el('p','Favours agreed with Edda: '+fav.map(f=>`${f.task} (${money(f.credit)})`).join('; '),'muted'));
     if(t.last_delivery)shelves.append(el('p','Last delivery: '+t.last_delivery.slice(0,16).replace('T',' '),'muted'));
     for(const l of (t.ledger||[]).slice(-6).reverse())shelves.append(el('p',`${(l.at||'').slice(5,16).replace('T',' ')} · ${l.text}`,'thought'));}
    else shelves.append(el('p','The trading post has not opened yet.','muted'));}
@@ -137,7 +183,7 @@ export function createDiary({document,player=null}){
    if(k){const feel=k.warmth>.3?'fond of him':k.warmth>.05?'warming to him':k.warmth<-.3?'wary of him':k.warmth<-.05?'a little cool towards him':'undecided about him';
     people.append(el('p',`Edda seems ${feel}. They have talked ${k.talks} time${k.talks===1?'':'s'}.`));
     for(const n of (k.notes||[]).slice(-5).reverse())people.append(el('p','Edda: “'+n.text+'”','thought'));
-    for(const f of k.favours||[])people.append(el('p',`Open favour (${f.id}): ${f.task} · ${f.minutes} min · ${f.credit} credit`,'muted'));}}
+    for(const f of k.favours||[])people.append(el('p',`Open favour (${f.id}): ${f.task} · ${f.minutes} min · ${money(f.credit)}`,'muted'));}}
   const stories=$('diaryStories');if(stories){stories.replaceChildren();
    const shown=(s.stories||[]).filter(x=>x.count>1).sort((a,b)=>(b.updated_hours||0)-(a.updated_hours||0)).slice(0,6);
    for(const st of shown){const box=el('div',undefined,'story');box.append(el('p',`${st.title}`));
@@ -165,7 +211,7 @@ export function createDiary({document,player=null}){
   const v=document.querySelector?.('meta[name="crow-version"]')?.content||'';
   L.push(`CROW REPORT · v${v} · ${s.clock?.date||''} ${s.clock?.time||''}${s.crow_clock?' (his own time)':''}`);
   L.push('','HOW HE IS',summary(s));
-  const p=s.provisions||{};L.push(`Food: pantry ${(p.pantry??0).toFixed(1)} · fruit ${(p.berries??0).toFixed(1)} · water ${(p.water_litres??0).toFixed(1)} L · credit ${s.trading?.credit??0} · owns: ${Object.entries(s.possessions||{}).filter(([,n])=>n).map(([k,n])=>n>1?k+'×'+n:k).join(', ')||'nothing'}`);
+  const p=s.provisions||{};L.push(`Food: pantry ${(p.pantry??0).toFixed(1)} · fruit ${(p.berries??0).toFixed(1)} · water ${(p.water_litres??0).toFixed(1)} L · purse ${money(s.trading?.credit??0)} · owns: ${Object.entries(s.possessions||{}).filter(([,n])=>n).map(([k,n])=>n>1?k+'×'+n:k).join(', ')||'nothing'}`);
   {const lots=p.larder||[];if(lots.length){const by={};for(const l of lots)by[l.food]=(by[l.food]||0)+l.servings;L.push('Larder: '+Object.entries(by).map(([k,n])=>`${k} ${n.toFixed(1)}`).join(' · '));}
    const w=s.wildlife;if(w){const alive=(w.deer||[]).filter(d=>d.alive).length;const tr=Object.entries(w.trust||{}).filter(([,t])=>t>=.05).sort((a,b)=>b[1]-a[1]).slice(0,4);
     L.push(`Wildlife: ${alive} deer in the herd · hunts ${w.hunts||0} · carcasses waiting ${(w.carcasses||[]).length}`+(tr.length?' · birds trusting him: '+tr.map(([k,t])=>`${k} ${t.toFixed(2)}`).join(', '):''));}}

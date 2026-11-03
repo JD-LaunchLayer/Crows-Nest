@@ -23,5 +23,6 @@ def step(action,intention,sens,i):
     story.note_step(s,m);story.settle_need(s,m,sens);return next(x for x in s['stories'] if x['id']==m['story_id'])
 assert step('rest','Let the just-eaten meal digest quietly in the cabin',['Food is still digesting.'],1)['stage']=='started'
 assert step('rest','Let the just-eaten meal digest quietly in the cabin',['Beginning to feel sleepy.'],2)['stage']=='done'
-assert step('rest','Rest quietly while the repeated asking settles',[],3)['stage']=='started'
+assert step('rest','Rest quietly while the repeated asking settles',[],3)['stage']=='done', 'v0.27: a rest is done once rested'
+assert step('rest','Walk past tree-75 into new woodland after a pause',[],4)['stage']=='started', 'a walk is not ended by a rest'
 print('PASS v0.26.3: dark outlines only of what is there; Edda told when the delivery is due; meal-rest stories end with digestion.')

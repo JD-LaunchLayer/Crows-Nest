@@ -97,11 +97,20 @@ NEEDS = {'drink': (('thirst', 'drink', 'spring'), ('thirst',)),
          'sleep': (('sleep', 'sleepiness', 'sleepy', 'tired'), ('sleepiness', 'sleepy')),
          # Resting while a meal settles (v0.26.3): done once nothing is still digesting.
          'rest': (('digest', 'digesting', 'digestion', 'meal', 'eaten', 'eating'), ('digesting', 'full'))}
+REST_WORDS = ('rest', 'settle', 'pause', 'quiet', 'quietly', 'stay', 'sit', 'wait')
 
 
 def settle_need(state, memory, sensations):
     need = NEEDS.get(memory.get('action'))
     story = next((s for s in state.get('stories', []) if s['id'] == memory.get('story_id')), None)
+    # A rest is a pause, not a pursuit (v0.27): a story that is only about resting is done once he has rested.
+    if memory.get('action') in ('rest', 'sleep') and story and story['stage'] in ('started', 'pursuing', 'dormant'):
+        first = re.findall(r'[a-z]+', story['title'].lower())[:1]
+        if first and first[0] in REST_WORDS and all(st.get('action') in ('rest', 'sleep') for st in story['steps'][-3:]):
+            story['stage'] = 'done'
+            story['ended'] = memory.get('at', '')
+            story['ended_by'] = 'he rested'
+            return
     if not need or not story or story['stage'] not in ('started', 'pursuing', 'dormant'):
         return
     title = story['title'].lower()
@@ -184,8 +193,35 @@ def keep_promise(state, ident, at):
 
 def open_items(state):
     ensure(state)
-    return {'threads': [{'id': t['id'], 'text': t['text'], 'place': t['place']} for t in state['threads'] if t['status'] == 'open'][-6:],
-            'promises': [{'id': p['id'], 'text': p['text'], 'to': p['to']} for p in state['promises'] if p['status'] == 'open'][-6:]}
+    note = lambda x: {'note_from_the_world': x['world_note']} if x.get('world_note') else {}
+    return {'threads': [{'id': t['id'], 'text': t['text'], 'place': t['place'], **note(t)} for t in state['threads'] if t['status'] == 'open'][-6:],
+            'promises': [{'id': p['id'], 'text': p['text'], 'to': p['to'], **note(p)} for p in state['promises'] if p['status'] == 'open'][-6:]}
+
+
+# Things the world told him wrongly, now put right (v0.27). His words are kept exactly; a plain note is added beside them.
+PHANTOMS = [
+    (('tam', 'cracked board', 'loose board', 'the board'), 'There is no Tam and no cracked or loose board at the trading post; '
+     'Edda said those by mistake. She runs the post on her own.'),
+    (('solid part', 'solid-part'), 'There was never a "solid part" rule. That message came from a fault in the world when a '
+     'blueprint drawing did not work; it has been put right, and drawing a blueprint needs no materials.'),
+]
+
+
+def annotate_phantoms(state):
+    """Once: add a plain note from the world beside threads and promises that rest on things the world got wrong."""
+    import re
+    ensure(state)
+    if state.get('phantoms_annotated'):
+        return 0
+    marked = 0
+    for item in state['threads'] + state['promises']:
+        low = item['text'].lower()
+        notes = [n for words, n in PHANTOMS if any(re.search(r'\b' + re.escape(w) + r'\b', low) for w in words)]
+        if notes:
+            item['world_note'] = ' '.join(notes)
+            marked += 1
+    state['phantoms_annotated'] = True
+    return marked
 
 
 # ---- Beliefs: patterns computed from his own record by fixed, published rules ----

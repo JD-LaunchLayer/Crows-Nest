@@ -1233,3 +1233,24 @@ it, and searched the reading cabin for it eight times. Now a failed drawing says
 what went wrong (for example, a shape drawn too high, or no shapes drawn at all), that
 nothing was planned, and that drawing a blueprint needs no materials in hand. His past
 events and promises are left as they happened.
+
+## v0.27.0 — gold and silver, natural sleep, and a friendlier journal
+
+- **Gold and silver.** Money is now gold and silver: one gold is ten silver, and what was
+  one credit is one gold (his 1.5 credit became 1 gold 5 silver). Prices, the board, jobs,
+  favours, Edda's haggling and his purse all use it. His past entries keep their words; the
+  post's ledger and a short note from the world say once how the old credit maps over.
+- **Sleep comes from his body, not the clock.** Sleepiness now builds mostly from what he
+  does: walking, chopping, building and gardening tire him far more than trading, reading,
+  talking or sitting, and a long time awake adds a little. He sleeps until he is rested,
+  whatever the hour, short or long, by day or by night. He is no longer told it is "night";
+  he has the time and can see whether it is dark.
+- **A rest is done once he has rested.** Stories that are only about resting close when the
+  rest is over, instead of staying "pursuing" and drawing him back to the cabin.
+- **Notes from the world.** Beside his open threads and promises about Tam, the cracked
+  board and the "solid part" rule, a plain note now says those came from mistakes in the
+  world, now put right. His own words are unchanged.
+- **Crow today.** The journal opens on a friendly page: what he is doing and how he seems,
+  what he is hoping to do, his day so far, how he has been feeling, his wishes, what is on
+  his mind, Edda, birds getting used to him, and his purse and pantry. The detailed notes
+  are one click away, and Copy report is unchanged.

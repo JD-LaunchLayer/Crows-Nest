@@ -46,12 +46,22 @@ def _day_of_year(state):
     except (KeyError,ValueError,TypeError):return 200
 
 
+def sleep_needed_seconds(state):
+    """How long he sleeps before waking rested (v0.27): set by how tired he is, not by the clock."""
+    b=ensure(state)
+    hours=b['sleep_debt']/SLEEP_RECOVERY+.25
+    return int(max(.75,min(11.,hours))*3600)
+
+
 def effort(action):
     return {'sleep':0.,'rest':.05,'read':.08,'reflect':.08,'observe':.1,
             'eat':.1,'drink':.05,'inspect':.12,'test_object':.2,'plan':.25,
             'craft':.55,'construct':.75,'gather':.65,'explore':.45,
             'practise':.65,'move_object':.8,'fell_tree':1.,'plant_tree':.6,'play_music':.2,'browse':.08,'trade':.3,'garden':.45,'talk':.05,'use_item':.2,
             'hunt':.5,'butcher':.55,'preserve':.3,'put_out_food':.08}.get(action,.15)
+
+
+SLEEP_RECOVERY = 1.1  # per hour asleep: a long day's tiredness takes a full night to sleep off
 
 
 def advance(state, seconds, action):
@@ -69,7 +79,9 @@ def advance(state, seconds, action):
         body['stomach']-=digested
         body['reserve']=clamp(body['reserve']+digested-(2.5+5*work)*dt)
         body['hydration']=clamp(body['hydration']-(2+4*work)*dt)
-        body['sleep_debt']=clamp(body['sleep_debt']+(-1.8 if sleeping else .65)*dt,0,24)
+        # Sleepiness comes mostly from what he does (v0.27): hard outdoor work tires him far more than sitting,
+        # talking or reading; being awake a long time adds a little whatever he does. Sleep clears it.
+        body['sleep_debt']=clamp(body['sleep_debt']+(-SLEEP_RECOVERY if sleeping else .3+.7*work)*dt,0,24)
         body['exertion']=clamp(body['exertion']+(work*.16-(.32 if resting else .04))*dt,0,1)
         body['active_hours']+=dt
         supplies=state['provisions']
