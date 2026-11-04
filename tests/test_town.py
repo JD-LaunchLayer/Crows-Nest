@@ -20,7 +20,7 @@ assert 'XII' in town.inspect(s,'bronze_dial',noon,.9)['text'] and 'IV' in town.i
 assert 'Too dark' in town.inspect(s,'weathered_figure',noon,0)['text']
 # Trading at posted rates.
 assert not town.trade(s,'buy','lantern',1,'t')['success']
-r=town.trade(s,'sell','wood',3,'t');assert r['success'] and s['trading']['credit']==2 and s['materials']==1
+r=town.trade(s,'sell','wood',6,'t');assert r['success'] and s['trading']['credit']==2 and s['materials']==1
 assert town.trade(s,'job','sweep_post',1,'2026-06-21T09:00')['success'] and s['trading']['credit']==3  # crates only after a delivery (v0.26.2)
 pantry=s['provisions']['pantry'];assert town.trade(s,'buy','provisions_bundle',1,'t')['success'] and s['provisions']['pantry']==pantry+4
 r=town.trade(s,'ask','a sketchbook and some charcoal',1,'t');town.trade(s,'ask','A sketchbook and some charcoal',1,'t')

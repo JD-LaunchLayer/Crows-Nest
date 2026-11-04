@@ -6,7 +6,7 @@ import town, world_state, life
 s={'materials':12.,'stone':10.,'creations':[{'id':7,'name':'Bowl','shape':'bowl','quality':6,'day':1}]}
 world_state.ensure(s);life.ensure(s);post=town.ensure(s)
 # Wood: sold at the posted rate, then on the shelf by the kg, dearer than he was paid.
-r=town.trade(s,'sell','wood',4,'t');assert r['success'] and s['materials']==0 and post['credit']==4 and post['stock']['wood']['qty']==12
+r=town.trade(s,'sell','wood',12,'t');assert r['success'] and s['materials']==0 and post['credit']==4 and post['stock']['wood']['qty']==12
 r=town.trade(s,'buy','wood',6,'t');assert r['success'] and s['materials']==6 and post['credit']==1 and post['stock']['wood']['qty']==6
 assert post['stock']['wood']['price']>1/3, 'the post sells on for more than it pays'
 # Something he owns: about half the board price; it goes back on the board line.

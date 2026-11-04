@@ -52,7 +52,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.32.0'
+APP_VERSION = '0.32.1'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -970,8 +970,8 @@ def parameter_request(d):
         carvings=[{'id':i,'name':o['name']} for i,o in objects.items() if o.get('kind')=='carving'][-8:]
         return ('Choose what to do at the trading post. trade_mode buy (trade_item = an item id for sale), sell (wood, stone, the id of '
                 'something you made, or something you own), job (a posted job id), ledger (read the trading post ledger: trade_item = a day such as 2026-12-03, or a word such as sweep), or ask (trade_item = something you would like the post to stock, in your words). '
-                'trade_quantity is how many (1 if not relevant).',
-                {'trade_mode':{'type':'string','enum':['buy','sell','job','ledger','ask']},'trade_item':STRING,'trade_quantity':{'type':'integer','minimum':1,'maximum':20}},
+                'trade_quantity is how many; when selling wood or stone it is how many kilograms (1 if not relevant).',
+                {'trade_mode':{'type':'string','enum':['buy','sell','job','ledger','ask']},'trade_item':STRING,'trade_quantity':{'type':'integer','minimum':1,'maximum':200}},
                 {'board':town.board(state),'your_carvings':carvings,'inventory_kg':{'wood':state['materials'],'stone':state['stone']},
                  'possessions':state.get('possessions',{})})
     if a=='plan':

@@ -541,7 +541,8 @@ def _record(post, text, at):
 def trade(state, mode, item, quantity, at):
     """Carry out one exchange at the posted rates. Returns a world result."""
     post = ensure(state)
-    quantity = max(1, min(20, int(quantity or 1)))
+    by_kg = mode == 'sell' and item in SELL_RATES   # wood and stone are sold by the kilogram he names (v0.32.1)
+    quantity = max(1, min(200 if by_kg else 20, int(quantity or 1)))
     if mode == 'buy':
         stock = post['stock'].get(item)
         if not stock or stock['qty'] <= 0:
@@ -559,11 +560,11 @@ def trade(state, mode, item, quantity, at):
         if item in SELL_RATES:
             key = 'materials' if item == 'wood' else 'stone'
             per = SELL_RATES[item]['kg_per_credit']
-            kg = min(state.get(key, 0), per * quantity)
-            credits = int(kg // per)
-            if credits < 1:
-                return {'success': False, 'text': f'Not enough {item} to sell: {per} kg are needed for each gold.'}
-            what = _take(state, item, credits * per, at)
+            kg = round(min(float(state.get(key, 0) or 0), quantity), 1)
+            credits = int(kg / per * 10 + 1e-6) / 10   # paid in whole silver at the posted rate, rounded down
+            if credits < .1:
+                return {'success': False, 'text': f'Not enough {item} to sell: he has {float(state.get(key, 0) or 0):g} kg, and the post pays 1 gold per {per} kg.'}
+            what = _take(state, item, kg, at)
             post['credit'] = round(post['credit'] + credits, 2)
             text = f'Sold {what} for {money(credits)}; it is on the post\'s shelves now. In his purse: {money(post["credit"])}.'
         else:

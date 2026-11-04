@@ -1702,3 +1702,11 @@ What the world does, from the materials' hidden properties:
 
 Not yet (phase 2b): clay worked, dried and fired; charcoal; cuts and burns that slow him; wear on any
 tool.
+
+## v0.32.1 — wood and stone sold by the kilogram
+
+A world bug, found in his own life: he promised Edda about 4 kg of wood, went to sell 4, and the post read
+the number as gold and took 12 kg for 4 gold. He noticed the shortfall and went to tell her. The number he
+gives when selling wood or stone is now kilograms: he hands over exactly that (or all he has, if less) and is
+paid in whole silver at the posted rate, rounded down (4 kg of wood: 1 gold 3 silver). Too little to earn a
+silver is refused and nothing leaves him. His history stays as it happened. Test: tests/test_sell_by_kg.py.
