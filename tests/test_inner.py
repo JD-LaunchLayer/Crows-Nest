@@ -109,3 +109,17 @@ with tempfile.TemporaryDirectory() as td:
     assert 'eat' not in app.available_actions()
     app.foods.add(st,'provisions',1);assert 'eat' in app.available_actions()
 print('PASS v0.30.8: nothing to eat, no eating.')
+# v0.30.10: reaching for eating with nothing to eat: he realises why and chooses again; never a stall.
+with tempfile.TemporaryDirectory() as td:
+    shutil.copy(ROOT/'crow.py',Path(td)/'crow.py')
+    spec=importlib.util.spec_from_file_location('crow_reask',Path(td)/'crow.py');app=importlib.util.module_from_spec(spec)
+    with contextlib.redirect_stdout(io.StringIO()):spec.loader.exec_module(app)
+    app.CLOCK_OVERRIDE=lambda:datetime(2026,12,17,12,0,tzinfo=app.TZ);app.clock();st=app.state
+    st['provisions']['pantry']=0.;st['provisions']['larder']=[];st['provisions']['berries']=0.
+    asked=[]
+    def fake(p,s,*a,**k):
+        asked.append(p);act='eat' if len(asked)==1 else 'trade'
+        return {'action':act,'intention':'i','reason':'r','next_step':'','wish':'','wish_reason':'','project':'none','which_project':''},1
+    app.model_call=fake
+    d,_=app.choose_action();assert d['action']=='trade' and len(asked)==2 and 'nothing to eat' in asked[1]
+print('PASS v0.30.10: an impossible choice is realised and remade, never a stall.')

@@ -1483,3 +1483,10 @@ Bodies do not repay lost sleep hour for hour: after bad nights sleep is deeper. 
 day's tiredness still takes about seven hours to sleep off, and anything beyond that clears much
 faster, so even the deepest tiredness is gone after about ten and a half hours. Short naps are as
 before. Sleep is still far more restoring than resting.
+
+## v0.30.10 — an impossible choice is realised, not refused
+
+With nothing to eat, eating was rightly off his list, but out of habit he still chose it; the
+answer was refused and he dozed, again and again. Now, if he reaches for something he can't do,
+he realises why in his own terms ("I thought of eating, but I can't: there is nothing to eat: my
+food chest is empty and the bushes are bare") and decides again in the same moment.

@@ -48,7 +48,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.30.9'
+APP_VERSION = '0.30.10'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -661,10 +661,19 @@ def choose_action():
         'Only the people, places and things you know of here exist. Going somewhere is part of doing anything. '
         'Reading about something is not the same as being able to do it. You will be asked for any details after you choose.'
         '\n\nThings I could do now:\n'+inner.choices(allowed)+'\n\n'+view)
-    schema=fields_schema({'action':{'type':'string','enum':allowed},'intention':STRING,'reason':STRING,'next_step':STRING,
+    # Eating is the one thing he reaches for from habit when it is impossible (v0.30.10): accepted, then realised.
+    schema=fields_schema({'action':{'type':'string','enum':allowed+([] if 'eat' in allowed else ['eat'])},'intention':STRING,'reason':STRING,'next_step':STRING,
         'wish':STRING,'wish_reason':STRING,'project':{'type':'string','enum':['none','continue','start','pause','abandon']},
         'which_project':{'type':'string','enum':['']+list(titles)}})
     d,seconds=model_call(prompt,schema,320,'choose_action')
+    if d.get('action') in ACTIONS and d.get('action') not in allowed:
+        # v0.30.10: he reached for something he can't do now (eating with nothing to eat). He realises why, as anyone
+        # would, and decides again in the same moment; the choice is never thrown away (which made him doze).
+        why=("there is nothing to eat: my food chest is empty and the bushes are bare" if d['action']=='eat'
+             else "it isn't something I can do just now")
+        d,more=model_call(prompt+f"\n\nI thought of doing that ({inner.CHOICES.get(d['action'],d['action'].replace('_',' '))}), "
+                          f"but I can't: {why}.",schema,320,'choose_action')
+        seconds+=more
     for k in ['intention','reason','next_step','wish','wish_reason']:
         if not isinstance(d.get(k),str):raise ValueError('Invalid decision text: '+k)
     if d.get('action') not in allowed:raise ValueError('Invalid action')
