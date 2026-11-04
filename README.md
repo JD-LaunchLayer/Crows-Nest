@@ -1914,3 +1914,12 @@ Your check of his save (still_hours 0.25 after a whole night in bed) showed two 
   lying awake ends in sleepiness, as it would for anyone.
 
 Test: new checks in tests/test_restless.py.
+
+## v0.36.2 — Edda answers plainly when asked about work
+
+On 22 December, hungry with 3 silver, he asked Edda again and again for "a clear answer about the crates or the
+sweeping" and she kept offering him the warm spot by the stove instead. Both jobs were open that day on her board
+(crates 2 gold, sweeping 1 gold), enough together for the bread, and he could have started either at the post at any
+time. Now, when he asks her plainly about work (a posted job or a favour he has agreed), she answers plainly: whether
+it is there today, what it pays, and that he can start it at the post whenever he likes. She still never volunteers
+work or ideas he has not asked about. Test: tests/test_edda_elf.py.

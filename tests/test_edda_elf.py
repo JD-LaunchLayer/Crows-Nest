@@ -12,3 +12,6 @@ js = (ROOT / 'world.js').read_text(); html = (ROOT / 'index.html').read_text()
 assert 'eddaHead' in js and 'braid' in js and 'E_SHAWL' in js, 'she is modelled'
 assert 'id="warmthMark"' in html and "$('warmthMark')" in js and 'never sees' in html, 'the warmth meter is for Jordan only'
 print('PASS v0.34.5: Edda is an elf woman he can see; Jordan has a warmth meter.')
+# v0.36.2: asked plainly about work, she answers plainly (asked, not volunteered).
+assert 'When he asks you plainly about work' in town.KEEPER_PERSONA and 'Do not put him off' in town.KEEPER_PERSONA
+print('PASS v0.36.2: Edda answers plain questions about work plainly.')

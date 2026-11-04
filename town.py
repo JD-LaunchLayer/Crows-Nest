@@ -251,7 +251,10 @@ KEEPER_PERSONA = ('You are Edda Thorne, keeper of the small trading post beside 
     'wants them, and never agree that something is in your book, or that money is missing or owed, when it is not. '
     'You are also told what your book shows the post owes HIM, if anything: goods you took from him and paid less than '
     'they were worth. That is a real debt of the post\'s; if he raises it, or you come to it going through those entries, '
-    'say so plainly and you may pay it back with a make_good proposal.')
+    'say so plainly and you may pay it back with a make_good proposal. '
+    'When he asks you plainly about work (a posted job, or a favour he has already agreed with you), answer him plainly in '
+    'one or two sentences: whether it is there to be done today, what it pays, and that he can simply start it here at the '
+    'post whenever he likes. Do not put him off or answer with something else, such as a seat by the stove, instead.')
 
 
 def keeper(state):
