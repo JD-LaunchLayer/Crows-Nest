@@ -18,7 +18,8 @@ def ensure(state):
         'hydration': 85., 'sleep_debt': 1., 'exertion': 0., 'active_hours': 0.})
     state['body'].setdefault('chill', 0.)   # v0.30.18: how cold he has got, 0 warm .. 1 cold through
     state['body'].setdefault('heat', 0.)    # v0.31.3: how hot he has got, 0 comfortable .. 1 overheated
-    state['body'].setdefault('injuries', [])   # v0.33.0: cuts and burns, each healing at its own pace
+    state['body'].setdefault('injuries', [])
+    state['body'].setdefault('still_hours', 0.)   # v0.34.4: hours lying awake without moving, which stiffens and unsettles   # v0.33.0: cuts and burns, each healing at its own pace
     state.setdefault('provisions', {'pantry': 24., 'berries': 8., 'berry_capacity': 12.,
         'water_litres': 40., 'water_capacity': 40.})
     state.setdefault('practical', {'control_hours': 0., 'methods': [], 'trials': [], 'next_trial_id': 1})
@@ -124,6 +125,9 @@ def advance(state, seconds, action):
         for signal in state['affect']['signals']:signal['age_hours']+=dt
         wear(state,action,dt)
         heal(state,dt)
+        # v0.34.4: lying awake for hours stiffens the limbs and unsettles anyone; moving about soon loosens them.
+        if action=='rest':body['still_hours']=body.get('still_hours',0.)+dt
+        elif action!='sleep':body['still_hours']=max(0.,body.get('still_hours',0.)-6*dt)
     refresh_affect(state)
     sync_energy(state)
 
@@ -256,6 +260,9 @@ def perceive(state):
         # v0.34.3: warmth is felt too, not only its absence. In bed he warmed through within the hour but was never
         # told so, and lay there a whole morning "letting my hands and feet warm".
         sensations.append('Warm through under the covers; hands and feet warm.')
+    still=b.get('still_hours',0.)
+    if b['sleep_debt']<4 and still>5:sensations.append('Restless and stiff from lying still for hours.')
+    elif b['sleep_debt']<4 and still>2.5:sensations.append('Limbs stiff from lying still a long while.')
     sensations+=injury_lines(state)
     if not sensations:sensations.append('No strong bodily discomfort.')
     return {'sensations':sensations,'work_impairment':round(fatigue(state),2),

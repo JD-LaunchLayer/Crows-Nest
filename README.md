@@ -1828,3 +1828,12 @@ up". Under the covers he had warmed through within the hour, but his body only e
 nothing told him the thing he was waiting for had happened, while every moment reminded him the room was cold. Now,
 warm in bed, he feels it: "I'm warm through under the covers; my hands and feet are warm again." Out of bed in the
 cold cabin he still chills as before. Test: tests/test_warm_in_bed.py.
+
+## v0.34.4 — lying still for hours is felt
+
+On 21 December he stayed in bed from midnight to dusk, resting in short stretches: warm, fed enough, not sleepy,
+and in no discomfort. A real body lying awake that long grows stiff and restless; his never changed, so every time he
+chose, staying put cost nothing. Now hours of lying awake (not sleeping) are felt: after about two and a half hours
+"my limbs are stiff from lying still so long", after five "I'm stiff and restless from lying still for hours; I can't
+settle". Being up and about loosens him again (an hour clears most of it). When he is sleepy, lying still is no bother,
+and sleep neither stiffens nor loosens him. Nothing tells him what to do about it. Test: tests/test_restless.py.
