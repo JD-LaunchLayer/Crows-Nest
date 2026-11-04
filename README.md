@@ -1531,3 +1531,12 @@ Night after night he meant to "lie down and sleep through the dark", but chose a
 lie quietly in my cabin, awake"; sleeping is "go to bed and sleep until I wake rested"; and heavy
 sleepiness is felt as it is: "I'm heavy with sleepiness and badly need sleep". Whether he sleeps is
 still his choice.
+
+## v0.30.16 — Edda lays out the options
+
+Short of the bread bundle, he asked Edda whether he could pay part now and part later. The post
+keeps no tab, and still doesn't. But a shopkeeper who likes him would do more than say no: now, when
+he is short or asks for a tab, Edda declines kindly and lays out plainly what the post can do: the
+posted jobs when they are needed, and that it buys wood, stone, things he has made and things he
+owns at the board's rates. She doesn't know what he has unless he's told her, and she doesn't tell
+him what to sell; that stays his decision.
