@@ -819,4 +819,8 @@ def use_item(state, item, target, how):
                                          f'and there is enough in it to burn for about {round(hours)} hour{"s" if round(hours) != 1 else ""}.'}
     if item == 'lantern':
         return {'success': True, 'text': 'Lit the lantern: a small warm pool of light. He keeps it with him after dark.'}
-    return {'success': True, 'text': f'Handled the {item.replace("_", " ")} ({" ".join(str(how).split())[:80] or "idly"}). Nothing in particular happened.'}
+    # v0.34.2: what he meant stays apart from what happened. Before, his words sat inside the event in brackets
+    # ("Handled the radish seeds (I'm going to eat my bread now...)"), and he later felt relieved to have eaten.
+    meant = " ".join(str(how).split())[:80]
+    return {'success': True, 'text': f'Handled the {item.replace("_", " ")}.' + (f' What he meant to do ("{meant}") did not come of it.' if meant else '')
+                                     + ' Nothing in particular happened.'}

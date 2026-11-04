@@ -1812,3 +1812,11 @@ seeds and by reaching into a heap that was not there. Now:
 - Eating the last serving says so: "That was the last of it; the chest is empty now."
 
 Test: tests/test_cannot_now.py.
+
+## v0.34.2 — what he meant, kept apart from what happened
+
+When he handled something with no particular effect, his own words for what he meant were put inside the event in
+brackets: "Handled the radish seeds (I'm going to eat my bread now…). Nothing in particular happened." Asked how he
+felt about it afterwards, he read that as having eaten, and was "quietly relieved to be eating at last" while still
+hungry. Now it reads: "Handled the radish seeds. What he meant to do ("…") did not come of it. Nothing in particular
+happened." His history stays as it happened. Test: tests/test_meant_vs_happened.py.
