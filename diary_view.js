@@ -216,7 +216,8 @@ export function createDiary({document,player=null}){
   L.push('','HOW HE IS',summary(s));
   {const pt=s.self_portrait,dr=(s.dreams||[]).at(-1);L.push('','IN HIS OWN WORDS');
    L.push(pt?`Who he is (${String(pt.at||'').slice(5,16).replace('T',' ')}): ${cut(pt.text,600)}`:'Who he is: not written yet (comes with his first sleep since v0.30)');
-   if(dr)L.push(`Last dream (${String(dr.at||'').slice(5,16).replace('T',' ')}): ${cut(dr.text,400)}`);}
+   if(dr)L.push(`Last dream (${String(dr.at||'').slice(5,16).replace('T',' ')}): ${cut(dr.text,400)}`);
+   if(s.outside_now)L.push(`What he can sense around him: ${cut(s.outside_now,400)}`);}
   const p=s.provisions||{};L.push(`Food: pantry ${(p.pantry??0).toFixed(1)} · fruit ${(p.berries??0).toFixed(1)} · water ${(p.water_litres??0).toFixed(1)} L · purse ${money(s.trading?.credit??0)} · owns: ${Object.entries(s.possessions||{}).filter(([,n])=>n).map(([k,n])=>n>1?k+'×'+n:k).join(', ')||'nothing'}`);
   {const lots=p.larder||[];if(lots.length){const by={};for(const l of lots)by[l.food]=(by[l.food]||0)+l.servings;L.push('Larder: '+Object.entries(by).map(([k,n])=>`${k} ${n.toFixed(1)}`).join(' · '));}
    const w=s.wildlife;if(w){const alive=(w.deer||[]).filter(d=>d.alive).length;const tr=Object.entries(w.trust||{}).filter(([,t])=>t>=.05).sort((a,b)=>b[1]-a[1]).slice(0,4);

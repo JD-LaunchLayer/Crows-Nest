@@ -1540,3 +1540,16 @@ he is short or asks for a tab, Edda declines kindly and lays out plainly what th
 posted jobs when they are needed, and that it buys wood, stone, things he has made and things he
 owns at the board's rates. She doesn't know what he has unless he's told her, and she doesn't tell
 him what to sell; that stays his decision.
+
+## v0.30.17 — weather, sky and the sounds of the wood
+
+Each moment he now senses what is around him outdoors, by day and by night alike, as plain
+perceptions with no feelings attached: whether it is warm, mild, chilly or bitterly cold; sun or
+grey sky; a breeze or wind; rain on a wet day (for some hours, not all of them); mist on still cold
+mornings; frost on clear nights near freezing; the moon in its real phase, up for part of the night;
+stars when the sky is clear; and what can be heard: small birds and cawing by day, a long wavering
+hoot and, in midwinter, a scream in the dark wood at night, rain on the roof, the spring trickling.
+Seasons change what there is (birdsong at spring dawns, insects in summer). Indoors he hears it from
+inside. Whether he comes to love frosty nights or warm afternoons is his to find out. It is worked
+out from his own date and hour, so nothing is saved and reading it changes nothing. Your report
+shows the same line under "What he can sense around him".

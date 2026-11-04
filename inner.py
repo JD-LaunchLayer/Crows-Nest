@@ -276,6 +276,8 @@ def scene(state, ctx, extras):
     date = state.get('clock', {}).get('date', '')
     out.append(f"It's {date}, {str(state.get('clock', {}).get('time', ''))[:5]}. {light(state.get('daylight', 0), hour)} "
                f"{PLACE.get(state.get('location'), 'I am in the clearing')}.")
+    import senses   # v0.30.17: the weather, the sky and the sounds of the wood, as he can sense them
+    out.append(senses.outside(state))
     body = [BODY.get(s, s) for s in ctx.get('body', [])]
     out.append(' '.join(body) + ' ' + mood(ctx.get('affect', {})))
     if extras.get('dream'):

@@ -20,6 +20,7 @@ import foods
 import wildlife
 import notebook
 import inner
+import senses
 import web
 import sys
 import world_state
@@ -48,7 +49,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.30.16'
+APP_VERSION = '0.30.17'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -2005,7 +2006,7 @@ class Handler(BaseHTTPRequestHandler):
             cached=STATE_CACHE.get(viewer)
             if not cached or time.monotonic()-cached[0]>1.5:
                 with LOCK:
-                    clock();body=json.dumps({**state,'ecology_view':ecology.view(state,now().timetuple().tm_yday),'birds_view':birds.view(state,ecology,state.get('daylight',0)),'deer_view':wildlife.view(state,ecology,state.get('daylight',0)),'reading_log':reading_journal.page(state)['items'],
+                    clock();body=json.dumps({**state,'ecology_view':ecology.view(state,now().timetuple().tm_yday),'birds_view':birds.view(state,ecology,state.get('daylight',0)),'deer_view':wildlife.view(state,ecology,state.get('daylight',0)),'outside_now':senses.outside(state),'reading_log':reading_journal.page(state)['items'],
                         'reading_count':len(state['reading_log']),'runtime':runtime,'viewer':viewer,
                         'maintenance_enabled':owner and ACCESS_TOKEN is not None and (ROOT/'.git').exists()}).encode()
                 cached=STATE_CACHE[viewer]=(time.monotonic(),body,gzip.compress(body,5))
