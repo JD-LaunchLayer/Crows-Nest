@@ -62,3 +62,11 @@ with tempfile.TemporaryDirectory() as td:
     b['sleep_debt']=9;life.advance(st,3600,'reflect');awake=b['sleep_debt']
     assert slept<rested<9<awake, (slept,rested,awake)
 print('PASS v0.29.3: rest eases sleepiness a little; sleep far more.')
+# v0.30.9: sleep is deeper the more tired he is: one long sleep clears even the deepest tiredness; an ordinary day's takes about seven hours.
+import life as _life
+for _d0,_lo,_hi in ((1,.8,1.),(8,6.9,7.5),(24,10.,11.)):
+    _b={'sleep_debt':float(_d0)};_t=0
+    while _b['sleep_debt']>.05:
+        _b['sleep_debt']=max(0,_b['sleep_debt']-_life.sleep_rate(_b['sleep_debt'])/60);_t+=1/60
+    assert _lo<=_t<=_hi,(_d0,_t)
+print('PASS v0.30.9: deeper sleep when more tired; one long sleep sets him right.')

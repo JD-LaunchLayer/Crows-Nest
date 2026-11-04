@@ -1474,3 +1474,12 @@ leave me low" and "Eating often does not work out" (from 289 occasions). Now, wh
 nothing to eat anywhere, eating is not among the things he can do (as with hunting without a bow),
 and finding a source empty no longer counts as eating in the patterns of his life; those patterns
 are recomputed from real meals and the old statements stay visible as revised.
+
+## v0.30.9 — one long sleep sets him right
+
+After nights of poor sleep his tiredness had built close to the most it can be, and one full night
+(eleven hours, the longest a sleep runs) only cleared about half of it, so he woke still worn out.
+Bodies do not repay lost sleep hour for hour: after bad nights sleep is deeper. Now an ordinary
+day's tiredness still takes about seven hours to sleep off, and anything beyond that clears much
+faster, so even the deepest tiredness is gone after about ten and a half hours. Short naps are as
+before. Sleep is still far more restoring than resting.

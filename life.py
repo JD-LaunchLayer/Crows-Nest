@@ -49,7 +49,8 @@ def _day_of_year(state):
 def sleep_needed_seconds(state):
     """How long he sleeps before waking rested (v0.27): set by how tired he is, not by the clock."""
     b=ensure(state)
-    hours=b['sleep_debt']/SLEEP_RECOVERY+.25
+    d=b['sleep_debt'];extra=max(0.,d-ORDINARY)
+    hours=min(d,ORDINARY)/SLEEP_RECOVERY+(math.log(1+DEEP*extra/SLEEP_RECOVERY)/DEEP if extra else 0)+.25
     return int(max(.75,min(11.,hours))*3600)
 
 
@@ -61,7 +62,14 @@ def effort(action):
             'hunt':.5,'butcher':.55,'preserve':.3,'put_out_food':.08,'notebook':.06}.get(action,.15)
 
 
-SLEEP_RECOVERY = 1.1  # per hour asleep: a long day's tiredness takes a full night to sleep off
+SLEEP_RECOVERY = 1.1  # per hour asleep: an ordinary day's tiredness takes a full night to sleep off
+# v0.30.9: tiredness beyond an ordinary day's (after nights of poor sleep) is slept off much faster, because sleep
+# is deeper then, as it is for anyone: even the deepest tiredness clears in one long sleep of about ten and a half hours.
+ORDINARY, DEEP = 8., .67
+
+
+def sleep_rate(debt):
+    return SLEEP_RECOVERY+DEEP*max(0.,debt-ORDINARY)
 REST_RECOVERY = .25  # per hour of quiet rest: a little, about a quarter of what sleep does
 
 
@@ -85,7 +93,7 @@ def advance(state, seconds, action):
         # v0.28 body clock: awake in the dark late hours, drowsiness builds faster, as it does for anyone.
         late=(not sleeping) and state.get('daylight',1)<.12 and (state.get('minute',720)>=20*60 or state.get('minute',720)<5*60)
         # v0.29.3: a quiet rest takes a little of the edge off sleepiness (much less than sleep), instead of adding to it.
-        rate=-SLEEP_RECOVERY if sleeping else -REST_RECOVERY if action=='rest' else .3+.7*work+(.5 if late else 0)
+        rate=-sleep_rate(body['sleep_debt']) if sleeping else -REST_RECOVERY if action=='rest' else .3+.7*work+(.5 if late else 0)
         body['sleep_debt']=clamp(body['sleep_debt']+rate*dt,0,24)
         body['exertion']=clamp(body['exertion']+(work*.16-(.32 if resting else .04))*dt,0,1)
         body['active_hours']+=dt
