@@ -53,7 +53,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.34.0'
+APP_VERSION = '0.34.1'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -824,7 +824,10 @@ def choose_action():
         'If you are working on something, say whether you carry on with it, pause it, drop it or start something new (project, and which_project); otherwise none. '
         'Only the people, places and things you know of here exist. Going somewhere is part of doing anything. '
         'Reading about something is not the same as being able to do it. You will be asked for any details after you choose.'
-        '\n\nThings I could do now:\n'+inner.choices(allowed)+'\n\n'+view)
+        '\n\nThings I could do now:\n'+inner.choices(allowed)+
+        # v0.34.1: what he cannot do just now, and why, as plainly as what he can (he reached for bread that was gone).
+        ('\n\nNot possible just now:\n'+'\n'.join(f'- {inner.CHOICES.get(a,a.replace("_"," "))}: {why}' for a,why in blocked.items() if a in ACTIONS) if blocked else '')+
+        '\n\n'+view)
     # Only what he can do is offered. Naming something else is explained and asked once more (v0.30.14).
     schema=fields_schema({'action':{'type':'string','enum':allowed},'intention':STRING,'reason':STRING,'next_step':STRING,
         'wish':STRING,'wish_reason':STRING,'project':{'type':'string','enum':['none','continue','start','pause','abandon']},

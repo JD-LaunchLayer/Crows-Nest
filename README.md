@@ -1800,3 +1800,15 @@ Nothing he is told changes yet; that is v0.35. Tests: tests/test_layout.py (the 
 3D view and the layout agree; the move is safe and repeatable; every ecology fact names a real thing inside the area
 it is reported for; bushy outlines in the dark only where something bushy grows; "not here" carries no coordinates
 or suggestion), plus new parity checks in tests/animation.mjs.
+
+## v0.34.1 — what he cannot do, shown as plainly as what he can
+
+On 20 December he ate the last serving at 06:24, slept, and woke believing he still had bread from the bundle. Eating
+was simply missing from his list of things he could do, with no word why, so he tried to eat by handling his radish
+seeds and by reaching into a heap that was not there. Now:
+
+- Beside "Things I could do now" he sees "Not possible just now", each with its plain reason in his own words
+  ("eat something: there is nothing to eat: my food chest is empty and the bushes are bare").
+- Eating the last serving says so: "That was the last of it; the chest is empty now."
+
+Test: tests/test_cannot_now.py.

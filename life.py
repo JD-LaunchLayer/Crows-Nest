@@ -304,6 +304,9 @@ def consume(state, action, ident, food=''):
         b['stomach']+=per*amount
         what=foods.FOODS.get(kind,foods.FOODS['provisions'])['name']
         text=f'Ate {amount:.2f} serving of {what} from {obj["name"]}. Nourishment will become available through digestion.'
+        left=sum(l['servings'] for l in stock['larder']) if key=='pantry' else stock[key]
+        if left<=.001:   # v0.34.1: the last of it, plainly, so he knows it is gone
+            text+=' That was the last of it; the chest is empty now.' if key=='pantry' else ' That was the last of the fruit on the bushes.'
     sync_energy(state)
     return {'success':True,'text':text,'source_id':ident,'consumed':round(amount,3)}
 
