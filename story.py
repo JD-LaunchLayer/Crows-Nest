@@ -314,6 +314,8 @@ def update_beliefs(state, at):
         if not m or m.get('action') not in PHRASE:
             continue
         result = m.get('world_result') if isinstance(m.get('world_result'), dict) else {}
+        if m['action'] in ('eat', 'drink') and result.get('success') is False:
+            continue  # v0.30.8: finding the chest empty is not eating; it says nothing about how eating leaves him
         by_action.setdefault(m['action'], []).append((float(a.get('valence') or 0), result.get('success')))
     for action, obs in by_action.items():
         if len(obs) < MIN_OBS:

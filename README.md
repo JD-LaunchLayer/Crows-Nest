@@ -1465,3 +1465,12 @@ own notebook, so he never had anything to read and the check could never finish.
 notebook, so now, when he talks with her, it is open to the pages that match what they are talking
 about, as he wrote them (with the day he wrote them), or he finds plainly that nothing he has
 written is about it. Nothing is added to or changed in his notebook.
+
+## v0.30.8 — an empty chest is not a meal
+
+With no food and 1 gold, he went to his empty chest (or the bare bushes) twenty times in two
+hours, and each empty visit was counted as "eating", so his record came to say "Eating tends to
+leave me low" and "Eating often does not work out" (from 289 occasions). Now, when there is
+nothing to eat anywhere, eating is not among the things he can do (as with hunting without a bow),
+and finding a source empty no longer counts as eating in the patterns of his life; those patterns
+are recomputed from real meals and the old statements stay visible as revised.

@@ -99,3 +99,13 @@ with tempfile.TemporaryDirectory() as td:
     app.start_action(d,1);st['pending']['remaining']=0;m=app.finish_action(None)
     assert '2 servings of bread, cheese and dried fruit' in m['event'], m['event']
 print('PASS v0.30.4: the chest can be opened and counted; a meal that cannot happen says why.')
+# v0.30.8: with nothing to eat anywhere, eating is not among the things he can do.
+with tempfile.TemporaryDirectory() as td:
+    shutil.copy(ROOT/'crow.py',Path(td)/'crow.py')
+    spec=importlib.util.spec_from_file_location('crow_noeat',Path(td)/'crow.py');app=importlib.util.module_from_spec(spec)
+    with contextlib.redirect_stdout(io.StringIO()):spec.loader.exec_module(app)
+    app.CLOCK_OVERRIDE=lambda:datetime(2026,12,16,12,0,tzinfo=app.TZ);app.clock();st=app.state
+    st['provisions']['pantry']=0.;st['provisions']['larder']=[];st['provisions']['berries']=0.
+    assert 'eat' not in app.available_actions()
+    app.foods.add(st,'provisions',1);assert 'eat' in app.available_actions()
+print('PASS v0.30.8: nothing to eat, no eating.')

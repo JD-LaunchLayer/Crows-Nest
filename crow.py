@@ -48,7 +48,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.30.7'
+APP_VERSION = '0.30.8'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -535,6 +535,8 @@ def available_actions():
     if not state.get('wildlife',{}).get('carcasses'):allowed.remove('butcher')
     if 'venison' not in foods.kinds(state):allowed.remove('preserve')
     if not foods.kinds(state):allowed.remove('put_out_food')
+    # v0.30.8: with nothing to eat anywhere (chest empty, bushes bare), eating is not something he can do now.
+    if not foods.kinds(state) and state['provisions'].get('berries',0)<=.001 and 'eat' in allowed:allowed.remove('eat')
     if not state.get('possessions',{}).get('harp'):allowed.remove('play_music')
     return allowed
 

@@ -83,3 +83,11 @@ b=story.add_promise(_st,"I'll check each line against my copy with you, one at a
 c=story.add_promise(_st,'I will bring you twenty kilos of wood tomorrow.','Edda Thorne','t3')
 assert a is b and a['times_said']==2 and a['last_said']=='t2' and c is not a and len(_st['promises'])==2
 print('PASS v0.30.5: a promise said again is the same promise.')
+# v0.30.8: going to an empty chest is not eating, so it never shapes what he believes eating does for him.
+_st2={'memories':[],'appraisals':[],'beliefs':[]};story.ensure(_st2)
+for i in range(8):
+    _st2['memories'].append({'id':i,'action':'eat','world_result':{'success':False}})
+    _st2['appraisals'].append({'source_id':i,'valence':-.6})
+story.update_beliefs(_st2,'t')
+assert not any(b['key'].endswith(':eat') for b in _st2['beliefs']), _st2['beliefs']
+print('PASS v0.30.8: an empty chest is not a meal in his record.')
