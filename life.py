@@ -114,7 +114,11 @@ def advance(state, seconds, action):
         # v0.28 body clock: awake in the dark late hours, drowsiness builds faster, as it does for anyone.
         late=(not sleeping) and state.get('daylight',1)<.12 and (state.get('minute',720)>=20*60 or state.get('minute',720)<5*60)
         # v0.29.3: a quiet rest takes a little of the edge off sleepiness (much less than sleep), instead of adding to it.
-        rate=-sleep_rate(body['sleep_debt']) if sleeping else -REST_RECOVERY if action=='rest' else .3+.7*work+(.5 if late else 0)
+        # v0.36.1: lying awake is not sleep. A rest eases real sleepiness a little (above about six hours' worth), but it
+        # cannot stand in for sleep: below that, being awake still adds up, more slowly than when up and about.
+        awake=.3+.7*work+(.5 if late else 0)
+        rate=(-sleep_rate(body['sleep_debt']) if sleeping else (-REST_RECOVERY if body['sleep_debt']>6 else awake-REST_RECOVERY)
+              if action=='rest' else awake)
         body['sleep_debt']=clamp(body['sleep_debt']+rate*dt,0,24)
         body['exertion']=clamp(body['exertion']+(work*.16-(.32 if resting else .04))*dt,0,1)
         body['active_hours']+=dt
@@ -126,8 +130,11 @@ def advance(state, seconds, action):
         wear(state,action,dt)
         heal(state,dt)
         # v0.34.4: lying awake for hours stiffens the limbs and unsettles anyone; moving about soon loosens them.
-        if action=='rest':body['still_hours']=body.get('still_hours',0.)+dt
-        elif action!='sleep':body['still_hours']=max(0.,body.get('still_hours',0.)-6*dt)
+        # v0.36.1: the minutes he spends deciding between rests, still lying there, count as lying still too (they had
+        # counted as moving about, so the stiffness never built up); thinking anywhere else neither stiffens nor loosens.
+        lying=action=='rest' or (action=='reflect' and state.get('in_bed') and state.get('action') in ('rest','sleep'))
+        if lying:body['still_hours']=body.get('still_hours',0.)+dt
+        elif action not in ('sleep','reflect'):body['still_hours']=max(0.,body.get('still_hours',0.)-6*dt)
     refresh_affect(state)
     sync_energy(state)
 

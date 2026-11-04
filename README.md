@@ -1900,3 +1900,17 @@ layout:
 - Visitors to the public page do not receive his map; your own view of the page gets a summary of it.
 
 Places at the woods and the range now face into the woods and towards the target. Test: tests/test_remembered_map.py.
+
+## v0.36.1 — lying still counts, and lying awake is not sleep
+
+Your check of his save (still_hours 0.25 after a whole night in bed) showed two world bugs behind his long rests:
+
+- **The stiffness never built up.** The few minutes he spends deciding what to do next, between one rest and the
+  next, were counted as moving about, and undid the stiffness each time. Deciding while still lying in bed now counts
+  as lying still; thinking anywhere else neither stiffens nor loosens him.
+- **Resting stood in for sleep.** A quiet rest took sleepiness away a little every hour, so lying awake in bed day
+  and night he never grew sleepy and never slept (none since 20 December). Now a rest still eases real sleepiness (above
+  about six hours' worth), but below that being awake adds up, slowly by day and faster late at night. A night of
+  lying awake ends in sleepiness, as it would for anyone.
+
+Test: new checks in tests/test_restless.py.
