@@ -78,3 +78,17 @@ with _tf.TemporaryDirectory() as td:
     assert app.conform({'which_project':'woodland plant sculpture'},sc)['which_project']=='Woodland Plant Sculpture'
     assert app.conform({'which_project':'A boat'},sc)['which_project']==''
 print('PASS v0.30.6: an unclear project name never stalls his choice.')
+# v0.30.13: an answer in the wrong shape is asked for once more at once, not a doze.
+with _tf.TemporaryDirectory() as td:
+    folder=_P(td);_sh.copy(ROOT/'crow.py',folder/'crow.py')
+    (folder/'crow-config.json').write_text(json.dumps({'model_provider':'anthropic','anthropic_api_key':'sk-test','daily_budget_usd':1.0}))
+    sp=_iu.spec_from_file_location('crow_slip',folder/'crow.py');app=_iu.module_from_spec(sp)
+    with _c.redirect_stdout(_io.StringIO()):sp.loader.exec_module(app)
+    n=[]
+    def once_bad(*a,**k):
+        n.append(1)
+        if len(n)==1:raise ValueError('The cloud answer did not fit the requested structure: action="eat"')
+        return {'a':'ok'},1,{'cost_usd':.001}
+    app.anthropic_call=once_bad
+    out,_=app.model_call('x',app.fields_schema({'a':app.STRING}),50,'test');assert out=={'a':'ok'} and len(n)==2
+print('PASS v0.30.13: a slip is asked again at once, not dozed on.')

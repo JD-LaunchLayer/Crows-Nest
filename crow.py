@@ -48,7 +48,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.30.12'
+APP_VERSION = '0.30.13'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -398,7 +398,15 @@ def model_call(prompt, schema, limit=650, purpose='other', system=None):
             ledger = spend();within = ledger['usd'] < DAILY_BUDGET
         if within:
             try:
-                data, seconds, usage = anthropic_call(prompt, schema, limit, purpose, system)
+                try:
+                    data, seconds, usage = anthropic_call(prompt, schema, limit, purpose, system)
+                except ValueError as slip:
+                    # v0.30.13: an answer in the wrong shape is a slip, not his mind being away: ask once more at
+                    # once (paid as usual) before dozing. Outages and money troubles still doze straight away.
+                    if 'did not fit the requested structure' not in str(slip):raise
+                    with LOCK:
+                        ledger = spend();ledger['retries'] = ledger.get('retries', 0) + 1;ledger['last_retry'] = (purpose+': '+str(slip))[:400]
+                    data, seconds, usage = anthropic_call(prompt, schema, limit, purpose, system)
                 with LOCK:
                     ledger = spend();ledger['usd'] = round(ledger['usd'] + usage['cost_usd'], 6)
                     ledger['total_usd'] = round(ledger['total_usd'] + usage['cost_usd'], 6);ledger['calls'] += 1

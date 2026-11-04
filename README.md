@@ -1504,3 +1504,10 @@ kept open as a story he was in the middle of, and every failed visit added a ste
 was shown back to him each moment as something under way, as if the bread were waiting. Now a plan to
 eat ends when he finds the source empty or bare ("there was nothing there to eat"), as it would for
 anyone. His memory of looking is untouched.
+
+## v0.30.13 — a slip is asked again, not dozed on
+
+An answer from his mind in the wrong shape was treated like his mind being out of reach: he dozed
+for five minutes and his world waited, and the same slip could repeat. Now a wrong-shaped answer is
+asked for once more straight away (paid as usual, counted in the spending record as a retry); only
+if that also fails does he doze. Outages, no credit and the daily budget still doze at once.
