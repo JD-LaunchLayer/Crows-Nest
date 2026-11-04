@@ -49,7 +49,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.30.19'
+APP_VERSION = '0.30.20'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -1221,6 +1221,8 @@ def start_action(d, seconds, reading=None):
         except ValueError as exc:
             state['pending']['music']={'error':str(exc)};state['pending']['remaining']=state['pending']['duration']=300
     if action=='use_item' and d.get('use_item')=='stove':state['location']='cabin'   # the stove is in his cabin
+    # v0.30.20: resting can be in bed under the covers, if that is what he says he is doing; then he is warm.
+    state['in_bed']=action=='sleep' or (action=='rest' and bool(re.search(r'\b(bed|covers|blankets?|lie|lying|lay)\b',str(d.get('intention','')),re.I)))
     if action=='use_item' and d.get('use_item')=='whetstone' and d.get('use_on'):
         state['pending']['remaining']=state['pending']['duration']=1200
     if action=='trade' and d.get('trade_mode')=='job' and d.get('trade_item') in town.JOBS and town.job_open(state,d['trade_item'],dt.isoformat())[0]:

@@ -166,8 +166,8 @@ def felt_temp(state, action=None):
     w = weather(state)
     _, _, hour = _when(state)
     loc = state.get('location')
-    if action == 'sleep':
-        return 18.
+    if action == 'sleep' or (action == 'rest' and state.get('in_bed') and loc == 'cabin'):
+        return 18.   # under the covers
     if loc in ('cafe', 'library'):
         return 19.
     if loc == 'shop' and 7 <= hour < 19:

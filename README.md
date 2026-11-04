@@ -1574,3 +1574,9 @@ four and a half kilos unless he says how much); it burns about a kilo and a half
 cabin warm while it burns, and goes out when the wood is gone. Edda knows what it does and how much
 it burns if he asks. Fallen wood from the woods and the post's seasoned wood both burn, so warmth
 now competes with selling wood for bread: his choice.
+
+## v0.30.20 — resting under the covers is warm
+
+He rested through a cold night "under the covers", but only sleeping counted as being in bed, so
+the world chilled him while he lay there. Now a rest he describes as in bed, lying down or under the
+covers is warm, as it would be; sitting up awake in his fireless cabin is still cold.

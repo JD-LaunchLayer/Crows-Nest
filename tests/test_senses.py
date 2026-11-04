@@ -64,3 +64,13 @@ with tempfile.TemporaryDirectory() as td:
     st['paused']=False;d={**app.DECISION_DEFAULTS,'action':'use_item','use_item':'stove','use_how':'','intention':'warm up','reason':'cold'}
     app.start_action(d,1);assert st['location']=='cabin'
 print('PASS v0.30.19: a stove he can buy, light and feed with his own wood; warm while it burns, cold when it is out.')
+# v0.30.20: resting in bed under the covers is warm; sitting up awake in the cold cabin is not.
+with tempfile.TemporaryDirectory() as td:
+    shutil.copy(ROOT/'crow.py',Path(td)/'crow.py')
+    spec=importlib.util.spec_from_file_location('crow_inbed',Path(td)/'crow.py');app=importlib.util.module_from_spec(spec)
+    with contextlib.redirect_stdout(io.StringIO()):spec.loader.exec_module(app)
+    app.CLOCK_OVERRIDE=lambda:datetime(2026,12,20,3,0,tzinfo=app.TZ);app.clock();st=app.state;b=st['body'];st['paused']=False
+    for words,warm in (('Stay under the covers in my cabin and rest',True),('Sit quietly at the table',False)):
+        d={**app.DECISION_DEFAULTS,'action':'rest','intention':words,'reason':'r'};app.start_action(d,1);st['pending']=None
+        b['chill']=.6;app.life.advance(st,3600,'rest');assert (b['chill']<.1)==warm,(words,b['chill'])
+print('PASS v0.30.20: resting under the covers is warm; sitting up in a cold cabin is not.')
