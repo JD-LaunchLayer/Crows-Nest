@@ -1634,3 +1634,28 @@ Phase 1, step 2. Nothing Crow experiences changes yet; this is the groundwork th
 Implemented now: data, checking, the ledger and its tests. Planned next (phase 1, step 3): the raw
 materials placed in the woods (seeded once, never moved), gathering them with what he has to hand,
 and drawing them in the world.
+
+## v0.31.2 — raw materials in his woods
+
+Phase 1, step 3. Fourteen places now hold raw materials, set once from a fixed seed beside everything
+already there (no tree or object moved or renumbered) and drawn in the world: slick grey-brown mud
+where the spring spreads (two beds), reeds at the spring's edge, sand and pebbles where it runs off, a
+patch of thin wiry stems on the damp open ground, three patches of stinging plants and three of
+knobbly white-skinned stones at the woodland edge, a wet hollow with rusty water and brown lumps in the
+deeper woods, and, farthest out and rarest, a green-streaked outcrop and a few dark heavy pebbles in a
+dry stream bed.
+
+- **He comes across them only by looking.** Observing or exploring shows what is there by look and
+  season (the wiry stems stand dead in winter and flower blue in summer), never by name, and nothing in
+  the dark.
+- **He can gather only from places he has seen,** named as he would name them ("the slick grey-brown mud
+  by the spring"). His hands alone take a session's worth: a few kilos of mud or sand, a little of the
+  stems, and only small pieces of the green rock. What he takes becomes lots in his stock with its own
+  dampness and where it came from, described as it felt ("cold, heavy and smooth, and it clings to my
+  fingers").
+- **Finite where it should be:** stone and ore never come back; plants grow back in their months; the
+  mud seeps back very slowly.
+- Data in data/resources.json, checked at start.
+
+Not yet: anything to do with these materials beyond gathering them (that is phase 2: heat, fire,
+working them), and the sheep, which come with the animals in phase 3.

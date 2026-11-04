@@ -13,6 +13,7 @@ import experience
 import interactions
 import town
 import materials
+import resources
 import story
 import garden
 import music
@@ -50,7 +51,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.31.1'
+APP_VERSION = '0.31.2'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -161,6 +162,7 @@ consolidation.ensure(state)
 town.ensure(state)
 materials.load()   # v0.31.1: the world's materials, checked; a malformed data file stops him starting rather than misleading him
 materials.ensure(state)
+resources.ensure(state)   # v0.31.2: raw materials placed in his woods once, from a fixed seed
 if not state['trading'].get('money_note'):
     # v0.27: the post counts in gold and silver. Said once, plainly, in the post's ledger; his past entries keep their words.
     state['trading']['money_note']=True
@@ -508,7 +510,7 @@ DECISION_DEFAULTS={'wish':'','wish_reason':'','object_id':'','plan_id':0,'destin
     'reading_mode':'lookup','research_question':'','next_step':'','creation_name':'','creation_shape':'orb',
     'project_id':-1,'project_title':'','project_status':'active','target_action':'rest','target_sessions':1,
     'observe_area':'woodland_edge','focus':'','trade_mode':'ask','trade_item':'','trade_quantity':1,'opening':'','hope':'','use_item':'','use_on':'','use_how':'',
-    'verb':'','other_id':'','procedure_id':'','hypothesis':'','prediction':'','bed':1,'garden_task':'look','sow_item':'','sapling':'','music_mode':'practise','title':'','notes':'','tempo':80,'piece_id':0,'songbook':'','explore_area':'woodland_edge','hunt_area':'deeper_woods','food':'','put_area':'clearing','notebook_mode':'read','note_title':'','note_text':'','note_query':''}
+    'verb':'','other_id':'','procedure_id':'','hypothesis':'','prediction':'','bed':1,'garden_task':'look','sow_item':'','sapling':'','music_mode':'practise','title':'','notes':'','tempo':80,'piece_id':0,'songbook':'','explore_area':'woodland_edge','hunt_area':'deeper_woods','food':'','put_area':'clearing','notebook_mode':'read','note_title':'','note_text':'','note_query':'','from_place':''}
 # One neutral line per action. Details are requested only after an action is chosen.
 ACTION_MENU=actions.menu()
 # The local 4,096-token model needs a tight context; the cloud model gets roughly three times the room.
@@ -860,8 +862,11 @@ def parameter_request(d):
                 {'axe':world['tools'].get('axe',0),'standing_trees':[{k:t[k] for k in ['id','x','z','height','timber_kg']} for t in standing[:8]]})
     if a=='gather':
         felled=[t['id'] for t in world['trees'].values() if t['stage']=='felled' and t.get('stock',0)>0]
-        return ('Choose material. object_id may name a felled tree with timber left, or be empty for loose wood/stone.',
-                {'material':{'type':'string','enum':['wood','stone']},'object_id':{'type':'string','enum':['']+felled}},
+        places=resources.known(state)   # v0.31.2: only places he has actually seen, as he would name them
+        return ('Choose material. object_id may name a felled tree with timber left, or be empty for loose wood/stone. '
+                'from_place may name one of the places I have seen, to gather what is there instead; otherwise empty.',
+                {'material':{'type':'string','enum':['wood','stone']},'object_id':{'type':'string','enum':['']+felled},
+                 'from_place':{'type':'string','enum':['']+sorted(set(places.values()))}},
                 {'loose_sources':world['sources'],'felled_trees':[{k:world['trees'][i][k] for k in ['id','stock']} for i in felled[:8]],
                  'inventory_kg':{'wood':state['materials'],'stone':state['stone']}})
     if a=='inspect':
@@ -1264,7 +1269,10 @@ def finish_action(geometry=None):
     elif a=='fell_tree':
         result=world_state.fell_tree(state,d.get('object_id',''));description=result['text']
     elif a=='gather':
-        result=world_state.collect(state,d.get('material','wood'),3,d.get('object_id',''));description=result['text']
+        place=next((i for i,label in resources.known(state).items() if d.get('from_place') and label==d['from_place']),None)
+        if place:result=resources.gather(state,place)   # v0.31.2: from a place he has seen
+        else:result=world_state.collect(state,d.get('material','wood'),3,d.get('object_id',''))
+        description=result['text']
     elif a=='plan':
         try:
             # v0.26.5: say plainly why a drawing failed. Before, any bad drawing came out as "A plan needs 1–16 solid
@@ -1580,7 +1588,7 @@ def tick(elapsed):
         pass_time(elapsed)
         doy=now().timetuple().tm_yday
         garden.advance(state,elapsed/3600,doy)
-        foods.advance(state);wildlife.advance(state)
+        foods.advance(state);wildlife.advance(state);resources.advance(state,elapsed/3600)
         world_state.grow_trees(state,elapsed/3600,garden.warmth(doy))
         if town.weekly_delivery(state,now()):runtime['status']='A delivery arrived at the trading post'
     clock()
@@ -1981,7 +1989,7 @@ class Handler(BaseHTTPRequestHandler):
             cached=STATE_CACHE.get(viewer)
             if not cached or time.monotonic()-cached[0]>1.5:
                 with LOCK:
-                    clock();body=json.dumps({**state,'ecology_view':ecology.view(state,now().timetuple().tm_yday),'birds_view':birds.view(state,ecology,state.get('daylight',0)),'deer_view':wildlife.view(state,ecology,state.get('daylight',0)),'outside_now':senses.outside(state),'reading_log':reading_journal.page(state)['items'],
+                    clock();body=json.dumps({**state,'ecology_view':ecology.view(state,now().timetuple().tm_yday),'birds_view':birds.view(state,ecology,state.get('daylight',0)),'deer_view':wildlife.view(state,ecology,state.get('daylight',0)),'resources_view':resources.view(state),'outside_now':senses.outside(state),'reading_log':reading_journal.page(state)['items'],
                         'reading_count':len(state['reading_log']),'runtime':runtime,'viewer':viewer,
                         'maintenance_enabled':owner and ACCESS_TOKEN is not None and (ROOT/'.git').exists()}).encode()
                 cached=STATE_CACHE[viewer]=(time.monotonic(),body,gzip.compress(body,5))

@@ -181,6 +181,26 @@ function syncGarden(g){
    for(let k=0;k<4;k++)mesh(new T.ConeGeometry(.09+.1*Math.min(1,b.growth),h,5),c,x-.6+k*.4,.22+h/2,z,gardenGroup);}
  });
 }
+// v0.31.2: raw materials in his woods, as anyone walking there would see them; fuller or thinner as he takes from them.
+const resourceGroup=new T.Group();scene.add(resourceGroup);let resourceKey='';
+const RES_SEASON={reeds:{winter:'#b9a978',spring:'#7f9a55',summer:'#5f8a45',autumn:'#b5a26a'},flax:{winter:'#9a8a6a',spring:'#7fa06a',summer:'#6f8f9a',autumn:'#b8a46a'},nettles:{winter:'#8a8a80',spring:'#3f6a35',summer:'#355f2f',autumn:'#6f6a40'}};
+function syncResources(view){
+ if(!view)return;const key=JSON.stringify(view.map(r=>[r.id,Math.round(r.left*5),r.season]));if(key===resourceKey)return;resourceKey=key;
+ while(resourceGroup.children.length){const c=resourceGroup.children[0];resourceGroup.remove(c);c.geometry?.dispose()}
+ for(const r of view){const {x,z}=r,f=Math.max(.15,r.left),rnd=i=>{const v=Math.sin((x*12.9898+z*78.233+i*37.719))*43758.5453;return v-Math.floor(v)};
+  const flat=(rad,c)=>{const m=mesh(new T.CylinderGeometry(rad,rad*1.05,.03,10),c,x,.015,z,resourceGroup);m.castShadow=false;return m};
+  if(r.kind==='clay_bed'){flat(1.3*Math.sqrt(f),'#7d6650');}
+  else if(r.kind==='sand_gravel'){flat(1.4,'#c9b383');for(let i=0;i<6;i++)mesh(new T.SphereGeometry(.07,5,4),'#9c917e',x-1+2*rnd(i),.06,z-1+2*rnd(i+9),resourceGroup);}
+  else if(r.kind==='reeds'||r.kind==='flax'){const c=RES_SEASON[r.kind][r.season],n=Math.round((r.kind==='reeds'?16:12)*f),h=r.kind==='reeds'?1.8:.8;
+   for(let i=0;i<n;i++)cyl(.015,.02,h,c,x-.7+1.4*rnd(i),h/2,z-.7+1.4*rnd(i+20),resourceGroup,4);}
+  else if(r.kind==='nettles'){const c=RES_SEASON.nettles[r.season],n=Math.round(7*f),h=r.season==='winter'?.9:1.1;
+   for(let i=0;i<n;i++)mesh(new T.ConeGeometry(r.season==='winter'?.04:.18,h,5),c,x-.6+1.2*rnd(i),h/2,z-.6+1.2*rnd(i+30),resourceGroup);}
+  else if(r.kind==='flint'){for(let i=0;i<Math.round(6*f);i++)mesh(new T.DodecahedronGeometry(.09+.06*rnd(i)),'#e8e4d8',x-.8+1.6*rnd(i),.07,z-.8+1.6*rnd(i+40),resourceGroup);}
+  else if(r.kind==='iron_hollow'){flat(1.5,'#8a5a32');for(let i=0;i<Math.round(6*f);i++)mesh(new T.DodecahedronGeometry(.12),'#6e4026',x-1.2+2.4*rnd(i),.08,z-1.2+2.4*rnd(i+50),resourceGroup);}
+  else if(r.kind==='copper_outcrop'){box(1.6,.7,1.1,'#7d7a72',x,.35,z,resourceGroup);for(let i=0;i<Math.round(5*f);i++)box(.25,.08,.2,'#3f8a6a',x-.6+1.2*rnd(i),.72,z-.4+.8*rnd(i+60),resourceGroup);}
+  else if(r.kind==='tin_stones'){flat(.9,'#9c917e');for(let i=0;i<Math.round(5*f);i++)mesh(new T.SphereGeometry(.06,5,4),'#2f2a28',x-.6+1.2*rnd(i),.05,z-.6+1.2*rnd(i+70),resourceGroup);}
+ }
+}
 function syncTrees(world){
  for(const [id,t]of Object.entries(world.trees||{})){
   let visual=treeMeshes.get(id);
@@ -425,7 +445,7 @@ $('reading').replaceChildren();const source=s.pending?.reading;if(source){const 
 const pending=s.pending;txt('remaining',pending?(pending.decision?.action==='read'&&pending.duration===0?`${s.paused?'Paused · ':''}Quick research · finishes after processing the excerpt`:`${s.paused?'Paused · ':''}${Math.ceil(pending.remaining/60)} min remaining · ${Math.round(pending.duration/60)} min session`):s.reflection_pending?'Processing this experience.':'Choosing the next activity.');
 journal.update(s);
 lifeView.update(s);diary.update(s);player.follow(s);syncGarden(s.garden);edda.visible=Boolean(s.keeper&&s.built_world?.objects?.trading_post);const lit=Boolean(s.possessions?.lantern)&&s.daylight<.12;heldLantern.visible=lit;lanternLight.intensity=lit?6:0;
-$('creations').replaceChildren();for(const c of s.creations.slice(-8).reverse())entry($('creations'),c.name,`${c.shape} · Day ${c.day}`);if(s.built_world){syncBuiltWorld(s.built_world)}else{creations(s.creations)}syncEcology(s.ecology_view);syncBirds(s.birds_view);syncDeer(s.deer_view);lamp.intensity=s.action==='read'&&s.pending?15:(s.daylight<.2?8:1.5);
+$('creations').replaceChildren();for(const c of s.creations.slice(-8).reverse())entry($('creations'),c.name,`${c.shape} · Day ${c.day}`);if(s.built_world){syncBuiltWorld(s.built_world)}else{creations(s.creations)}syncEcology(s.ecology_view);syncBirds(s.birds_view);syncDeer(s.deer_view);syncResources(s.resources_view);lamp.intensity=s.action==='read'&&s.pending?15:(s.daylight<.2?8:1.5);
 const celestial=sky.update(new Date(s.clock.iso));if($('skyInfo'))txt('skyInfo',`Sun ${celestial.sun.altitude.toFixed(0)}° · Moon ${celestial.moon.altitude.toFixed(0)}° above horizon · Wickford`);
 if($('worldPlans')&&s.built_world){$('worldPlans').replaceChildren();for(const p of s.built_world.plans.slice(-5).reverse())entry($('worldPlans'),`${p.name} · ${p.status}`,`Plan ${p.id} · ${Object.entries(p.bill).map(([m,q])=>q+' kg '+m).join(', ')||'No new materials'} · ${p.work_done_minutes||0}/${p.minutes} min work`);$('worldObjects').replaceChildren();for(const o of Object.values(s.built_world.objects))entry($('worldObjects'),o.name,`${o.id} · (${o.x.toFixed(1)}, ${o.z.toFixed(1)}) · ${o.parts.length} parts`);txt('sourceStocks',Object.entries(s.built_world.sources).map(([m,v])=>`${m}: ${v.stock} kg remains`).join(' · '));}
 }catch(e){if(updateRequested){txt('status','Reconnecting after the update…');txt('error','');}else{txt('status','Connection lost — keep the Python terminal open.');txt('error',e.message)}}}

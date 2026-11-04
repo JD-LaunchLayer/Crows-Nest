@@ -359,12 +359,14 @@ def visible_facts(state, area, doy, daylight):
         facts += [(a, x, 'bird animal ' + x) for a, x in birds.facts(state, sys.modules[__name__], area, daylight)]
     import wildlife, sys        # deer (v0.26): by look, where they are and what they are doing, never named
     facts += [(a, x, 'animal deer mammal ' + x) for a, x in wildlife.facts(state, sys.modules[__name__], area, daylight)]
+    import resources            # v0.31.2: mud, reeds, sand, wiry stems, stinging plants, stones, rusty and green rock
+    facts += [(a, x, 'ground earth stone plant water ' + x) for a, x in resources.facts(state, sys.modules[__name__], area, daylight)]
     return facts
 
 
 def fact_key(about, text):
     """What counts as having seen something: a bird is the same bird wherever it perches."""
-    return _key(about) if str(about).startswith(('bird-', 'deer-')) else _key(text)
+    return _key(about) if str(about).startswith(('bird-', 'deer-', 'res-')) else _key(text)
 
 
 def _key(text):
