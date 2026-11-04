@@ -14,6 +14,7 @@ import interactions
 import town
 import materials
 import resources
+import handwork
 import story
 import garden
 import music
@@ -51,7 +52,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.31.3'
+APP_VERSION = '0.32.0'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -163,6 +164,7 @@ town.ensure(state)
 materials.load()   # v0.31.1: the world's materials, checked; a malformed data file stops him starting rather than misleading him
 materials.ensure(state)
 resources.ensure(state)   # v0.31.2: raw materials placed in his woods once, from a fixed seed
+handwork.ensure(state)    # v0.32.0: his heaps, fires and practice
 if not state['trading'].get('money_note'):
     # v0.27: the post counts in gold and silver. Said once, plainly, in the post's ledger; his past entries keep their words.
     state['trading']['money_note']=True
@@ -843,9 +845,13 @@ def parameter_request(d):
     if a=='interact':
         return ('Choose a physical operation, or a supported posture. You may attempt any listed operation; physical properties determine the result. '
                 'shape works inventory material; split divides an existing solid; stack arranges two loose objects; '
-                'place_on puts an object on a face; sit/lie use a face for that posture. Targets and methods are chosen next.',
-                {'verb':{'type':'string','enum':interactions.VERBS}},
-                {'objects':interactions.context(state,4),'recent_work':interactions.learning_context(state,limit=2)})
+                'place_on puts an object on a face; sit/lie use a face for that posture; '
+                'pile puts some of what you have into a heap where you are; strike hits one thing you have against another, over a heap if you name one; '
+                'feed adds some of what you have to a heap or fire; heat holds something in a fire for a while; dry leaves something to dry for a while. '
+                'Targets and methods are chosen next.',
+                {'verb':{'type':'string','enum':interactions.VERBS+handwork.VERBS}},
+                {'objects':interactions.context(state,4),'recent_work':interactions.learning_context(state,limit=2),
+                 'to_hand':list(handwork.to_hand(state))[:12],'heaps_here':list(handwork.heaps_here(state))})
     if a=='eat':
         ids=[i for i,o in objects.items() if i in ['food_store','berry_patch'] and o.get('parts')]
         kinds=foods.kinds(state)
@@ -1046,8 +1052,30 @@ def choose_parameters(d):
     return merged
 
 
+def choose_hand_detail(d, verb):
+    """v0.32.0: details of pile, strike, feed, heat or dry: what with, on what, how much, how long. All by his own words."""
+    with LOCK:
+        hand=handwork.to_hand(state);heaps=handwork.heaps_here(state)
+        context={'to_hand':list(hand),'heaps_here':list(heaps),'where':state.get('location'),
+                 'memories':memory_recall.recall(state,700,limit=3,focus=d['intention'])}
+    props={'hypothesis':STRING,'prediction':STRING,'what':{'type':'string','enum':list(hand) or ['nothing']}}
+    if verb=='strike':props['against']={'type':'string','enum':list(hand) or ['nothing']}
+    if verb in ('strike','feed','heat'):props['heap']={'type':'string','enum':['']+list(heaps)}
+    if verb in ('pile','feed'):props['kg']={'type':'number','minimum':.05,'maximum':20}
+    if verb in ('heat','dry'):props['minutes']={'type':'number','minimum':5,'maximum':240}
+    prompt=('You chose to '+verb+' for '+d['intention']+'. Choose what, and the rest, from what you have to hand. '
+            'hypothesis and prediction are your own expectations BEFORE acting, and can be empty if none. '
+            'What actually happens is what the world does; describing it does not make it so. '+json.dumps(context,ensure_ascii=False))
+    raw,_=ask_allowed(prompt,fields_schema(props),400,'interaction:'+verb)
+    raw={k:v for k,v in raw.items() if k in props}
+    return {'verb':verb,'hypothesis':raw.pop('hypothesis',''),'prediction':raw.pop('prediction',''),'object_id':'','other_id':'',
+            'procedure_id':'','interaction_params':raw,'hand':{'what':hand.get(raw.get('what')),'against':hand.get(raw.get('against')),
+            'heap':heaps.get(raw.get('heap',''),'')}}
+
+
 def choose_interaction(d, verb):
     """Only details of the selected primitive; targets never come from a hobby script."""
+    if verb in handwork.VERBS:return choose_hand_detail(d,verb)
     if verb not in interactions.VERBS:raise ValueError('Unknown physical operation')
     with LOCK:
         objects={i:o for i,o in state['built_world']['objects'].items() if o.get('parts')}
@@ -1087,6 +1115,25 @@ def choose_interaction(d, verb):
     return out
 
 
+def handwork_duration(d):
+    pr=d.get('interaction_params') or {}
+    mins=lambda:max(5,min(240,float(pr.get('minutes') or 30)))
+    return {'pile':300,'strike':300,'feed':120,'heat':int(mins()*60),'dry':int(mins()*60)}[d['verb']]
+
+
+def do_handwork(d):
+    """Carry out pile, strike, feed, heat or dry on what he named. A thing not to hand is honestly nothing."""
+    h=d.get('hand') or {};v=d['verb'];pr=d.get('interaction_params') or {}
+    what=h.get('what') or ('',None);lot=what[1] if what and what[0]=='lot' else None
+    if v=='pile':return handwork.pile(state,lot,pr.get('kg'))
+    if v=='strike':
+        if not h.get('what') or not h.get('against'):return {'success':False,'text':'He did not have that to hand.'}
+        return handwork.strike(state,tuple(h['what']),tuple(h['against']),h.get('heap',''))
+    if v=='feed':return handwork.feed(state,h.get('heap',''),lot,pr.get('kg'))
+    if v=='heat':return handwork.heat(state,h.get('heap',''),lot,float(pr.get('minutes') or 30))
+    return handwork.dry(state,lot,float(pr.get('minutes') or 30))
+
+
 def validate_decision(d):
     for k in ['reason','intention','wish','wish_reason','creation_name','project_title','library_query','research_question','next_step']:
         if not isinstance(d.get(k),str): raise ValueError('Invalid decision text: '+k)
@@ -1114,7 +1161,7 @@ def choose():
 def start_action(d, seconds, reading=None):
     dt = clock()
     life.ensure(state)
-    if d['action']=='interact':interactions.prepare(state,d)
+    if d['action']=='interact' and d.get('verb') not in handwork.VERBS:interactions.prepare(state,d)
     if d['action']=='read' and d.get('research_question','').strip():d['reading_mode']='lookup'
     if d['action']=='resume_work':
         job=next((w for w in state['suspended_work'] if w['id']==d.get('resume_work_id')),None)
@@ -1172,7 +1219,7 @@ def start_action(d, seconds, reading=None):
             until=((light-hour)%24)*3600
             if until<=11*3600:duration=max(duration,int(until))
     else: duration=DURATIONS[action]
-    if action=='interact':duration=interactions.duration(d)
+    if action=='interact':duration=handwork_duration(d) if d.get('verb') in handwork.VERBS else interactions.duration(d)
     if action == 'read' and d.get('reading_mode', 'lookup') == 'lookup':
         duration = 0
     if action=='construct':
@@ -1296,6 +1343,8 @@ def finish_action(geometry=None):
             result={'success':False,'text':description}
         else:
             result=world_state.move(state,d.get('object_id',''),d.get('destination_x',0),d.get('destination_z',0));description=result['text']
+    elif a=='interact' and d.get('verb') in handwork.VERBS:
+        result=do_handwork(d);description=result['text']
     elif a=='interact':
         result=interactions.execute(state,d,p['duration']);description=result['text']
     elif a=='inspect':
@@ -1588,7 +1637,7 @@ def tick(elapsed):
         pass_time(elapsed)
         doy=now().timetuple().tm_yday
         garden.advance(state,elapsed/3600,doy)
-        foods.advance(state);wildlife.advance(state);resources.advance(state,elapsed/3600)
+        foods.advance(state);wildlife.advance(state);resources.advance(state,elapsed/3600);handwork.advance(state,elapsed/3600)
         world_state.grow_trees(state,elapsed/3600,garden.warmth(doy))
         if town.weekly_delivery(state,now()):runtime['status']='A delivery arrived at the trading post'
     clock()
@@ -1989,7 +2038,7 @@ class Handler(BaseHTTPRequestHandler):
             cached=STATE_CACHE.get(viewer)
             if not cached or time.monotonic()-cached[0]>1.5:
                 with LOCK:
-                    clock();body=json.dumps({**state,'ecology_view':ecology.view(state,now().timetuple().tm_yday),'birds_view':birds.view(state,ecology,state.get('daylight',0)),'deer_view':wildlife.view(state,ecology,state.get('daylight',0)),'resources_view':resources.view(state),'outside_now':senses.outside(state),'reading_log':reading_journal.page(state)['items'],
+                    clock();body=json.dumps({**state,'ecology_view':ecology.view(state,now().timetuple().tm_yday),'birds_view':birds.view(state,ecology,state.get('daylight',0)),'deer_view':wildlife.view(state,ecology,state.get('daylight',0)),'resources_view':resources.view(state),'fires_view':handwork.view(state),'outside_now':senses.outside(state),'reading_log':reading_journal.page(state)['items'],
                         'reading_count':len(state['reading_log']),'runtime':runtime,'viewer':viewer,
                         'maintenance_enabled':owner and ACCESS_TOKEN is not None and (ROOT/'.git').exists()}).encode()
                 cached=STATE_CACHE[viewer]=(time.monotonic(),body,gzip.compress(body,5))

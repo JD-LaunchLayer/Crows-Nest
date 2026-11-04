@@ -271,6 +271,9 @@ def scene(state, ctx, extras):
                f"{PLACE.get(state.get('location'), 'I am in the clearing')}.")
     import senses   # v0.30.17: the weather, the sky and the sounds of the wood, as he can sense them
     out.append(senses.outside(state))
+    import handwork   # v0.32.0: a heap or fire of his where he is
+    if handwork.line_here(state):
+        out.append(handwork.line_here(state))
     body = [BODY.get(s, s) for s in ctx.get('body', [])]
     out.append(' '.join(body) + ' ' + mood(ctx.get('affect', {})))
     if extras.get('dream'):

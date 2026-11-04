@@ -1675,3 +1675,30 @@ is doing:
   pounding". Shade and rest cool him, a roof keeps a hot day a little cooler inside, and cold spring
   water cools him when he drinks.
 - Nothing tells him what to do about any of it; how he deals with cold and heat, if he does, is his.
+
+## v0.32.0 — fire, and striking stone (phase 2a)
+
+Five new things he can do with his hands, offered among his other hand work in plain words: **pile**
+some of what he has into a heap where he is; **strike** one thing against another, over a heap if he
+likes; **feed** a heap or fire; **heat** something in a fire; **dry** something out. He chooses what
+from the things he has to hand, named as he knows them ("what I took from the reeds at the spring",
+"my axe"). Nothing names what any of it might make, and nothing suggests what to try.
+
+What the world does, from the materials' hidden properties:
+
+- **Sparks come only from the hard, glassy stone struck on steel** (his axe or knife). Plain stone on
+  steel only knocks.
+- **A spark takes only in fine, dry plant stems** in a heap. Damp ones smoke and go out, again and
+  again. With wood above the stems, a caught spark becomes a fire. Practice makes it surer.
+- **A fire burns its wood** (about 1.5 kg an hour), crackles and gives off heat; beside it he is warm.
+  Indoors its smoke gathers under the roof and stings his eyes. It goes out when the wood is gone,
+  leaving ash; rain falling on a fire in the open can put it out, heavier rain more surely.
+- **Heating** something in a fire makes it too hot to touch and dries it; **drying** it by a fire,
+  indoors or in dry open air takes the damp out slowly.
+- **Struck with another stone, the glassy stone can lose thin flakes** with an edge sharp enough to draw
+  blood; sometimes it only chips, sometimes it cracks into blunt lumps. Practice makes good flakes more
+  likely. Plain stone on plain stone does nothing.
+- Heaps and fires are drawn in the world, with firelight.
+
+Not yet (phase 2b): clay worked, dried and fired; charcoal; cuts and burns that slow him; wear on any
+tool.

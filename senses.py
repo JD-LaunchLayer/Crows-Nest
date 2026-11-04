@@ -174,6 +174,9 @@ def felt_temp(state, action=None):
         return 19. if t < 17 else t - 2
     if loc == 'shop' and 7 <= hour < 19:
         return 17. if t < 15 else t - 2
+    import handwork
+    if handwork.lit_here(state):   # v0.32.0: beside his own fire
+        return max(17., t) if loc == 'cabin' else max(15., t + 8)
     if loc == 'cabin' and stove_lit(state):
         return max(16., t)   # warm through, though the open south side lets some of it out
     if loc in ('cabin', 'shop'):

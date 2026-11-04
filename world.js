@@ -201,6 +201,18 @@ function syncResources(view){
   else if(r.kind==='tin_stones'){flat(.9,'#9c917e');for(let i=0;i<Math.round(5*f);i++)mesh(new T.SphereGeometry(.06,5,4),'#2f2a28',x-.6+1.2*rnd(i),.05,z-.6+1.2*rnd(i+70),resourceGroup);}
  }
 }
+// v0.32.0: his heaps and fires: a pile of wood and stems, flames and a warm light when lit, grey ash after.
+const fireGroup=new T.Group();scene.add(fireGroup);let fireKey='';const fireLights=[];
+function syncFires(view){
+ if(!view)return;const key=JSON.stringify(view.map(f=>[f.id,f.lit,Math.round(f.kg*2),f.ash>0]));if(key===fireKey)return;fireKey=key;
+ while(fireGroup.children.length){const c=fireGroup.children[0];fireGroup.remove(c);c.geometry?.dispose()}fireLights.length=0;
+ for(const f of view){const {x,z}=f,h=Math.min(.6,.12+f.kg*.06);
+  if(f.ash>0&&!f.lit&&f.kg<.05){const a=mesh(new T.CylinderGeometry(.45,.5,.02,9),'#8d8a84',x,.01,z,fireGroup);a.castShadow=false;continue;}
+  if(f.kg>.02)mesh(new T.ConeGeometry(.45,h,7),'#6b4e2e',x,h/2,z,fireGroup);
+  if(f.lit){mesh(new T.ConeGeometry(.22,.55,6),'#ff9a3a',x,h+.2,z,fireGroup).castShadow=false;mesh(new T.ConeGeometry(.12,.35,5),'#ffd36a',x,h+.25,z,fireGroup).castShadow=false;
+   const l=new T.PointLight('#ffb060',4,8);l.position.set(x,h+.6,z);fireGroup.add(l);fireLights.push(l);}
+ }
+}
 function syncTrees(world){
  for(const [id,t]of Object.entries(world.trees||{})){
   let visual=treeMeshes.get(id);
@@ -445,7 +457,7 @@ $('reading').replaceChildren();const source=s.pending?.reading;if(source){const 
 const pending=s.pending;txt('remaining',pending?(pending.decision?.action==='read'&&pending.duration===0?`${s.paused?'Paused · ':''}Quick research · finishes after processing the excerpt`:`${s.paused?'Paused · ':''}${Math.ceil(pending.remaining/60)} min remaining · ${Math.round(pending.duration/60)} min session`):s.reflection_pending?'Processing this experience.':'Choosing the next activity.');
 journal.update(s);
 lifeView.update(s);diary.update(s);player.follow(s);syncGarden(s.garden);edda.visible=Boolean(s.keeper&&s.built_world?.objects?.trading_post);const lit=Boolean(s.possessions?.lantern)&&s.daylight<.12;heldLantern.visible=lit;lanternLight.intensity=lit?6:0;
-$('creations').replaceChildren();for(const c of s.creations.slice(-8).reverse())entry($('creations'),c.name,`${c.shape} · Day ${c.day}`);if(s.built_world){syncBuiltWorld(s.built_world)}else{creations(s.creations)}syncEcology(s.ecology_view);syncBirds(s.birds_view);syncDeer(s.deer_view);syncResources(s.resources_view);lamp.intensity=s.action==='read'&&s.pending?15:(s.daylight<.2?8:1.5);
+$('creations').replaceChildren();for(const c of s.creations.slice(-8).reverse())entry($('creations'),c.name,`${c.shape} · Day ${c.day}`);if(s.built_world){syncBuiltWorld(s.built_world)}else{creations(s.creations)}syncEcology(s.ecology_view);syncBirds(s.birds_view);syncDeer(s.deer_view);syncResources(s.resources_view);syncFires(s.fires_view);lamp.intensity=s.action==='read'&&s.pending?15:(s.daylight<.2?8:1.5);
 const celestial=sky.update(new Date(s.clock.iso));if($('skyInfo'))txt('skyInfo',`Sun ${celestial.sun.altitude.toFixed(0)}° · Moon ${celestial.moon.altitude.toFixed(0)}° above horizon · Wickford`);
 if($('worldPlans')&&s.built_world){$('worldPlans').replaceChildren();for(const p of s.built_world.plans.slice(-5).reverse())entry($('worldPlans'),`${p.name} · ${p.status}`,`Plan ${p.id} · ${Object.entries(p.bill).map(([m,q])=>q+' kg '+m).join(', ')||'No new materials'} · ${p.work_done_minutes||0}/${p.minutes} min work`);$('worldObjects').replaceChildren();for(const o of Object.values(s.built_world.objects))entry($('worldObjects'),o.name,`${o.id} · (${o.x.toFixed(1)}, ${o.z.toFixed(1)}) · ${o.parts.length} parts`);txt('sourceStocks',Object.entries(s.built_world.sources).map(([m,v])=>`${m}: ${v.stock} kg remains`).join(' · '));}
 }catch(e){if(updateRequested){txt('status','Reconnecting after the update…');txt('error','');}else{txt('status','Connection lost — keep the Python terminal open.');txt('error',e.message)}}}
