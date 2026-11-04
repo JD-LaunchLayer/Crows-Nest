@@ -88,10 +88,16 @@ def add_inventory(state, material, amount):
     state[key]=round(max(0,state[key]+amount),2)
 
 
+# Where he stands at each place, as the 3D view has it (world.js stations). Before v0.33.2 the café, trading post
+# and garden were missing, so "what is near me" there was measured from the middle of the green.
+PLACE_SPOTS={'cabin':[-10,-6],'range':[10,-7],'woods':[13,10],'workbench':[0,10],'library':[-11,5],
+             'cafe':[9,-14.2],'shop':[-3,-14.2],'garden':[-9,-14.2]}
+
+
 def nearby(state):
     world=ensure(state)
     # Area-based observations, not claims of visual recognition or pixel vision.
-    x,z={'cabin':[-10,-6],'range':[10,-7],'woods':[13,10],'workbench':[0,10],'library':[-11,5]}.get(state['location'],[0,0])
+    x,z=PLACE_SPOTS.get(state['location'],[0,0])
     objects=sorted((o for o in world['objects'].values() if o.get('parts')),key=lambda o:(o['x']-x)**2+(o['z']-z)**2)
     return {'observation_method':'area-based spatial state',
             'inventory_kg':{'wood':state['materials'],'stone':state['stone']},

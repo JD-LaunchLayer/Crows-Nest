@@ -1,7 +1,7 @@
 import * as T from '/vendor/three.module.js';
 import {installTouchControls} from '/mobile_controls.js';
 import {createSky} from '/sky.js';
-import {createJournal} from '/journal.js';import {buildVillage} from '/village.js';import {createPlayer} from '/music_player.js';
+import {createJournal} from '/journal.js';import {buildVillage,VILLAGE} from '/village.js';import {createPlayer} from '/music_player.js';
 import {createLifeView} from '/life_view.js';
 import {createDiary} from '/diary_view.js';
 const $=id=>document.getElementById(id),txt=(id,v)=>$(id).textContent=v;
@@ -321,7 +321,7 @@ function readingPlan(){
  const after=spot==='chair'?[walk(LIB.approach,Math.PI),wait('sit',1.2),wait('reading',Infinity)]:
  spot==='floor'?[walk(LIB.floor,Math.PI),wait('sitfloor',1.2),wait('readingFloor',Infinity)]:
  [walk(LIB.aisle,Math.PI),wait('readingStanding',Infinity)];
- anim.steps=[walk(new T.Vector3(0,0,0)),walk(LIB.door),walk(LIB.aisle),walk(LIB.shelf,0),
+ anim.steps=[...route(LIB.door),walk(LIB.aisle),walk(LIB.shelf,0),
  wait('take',1.4,()=>{anim.book=true}),walk(LIB.aisle),...after];
 }
 // His bed in the cabin: sleeping lies him down under a blanket; resting sits him on its edge.
@@ -344,21 +344,43 @@ function targetFor(d){
  }
  return null;
 }
-// Walk straight there unless something solid is in the way; then go round by the green as before.
+// v0.33.2: is the straight line from a to b free of anything solid? (the ends themselves may be inside a doorway)
+function clearLine(a,b){
+ const dx=b.x-a.x,dz=b.z-a.z,len=Math.hypot(dx,dz);
+ for(let k=1;k<len/.4;k++){const t=k*.4/len;if(t*len<.9||len-t*len<.9)continue;const x=a.x+dx*t,z=a.z+dz*t;
+  if(obstacles.some(o=>Math.abs(x-o.x)<o.w&&Math.abs(z-o.z)<o.d))return false;}
+ return true;
+}
+// Points he can walk between: the bends and ends of every lane, round the ring lane, and the fronts of the doors.
+// Before v0.33.2 a blocked walk always went via the middle of the green, so he crossed it to go anywhere.
+function hubs(){
+ const out=[];for(const lane of VILLAGE.lanes)for(const [x,z] of lane.points)out.push(new T.Vector3(x,0,z));
+ const r=(VILLAGE.ringLane.inner+VILLAGE.ringLane.outer)/2;for(let i=0;i<12;i++){const a=i*Math.PI/6;out.push(new T.Vector3(Math.cos(a)*r,0,Math.sin(a)*r));}
+ return [...out,...Object.values(stations),LIB.door];
+}
+// Straight there if nothing is in the way; otherwise the shortest chain of clear legs between those points;
+// if there is none, he stays where he is.
 function route(to){
- const from=crow.position,dx=to.x-from.x,dz=to.z-from.z,len=Math.hypot(dx,dz);
- for(let k=1;k<len/.4;k++){const t=k*.4/len;if(t*len<.9||len-t*len<.9)continue;const x=from.x+dx*t,z=from.z+dz*t;
-  if(obstacles.some(o=>Math.abs(x-o.x)<o.w&&Math.abs(z-o.z)<o.d))return [walk(new T.Vector3(0,0,0)),walk(to)];}
- return [walk(to)];
+ const from=crow.position.clone();from.y=0;const goal=to.clone();goal.y=0;
+ if(clearLine(from,goal))return [walk(to)];
+ const nodes=[from,goal,...hubs()],n=nodes.length,dist=Array(n).fill(Infinity),prev=Array(n).fill(-1),done=Array(n).fill(false);dist[0]=0;
+ for(;;){let u=-1;for(let i=0;i<n;i++)if(!done[i]&&dist[i]<Infinity&&(u<0||dist[i]<dist[u]))u=i;
+  if(u<0||u===1)break;done[u]=true;
+  for(let v=0;v<n;v++){if(done[v])continue;const d=dist[u]+nodes[u].distanceTo(nodes[v]);if(d<dist[v]&&clearLine(nodes[u],nodes[v])){dist[v]=d;prev[v]=u;}}}
+ if(prev[1]<0)return [];
+ const path=[];for(let v=prev[1];v>0;v=prev[v])path.unshift(walk(nodes[v]));
+ return [...path,walk(to)];
 }
 function beginDesired(){
+ // v0.33.2: a page opened mid-activity places him there once, whatever the activity (reading used to keep the flag).
+ const snap=anim.snap;anim.snap=false;
  const wasPondering=anim.activeAction==='ponder'&&anim.floor>0;
  anim.returning=false;anim.seated=0;anim.floor=0;
  const d=anim.desired;if(!d)return;
  // Between activities he is choosing what to do next: he sits down where he is rather than heading off (v0.24).
- if(!d.pending&&!d.twin&&!anim.snap){anim.activeAction='ponder';anim.steps=[wait('ponderdown',1.1),wait('ponder',Infinity)];return}
+ if(!d.pending&&!d.twin&&!snap){anim.activeAction='ponder';anim.steps=[wait('ponderdown',1.1),wait('ponder',Infinity)];return}
  const rise=wasPondering?[wait('ponderup',.9)]:[];
- if(d.pending&&d.action==='read'){readingPlan();return}
+ if(d.pending&&d.action==='read'){readingPlan();if(snap||d.twin){crow.position.copy(LIB.aisle);anim.steps=anim.steps.slice(anim.steps.findIndex(x=>x.kind==='walk'&&x.point.equals(LIB.shelf)));}return}
  anim.activeAction=d.pending?d.action:'idle';
  const pose=d.pending&&d.action==='interact'&&d.posture?(d.posture.verb==='sit'?'objectSit':'objectLie'):(d.pending?d.action:'idle');
  let place=stations[d.location]||stations.cabin;
@@ -369,7 +391,7 @@ function beginDesired(){
  const toBed=d.pending&&['sleep','rest'].includes(d.action);if(toBed)place=BEDSIDE.clone();
  // The twin's clock outruns any walk, so its view shows him where he is rather than on the way there.
  // Opening the page mid-activity shows him where he already is; the twin's clock outruns any walk.
- if(d.twin||anim.snap){anim.snap=false;crow.position.copy(place);anim.steps=[wait(pose,Infinity)];return}
+ if(d.twin||snap){crow.position.copy(place);anim.steps=[wait(pose,Infinity)];return}
  if(wasPondering){anim.seated=1;anim.floor=1;}
  anim.steps=toBed?[...rise,...route(stations.cabin),walk(place),wait(d.action,Infinity)]
   :[...rise,...route(place),wait(pose,Infinity)];

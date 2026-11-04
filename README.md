@@ -1762,3 +1762,19 @@ Now Edda is told what her own book shows the post owes him (wood or stone it too
 posted rate, less anything already paid back), and she may pay some or all of it with a new kind of deal,
 make_good, if he raises it or they come to it going through those entries. It cannot pay more than the book
 shows is owed. Nothing in the book is changed; a payment back is a new line. Test: tests/test_post_owes.py.
+
+## v0.33.2 — he stands where he is (mapping phase 1a)
+
+The first step of the shared-world and mental-map work. Two things were measured from the wrong place:
+
+- **"What is near me"** at the café, the trading post and the garden was measured from the middle of the
+  green, because those three places were missing from the table (world_state.PLACE_SPOTS). He was told about
+  things around the green while standing on the High Street.
+- **In the 3D view** he walked through the middle of the green whenever the straight way was blocked, and
+  every trip to read began by walking to it. He now goes straight if he can, otherwise along the lanes, the
+  ring lane and the door fronts (the shortest clear chain); if there is no way at all he stays put. Opening
+  the page while he reads places him in the library aisle once, instead of leaving him to walk in on the
+  next activity as if the page had just loaded.
+
+Tests: tests/test_nearby_places.py, and new checks in tests/animation.mjs (they fail on the old code). Next:
+v0.34.0, one shared world layout and a real position for him.

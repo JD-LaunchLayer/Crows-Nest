@@ -2,9 +2,11 @@ import {readFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 const threeURL = new URL('../vendor/three.module.js', import.meta.url).href;
-const source = (await readFile(new URL('../world.js', import.meta.url), 'utf8')).replace("import * as T from '/vendor/three.module.js';", '').replace("import {installTouchControls} from '/mobile_controls.js';", '').replace("import {createSky} from '/sky.js';", '').replace("import {createJournal} from '/journal.js';", '').replace("import {buildVillage} from '/village.js';", '').replace("import {createPlayer} from '/music_player.js';", '').replace("import {createLifeView} from '/life_view.js';", '').replace("import {createDiary} from '/diary_view.js';", '');
+const source = (await readFile(new URL('../world.js', import.meta.url), 'utf8')).replace("import * as T from '/vendor/three.module.js';", '').replace("import {installTouchControls} from '/mobile_controls.js';", '').replace("import {createSky} from '/sky.js';", '').replace("import {createJournal} from '/journal.js';", '').replace("import {buildVillage,VILLAGE} from '/village.js';", '').replace("import {createPlayer} from '/music_player.js';", '').replace("import {createLifeView} from '/life_view.js';", '').replace("import {createDiary} from '/diary_view.js';", '');
 let prefix = "import * as RealThree from THREE_URL;\nimport assert from 'node:assert/strict';\nconst elements=new Map();\nfunction element(){return {clientWidth:1000,clientHeight:800,children:[],textContent:'',append(...x){this.children.push(...x)},prepend(...x){this.children.unshift(...x)},replaceChildren(){this.children=[]},remove(){},getContext(){return {fillRect(){},fillText(){}}}}}\nglobalThis.document={getElementById(id){if(!elements.has(id))elements.set(id,element());return elements.get(id)},createElement(){return element()},addEventListener(){},pointerLockElement:null};\nglobalThis.devicePixelRatio=1;globalThis.addEventListener=()=>{};globalThis.requestAnimationFrame=()=>{};globalThis.setInterval=()=>{};\nclass MockRenderer{constructor(){this.domElement=element();this.shadowMap={}}setPixelRatio(){}setSize(){}render(){}}\nconst T={...RealThree,WebGLRenderer:MockRenderer};\nconst testState={decisions:1,paused:false,daylight:0,action:'read',location:'library',clock:{date:'Wed 28 Oct',time:'23:00',timezone:'Europe/London'},runtime:{status:'Reading'},last_seconds:2,last_error:'',reason:'I want to read.',energy:80,materials:4,skills:{archery:2,craft:1},current_intention:'Read about trees.',memories:[],wishes:[],projects:[],emotions:{joy:50},appraisals:[],long_term:[],creations:[],pending:{decision:{reading_spot:'chair'},remaining:900,duration:900,reading:{title:'Tree',url:'https://en.wikipedia.org/wiki/Tree'}}};\nglobalThis.fetch=async()=>({ok:true,json:async()=>structuredClone(testState)});\n".replace("THREE_URL", JSON.stringify(threeURL));
-prefix='const buildVillage=()=>{};const createPlayer=()=>({follow(){},play(){},setEnabled(){},enabled:false});const createLifeView=()=>({update(){}});const createDiary=()=>({update(){},open(){},toggle(){}});const createJournal=()=>({update(){}});const createSky=()=>({update:()=>({sun:{altitude:0},moon:{altitude:0}}),frame(){}});\n'+prefix;
+const villageSource=await readFile(new URL('../village.js', import.meta.url), 'utf8');
+const villageObject=villageSource.slice(villageSource.indexOf('export const VILLAGE = ')+'export const VILLAGE = '.length,villageSource.indexOf('\n};\n')+2);
+prefix='const VILLAGE='+villageObject+';\nconst buildVillage=()=>{};const createPlayer=()=>({follow(){},play(){},setEnabled(){},enabled:false});const createLifeView=()=>({update(){}});const createDiary=()=>({update(){},open(){},toggle(){}});const createJournal=()=>({update(){}});const createSky=()=>({update:()=>({sun:{altitude:0},moon:{altitude:0}}),frame(){}});\n'+prefix;
 const fixtureJSON=execFileSync('python3',['-c',"import world_state,json;s={'materials':1,'creations':[{'id':1,'name':'Test carving','shape':'orb'}],'location':'library'};print(json.dumps(world_state.ensure(s)))"],{cwd:fileURLToPath(new URL('..',import.meta.url)),encoding:'utf8'});
 prefix='const fixtureBuiltWorld='+fixtureJSON+';\n'+prefix;
 const interactionJSON=execFileSync('python3',['-c',"import world_state,life,interactions,json;s={'materials':2,'creations':[],'location':'workbench'};world_state.ensure(s);life.ensure(s);interactions.ensure(s);d={'verb':'shape','creation_name':'My piece','interaction_params':{'material':'wood','shape':'box','mass_kg':1,'width_m':.2,'depth_m':.2,'support':'bench','passes':'light'}};interactions.prepare(s,d);r=interactions.execute(s,d,1800);d={'verb':'place_on','object_id':r['object_id'],'other_id':'workbench','interaction_params':{'part_id':'top'}};interactions.prepare(s,d);interactions.execute(s,d,180);print(json.dumps(s['built_world']))"],{cwd:fileURLToPath(new URL('..',import.meta.url)),encoding:'utf8'});
@@ -35,5 +37,26 @@ await refresh();advance(.5);assert.equal(anim.pose,'objectLie');assert.ok(Math.a
 testState.decisions=33;testState.action='inspect';testState.pending={decision:{action:'inspect',object_id:'workbench'},remaining:60,duration:60};
 await refresh();advance(.5);assert.equal(crow.rotation.x,0);
 console.log('PASS: ledger furnishings replace static props once; supported object heights; explicit sitting/lying; moved chair reading; clean posture exit.');
+`;
+tail+=`
+// v0.33.2: he goes by the lanes, never via the middle of the green, and a reload into reading places him once.
+delete testState.twin;
+const seg=(p,a,b)=>{const dx=b.x-a.x,dz=b.z-a.z,l=dx*dx+dz*dz||1e-9,t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.z-a.z)*dz)/l));return Math.hypot(p.x-a.x-t*dx,p.z-a.z-t*dz);};
+const trips=[['cabin','rest'],['library','read'],['cafe','browse'],['shop','trade'],['range','practise'],['garden','garden'],['library','read'],['woods','explore'],['cabin','rest']];
+let n=40;
+for(const [loc,act] of trips){
+ testState.decisions=++n;testState.action=act;testState.location=loc;testState.pending={decision:{action:act,reading_spot:'standing'},remaining:900,duration:900};
+ await refresh();
+ const plan=[crow.position.clone(),...anim.steps.filter(x=>x.kind==='walk').map(x=>x.point.clone())];
+ assert.ok(!plan.slice(1).some(p=>Math.hypot(p.x,p.z)<.01),'no waypoint at the middle of the green: '+loc);
+ let pathMin=Infinity;for(let i=1;i<plan.length;i++)pathMin=Math.min(pathMin,seg(new T.Vector3(0,0,0),plan[i-1],plan[i]));
+ let seen=Infinity;for(let i=0;i<1600;i++){testTime+=50;frame(testTime);seen=Math.min(seen,Math.hypot(crow.position.x,crow.position.z));}
+ assert.ok(seen>=.5||pathMin<1,'he passed through the middle of the green going to '+loc+' ('+seen.toFixed(2)+')');
+}
+testState.decisions=++n;testState.action='read';testState.location='library';testState.pending={decision:{action:'read',reading_spot:'standing'},remaining:900,duration:900};
+initialized=false;anim.key=null;await refresh();
+assert.equal(anim.snap,false,'the reload flag is cleared after reading');
+assert.ok(Math.hypot(crow.position.x-LIB.aisle.x,crow.position.z-LIB.aisle.z)<.05,'a reload into reading places him in the aisle');
+console.log('PASS v0.33.2: walks go by the lanes, never via the middle of the green; a reload into reading places him once.');
 `;
 await import('data:text/javascript;base64,'+Buffer.from(prefix+source+tail).toString('base64'));
