@@ -33,6 +33,7 @@ BODY = {'Persistent hunger; little food is being digested.': "I'm properly hungr
         'Overheated: sweating hard, head pounding.': "I'm overheated: sweating hard, and my head is pounding.",
         'Hot and sweating.': "I'm hot and sweating.", 'A little too warm.': "I'm a little too warm.",
         'Warm through under the covers; hands and feet warm.': "I'm warm through under the covers; my hands and feet are warm again.",
+        'Warm through by the stove; hands and feet warm.': "I'm warm through by the stove; my hands and feet are warm again.",
         'Limbs stiff from lying still a long while.': "My limbs are stiff from lying still so long.",
         'Restless and stiff from lying still for hours.': "I'm stiff and restless from lying still for hours; I can't settle."}
 

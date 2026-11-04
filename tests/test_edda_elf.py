@@ -15,3 +15,13 @@ print('PASS v0.34.5: Edda is an elf woman he can see; Jordan has a warmth meter.
 # v0.36.2: asked plainly about work, she answers plainly (asked, not volunteered).
 assert 'When he asks you plainly about work' in town.KEEPER_PERSONA and 'Do not put him off' in town.KEEPER_PERSONA
 print('PASS v0.36.2: Edda answers plain questions about work plainly.')
+# v0.36.5: she offers no food that is not on her shelves; and warmth by a stove is felt.
+assert 'there is no soup, tea or meal of yours to offer' in town.KEEPER_PERSONA
+import life, world_state, inner
+b = {'materials': 0., 'stone': 0., 'creations': [], 'location': 'shop', 'action': 'talk', 'clock': {'iso': '2026-12-23T12:00:00+00:00'}}
+world_state.ensure(b); life.ensure(b); b['body']['chill'] = 0
+assert 'Warm through by the stove; hands and feet warm.' in life.perceive(b)['sensations']
+assert 'Warm through by the stove; hands and feet warm.' in inner.BODY
+b['body']['chill'] = .4; assert not any('Warm through' in x for x in life.perceive(b)['sensations'])
+b['body']['chill'] = 0; b['location'] = 'woods'; assert not any('Warm through' in x for x in life.perceive(b)['sensations'])
+print('PASS v0.36.5: no invented food from Edda; warm through by a stove is felt.')

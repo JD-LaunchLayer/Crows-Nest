@@ -1938,3 +1938,14 @@ Another resting story ran on for 99 steps: "Stop the notebook copy loop for toni
 the cord bundle check in daylight". Its rest was not at the start. A story that names rest, lying down or bed anywhere
 in it is now done once his last three steps (at least three) were all rest or sleep, so he really has rested. A walk
 "after a pause", or a meal left to digest, is not ended by one rest. Test: tests/test_rest_story.py.
+
+## v0.36.5 — warm by a stove is felt; Edda offers no food that is not there
+
+- **Warm by a stove.** Sitting by Edda's stove he was warm through (the warmth meter read comfortable), yet kept
+  saying he was cold: his body only ever told him when he was cold, and of being warm again only under the covers.
+  Now, warm through indoors by a stove (the post, the café, the reading cabin, or his own cabin with his stove lit),
+  he feels it: "I'm warm through by the stove; my hands and feet are warm again."
+- **No invented soup.** Edda offered him "soup and bread by the stove", which do not exist in the world: she cannot
+  give food except by selling what is on her shelves. He accepted five times in a row, ate nothing, and stayed hungry.
+  Her character now knows she has no soup or meal of her own to give; food is what is on her shelves, sold at its price
+  (she may haggle); he is welcome to warm himself by her stove. Test: tests/test_edda_elf.py.

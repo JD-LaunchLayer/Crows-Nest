@@ -267,6 +267,10 @@ def perceive(state):
         # v0.34.3: warmth is felt too, not only its absence. In bed he warmed through within the hour but was never
         # told so, and lay there a whole morning "letting my hands and feet warm".
         sensations.append('Warm through under the covers; hands and feet warm.')
+    elif c<.05 and state.get('location') in ('shop','cafe','library') or (c<.05 and state.get('location')=='cabin' and __import__('senses').stove_lit(state)):
+        # v0.36.5: warm through indoors by a stove is felt too. By Edda's stove, warm through, he still said he was cold,
+        # because his body only ever told him of cold, never of being warm again.
+        sensations.append('Warm through by the stove; hands and feet warm.')
     still=b.get('still_hours',0.)
     if b['sleep_debt']<4 and still>5:sensations.append('Restless and stiff from lying still for hours.')
     elif b['sleep_debt']<4 and still>2.5:sensations.append('Limbs stiff from lying still a long while.')
