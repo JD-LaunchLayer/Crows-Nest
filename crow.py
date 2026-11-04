@@ -55,7 +55,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.36.5'
+APP_VERSION = '0.36.6'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -163,6 +163,7 @@ world_state.ensure(state)
 life.ensure(state)
 life.annotate_overridden_trials(state)  # v0.21.1: labels, never rewrites, past trials
 story.annotate_phantoms(state)  # v0.27: a plain note beside threads about Tam, the board and the "solid part" rule
+story.leave_phantom_stories(state)  # v0.36.6: stories resting on Edda's soup, which never existed, are left with a note
 ecology.ensure(state)
 ecology.backfill_recorded(state)  # v0.24.2: his field notebook, from what he already recorded
 consolidation.ensure(state)

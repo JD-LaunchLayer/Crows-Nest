@@ -1949,3 +1949,12 @@ in it is now done once his last three steps (at least three) were all rest or sl
   give food except by selling what is on her shelves. He accepted five times in a row, ate nothing, and stayed hungry.
   Her character now knows she has no soup or meal of her own to give; food is what is on her shelves, sold at its price
   (she may haggle); he is welcome to warm himself by her stove. Test: tests/test_edda_elf.py.
+
+## v0.36.6 — the soup that never was
+
+Before v0.36.5 Edda offered him "soup and bread by the stove", which never existed. Two of his stories were still
+built on it ("Stay at the stove with Edda, eat her soup and bread…", "…ask again whether she has any soup or bread")
+and were put in front of him as things he was in the middle of. As was done in v0.27 for the things Edda wrongly said
+then (Tam, the cracked board), stories, threads and promises that rest on the soup are now left with a plain note from
+the world beside them ("Edda has no soup or meal of her own to give; she spoke of one by mistake. Food at the post is
+what is on her shelves, at its price."). His words are kept exactly. Runs once. Test: tests/test_phantom_soup.py.

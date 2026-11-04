@@ -243,6 +243,8 @@ def open_items(state):
 PHANTOMS = [
     (('tam', 'cracked board', 'loose board', 'the board'), 'There is no Tam and no cracked or loose board at the trading post; '
      'Edda said those by mistake. She runs the post on her own.'),
+    (('soup',), 'Edda has no soup or meal of her own to give; she spoke of one by mistake. Food at the post is what is on '
+     'her shelves, at its price.'),
     (('solid part', 'solid-part'), 'There was never a "solid part" rule. That message came from a fault in the world when a '
      'blueprint drawing did not work; it has been put right, and drawing a blueprint needs no materials.'),
 ]
@@ -254,6 +256,28 @@ def _phantom(text):
     low = str(text).lower()
     notes = [n for words, n in PHANTOMS if any(re.search(r'\b' + re.escape(w) + r'\b', low) for w in words)]
     return {'world_note': ' '.join(notes)} if notes else {}
+
+
+def leave_phantom_stories(state):
+    """v0.36.6: stories that rest on something the world said by mistake (Edda's soup) are left, with the world's note
+    beside them; his words stay exactly as he wrote them. Run once."""
+    import re
+    ensure(state)
+    if state.get('phantom_stories_left'):
+        return 0
+    n = 0
+    for st in state.get('stories', []):
+        note = _phantom(' '.join([st.get('title', '')] + st.get('variants', []))).get('world_note')
+        if note and st.get('stage') in ('started', 'pursuing', 'dormant'):
+            st.update(stage='left', ended_by=note)
+            n += 1
+    for item in state['threads'] + state['promises']:
+        if not item.get('world_note'):
+            note = _phantom(item['text']).get('world_note')
+            if note:
+                item['world_note'] = note
+    state['phantom_stories_left'] = True
+    return n
 
 
 def annotate_phantoms(state):
