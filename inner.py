@@ -94,11 +94,16 @@ def plain(text):
     def spot(m):
         x, z = float(m.group(2)), float(m.group(3))
         return m.group(1) + place_words(x, z) if math.hypot(x, z) <= 60 else m.group(0)   # further than the world reaches: not a place
-    t = re.sub(r'(\b(?:at|near|by|around|to|from|of|in|towards?) )\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)', spot, t)
+    t = re.sub(r'(\b(?:at|near|by|around|to|from|of|in|towards?|about|at about) )\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)', spot, t)
     t = re.sub(r'\(\s*ground light (?:is )?(?:about )?(\d+)% of open sky\s*\)',
                lambda m: '(the ground there is ' + _light_words(int(m.group(1))) + ')', t)
     t = re.sub(r'ground light (?:here |there )?(?:is )?(?:about )?(\d+)% of open sky',
                lambda m: 'the ground there is ' + _light_words(int(m.group(1))), t)
+    # v0.35.0: heights, distances and shares as he would judge them by eye, never in metres or per cent.
+    import spatial_words
+    t = re.sub(r'\babout (\d+(?:\.\d+)?) ?m tall\b', lambda m: spatial_words.height(float(m.group(1))), t)
+    t = re.sub(r'\b(?:about )?(\d+(?:\.\d+)?) ?(?:m|metres?)\b(?! tall)', lambda m: spatial_words.distance(float(m.group(1))), t)
+    t = re.sub(r'\b(?:about )?(\d+(?:\.\d+)?) ?%', lambda m: _share(float(m.group(1))), t)
 
     def date(m):
         y, mo, d, hm = m.group(1), int(m.group(2)), int(m.group(3)), m.group(4)
@@ -108,6 +113,11 @@ def plain(text):
     t = re.sub(r'\s*\(\s*[a-z][a-z_]*-\d+\s*\)', '', t)
     t = re.sub(r'\b(?:(?i:a|an|the)\s+)?([a-z][a-z_]*)-\d+\b', lambda m: 'the ' + HIDDEN.get(m.group(1), m.group(1).replace('_', ' ')), t)
     return t
+
+
+def _share(p):
+    return ('none' if p < 3 else 'a few' if p < 15 else 'about a third' if p < 40 else 'about half' if p < 60
+            else 'most' if p < 85 else 'nearly all')
 
 
 def tidy(text):
@@ -278,6 +288,8 @@ def scene(state, ctx, extras):
         out.append(handwork.line_here(state))
     body = [BODY.get(s, s) for s in ctx.get('body', [])]
     out.append(' '.join(body) + ' ' + mood(ctx.get('affect', {})))
+    if ctx.get('around_me'):   # v0.35.0: what he can make out from where he stands, a few things as anyone notices them
+        out.append('What I can make out around me:\n' + '\n'.join('- ' + x for x in ctx['around_me']))
     if extras.get('dream'):
         out.append('Last night I dreamt: ' + extras['dream'])
     if extras.get('thoughts'):
@@ -356,9 +368,8 @@ def scene(state, ctx, extras):
     if ctx.get('garden_beds'):
         out.append('My garden: ' + ' '.join(ctx['garden_beds']))
     woods = ctx.get('woods') or {}
-    if woods.get('nearest_standing_tree_m_from_clearing_centre'):
-        out.append(f"The nearest trees stand about {woods['nearest_standing_tree_m_from_clearing_centre']} m from the middle of the clearing. "
-                   'Felled trees do not grow back by themselves; only planted ones grow.')
+    if woods.get('nearest_standing_tree_m_from_clearing_centre'):   # v0.35.0: no measurements; what is seen is in "around me"
+        out.append('Felled trees do not grow back by themselves; only planted ones grow.')
     if ctx.get('your_field_notebook'):
         lines = [f'- {place}: ' + '; '.join(tidy(x) for x in v) for place, v in ctx['your_field_notebook'].items()]
         out.append("What I've found and noted in the woods:\n" + '\n'.join(lines[:8]))

@@ -25,9 +25,12 @@ with tempfile.TemporaryDirectory() as td:
     assert st['pending']['duration']<2*3600
     st['pending']=None
     # Lit buildings after dark only.
-    assert 'lit_after_dark' not in app.decision_context()
+    # v0.35.0: lit windows are seen when they are in sight, from where he is (perception), not listed from anywhere.
+    st['location']='workbench';app.layout.follow(st)
+    assert not any('light in the window' in x.lower() for x in app.decision_context()['around_me'])
     app.CLOCK_OVERRIDE=lambda:datetime(2026,12,2,2,30,tzinfo=app.TZ);app.clock()
-    assert any('reading cabin' in x for x in app.decision_context()['lit_after_dark'])
+    st['position']['heading']=-1.6   # facing west, towards the reading cabin
+    assert any('light in the window of the reading cabin' in x.lower() for x in app.decision_context()['around_me']), app.decision_context()['around_me']
     # The ledger can be read at the post.
     town.trade(st,'job','sweep_post',1,'2026-12-02T09:00:00+00:00')
     assert any('sweep' in e.lower() for e in town.board(st)['ledger_latest_entries'])
@@ -48,7 +51,7 @@ with tempfile.TemporaryDirectory() as td:
     interactions.prepare(st,d);app.start_action(d,1);app.tick(400);ev=app.finish_action()['event']
     assert ev.startswith('Nothing was done') and st['built_world']['objects']==before, ev
     st['trading']['credit']=1.;d={**app.DECISION_DEFAULTS,'action':'inspect','object_id':'purse','intention':'count my purse','reason':'r'}
-    assert 'purse' in app.parameter_request({'action':'inspect'})[1]['object_id']['enum']
+    assert 'my purse' in app.parameter_request({'action':'inspect'})[1]['object_id']['enum']
     app.start_action(d,1);app.tick(120);ev=app.finish_action()['event'];assert 'Opened his purse' in ev and '1 gold' in ev, ev
 print('PASS v0.28.1: none touches nothing; the purse opens and counts.')
 # v0.29.3: a quiet rest eases sleepiness a little (far less than sleep); sitting awake doing nothing still adds to it.

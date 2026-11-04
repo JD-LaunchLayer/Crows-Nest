@@ -16,6 +16,7 @@ import materials
 import resources
 import handwork
 import layout
+import perception
 import story
 import garden
 import music
@@ -53,7 +54,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.34.5'
+APP_VERSION = '0.35.0'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -772,8 +773,6 @@ def decision_context():
         'held_most_strongly':consolidation.strongest(state,8 if WIDE else 3),
         'your_ongoing_stories':story.context(state,10 if WIDE else 4),'left_open':grouped_open_items(),
         **({'notes_from_the_world':state['world_notes'][-2:]} if state.get('world_notes') else {}),
-        # v0.28: what anyone could see from his door after dark: which buildings have light in them.
-        **({'lit_after_dark':['the reading cabin: its lamp is lit','the internet café: lit and open at all hours']} if state.get('daylight',1)<.12 else {}),
         'patterns_in_your_record':story.belief_context(state,8 if WIDE else 4),
         'relevant_memories':memory,'recent_pattern':memory_recall.recent_pattern(state),
         'paused_work':[{'id':w['id'],'action':w['pending']['decision']['action'],'intention':w['pending']['decision']['intention'],
@@ -791,12 +790,13 @@ def decision_context():
         'people':[{'name':'Edda Thorne','where':'trading post','times_talked':town.keeper(state)['talks'],
                    'open_favours':[f"{f['id']}: {f['task']} ({f['minutes']} min, pays {town.money(f['credit'])}). "
                                    f"Done by working at the trading post: trade, job {f['id']}." for f in town.keeper(state)['favours']]}],
-        'nearby':[o['id']+' ('+o['name']+')' for o in near['objects']]+[t['id']+' '+t['stage'] for t in near['trees'][:2]]}
+        # v0.35.0: what he can actually make out from where he stands (lit windows after dark included), in plain words.
+        'around_me':perception.lines(state,WIDE)}
     context=compact(context)
     # Recent events are what just happened to him: give them room (180 characters cut most observations
     # to their first finding and hid any closing statement). The budget below still trims if needed.
     context['recent_events']=[{k:m.get(k) for k in ['id','time']}|{'event':cut(str(m.get('event','')),700 if WIDE else 320)} for m in recent]
-    return fit(context,CONTEXT_BUDGET,['nearby','your_field_notebook','interests','wishes','self_notes','research','projects','paused_work','patterns_in_your_record','left_open','held_most_strongly','your_ongoing_stories','recent_events','relevant_memories'])
+    return fit(context,CONTEXT_BUDGET,['your_field_notebook','around_me','interests','wishes','self_notes','research','projects','paused_work','patterns_in_your_record','left_open','held_most_strongly','your_ongoing_stories','recent_events','relevant_memories'])
 
 
 def inner_extras():
@@ -871,12 +871,13 @@ def parameter_request(d):
                 {'supplies':life.perceive(state)['supplies'],'what_each_is':{k:foods.FOODS[k]['name'] for k in kinds}})
     if a=='drink':return None
     if a=='fell_tree':
-        standing=[t for t in world['trees'].values() if t['stage']=='standing']
-        x,z=13,10  # the woodland station where felling takes place
-        standing.sort(key=lambda t:(t['x']-x)**2+(t['z']-z)**2)
-        return ('Choose a standing tree. Felling takes long effort, leaves a stump and finite timber at the site; no regrowth.',
-                {'object_id':{'type':'string','enum':[t['id'] for t in standing] or ['tree-0']}},
-                {'axe':world['tools'].get('axe',0),'standing_trees':[{k:t[k] for k in ['id','x','z','height','timber_kg']} for t in standing[:8]]})
+        # v0.35.0: a tree he can see from the woods, picked by his own words for it, never by an id.
+        x,z=layout.stand('woods')
+        trees=perception.handles(state,kinds={'tree'},at=(x,z,layout._facing(x,z)),limit=14,
+                                 test=lambda h:world['trees'].get(h,{}).get('stage')=='standing')
+        return ('Choose a standing tree you can see from the woods. Felling takes long effort, leaves a stump and finite timber at the site; no regrowth.',
+                {'object_id':{'type':'string','enum':list(trees) or ['none']}},
+                {'trees_in_sight':list(trees)[:8],'__handles__':trees})
     if a=='gather':
         felled=[t['id'] for t in world['trees'].values() if t['stage']=='felled' and t.get('stock',0)>0]
         places=resources.known(state)   # v0.31.2: only places he has actually seen, as he would name them
@@ -887,11 +888,15 @@ def parameter_request(d):
                 {'loose_sources':world['sources'],'felled_trees':[{k:world['trees'][i][k] for k in ['id','stock']} for i in felled[:8]],
                  'inventory_kg':{'wood':state['materials'],'stone':state['stone']}})
     if a=='inspect':
-        eco=ecology.ensure(state)
-        return ('Choose an object, tree or plant to examine. Trees and plants are named in your memories or observations.',
-                {'object_id':{'type':'string','enum':list(objects)+[p['id'] for p in eco['plants']]+list(world['trees'])+
-                              ['axe','carving_knife','purse']+[k for k,v in state.get('possessions',{}).items() if v]}},
-                {'objects':[o['id']+' ('+o['name']+')' for o in world_state.nearby(state)['objects']]})
+        # v0.35.0: something he can see from where he is, or something of his own, by his own words for it.
+        seen=perception.handles(state,kinds={'object','building','structure','furniture','provisions','food_source','water_source',
+                                              'tree','plant','ground','target','water','carving','workpiece','heap','fire'},limit=20)
+        own={'my axe':'axe','my carving knife':'carving_knife','my purse':'purse',
+             **{'my '+k.replace('_',' '):k for k,v in state.get('possessions',{}).items() if v}}
+        handles={**seen,**own}
+        return ('Choose something to examine closely: something you can see from here, or something of your own.',
+                {'object_id':{'type':'string','enum':list(handles)}},
+                {'in_sight':list(seen)[:10],'__handles__':handles})
     if a=='observe':
         return ('Choose where to look. focus is what you are looking for, or empty for open attention. '
                 'You notice what is actually visible there now; things matching your focus are likelier to be noticed but not guaranteed. '
@@ -1023,8 +1028,9 @@ def choose_parameters(d):
     with LOCK:
         request=parameter_request(d)
         projects=[p['id'] for p in state['projects']]
-    props={};instruction='';context={}
+    props={};instruction='';context={};handles={}
     if request:instruction,props,context=request
+    if isinstance(context,dict):handles=context.pop('__handles__',{})   # v0.35.0: his phrases for things, mapped back here
     if request and d['action']!='interact':
         with LOCK:context['relevant_memories']=memory_recall.recall(state,900,limit=3,focus=d['intention'])
     single={k:v['enum'][0] for k,v in props.items() if len(v.get('enum',[]))==1}
@@ -1043,6 +1049,8 @@ def choose_parameters(d):
         # Only the requested detail fields are accepted, so this step can never change the chosen action.
         params={k:v for k,v in params.items() if k in props}
     params.update(single)
+    if handles and params.get('object_id') in handles:params['object_id']=handles[params['object_id']]
+    elif handles and 'object_id' in params:params['object_id']=''   # 'none', or a phrase for nothing in sight: nothing is touched
     if d['action']=='interact':
         params={**params,**choose_interaction(d,params.get('verb'))}
     merged={**DECISION_DEFAULTS,**{k:v for k,v in d.items() if k!='project'}}

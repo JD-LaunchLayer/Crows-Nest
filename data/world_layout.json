@@ -16,7 +16,12 @@
     -10,
     -10
    ],
-   "words": "inside your cabin, open on the south side"
+   "words": "inside your cabin, open on the south side",
+   "inside": [
+    -11.5,
+    -10.3,
+    3.142
+   ]
   },
   "workbench": {
    "stand": [
@@ -32,7 +37,12 @@
     5
    ],
    "object": "library",
-   "words": "the reading cabin"
+   "words": "the reading cabin",
+   "inside": [
+    -11,
+    9.4,
+    0
+   ]
   },
   "range": {
    "stand": [
@@ -58,7 +68,12 @@
     -14.2
    ],
    "object": "trading_post",
-   "words": "the trading post"
+   "words": "the trading post",
+   "inside": [
+    -3,
+    -16.4,
+    0
+   ]
   },
   "cafe": {
    "stand": [
@@ -66,7 +81,12 @@
     -14.2
    ],
    "object": "internet_cafe",
-   "words": "the internet café"
+   "words": "the internet café",
+   "inside": [
+    10.3,
+    -17.6,
+    0
+   ]
   },
   "garden": {
    "stand": [

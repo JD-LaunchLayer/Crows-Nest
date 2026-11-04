@@ -1849,3 +1849,31 @@ knows she is an elf and never remarks on it. She stays a shopkeeper: no needs or
 
 **Warmth meter** (Jordan's panel only, under Fed and Rested): blue is chilled, the middle comfortable, red too hot,
 with a word beside it. It moves as slowly as his body does. Crow never sees it. Test: tests/test_edda_elf.py.
+
+## v0.35.0 — seeing like a person (mapping phase 2)
+
+Each time he chooses, he now gets **"What I can make out around me"**: a few things he notices from where he really
+is and which way he faces (perception.py), in plain words such as "the provisions chest, to my left, a few steps
+away" or "light in the window of the reading cabin, ahead of me, a good way off".
+
+- **Sight:** about 120 degrees of clear view ahead, plus what is right beside him. Walls and solid things hide what is
+  behind them (an exact sight-line test, so even a thin wall does); darkness cuts sight to a few steps (further with
+  his lantern), rain and mist shorten it; lit windows and a fire show from far off at night. Inside a building he
+  sees the room, not through its walls; in bed he looks out of his cabin's open side.
+- **Detail by distance:** near things with a detail, things across the way by kind, the wood further off as the wood.
+- **Attention:** of everything in view he notices four (eight on the cloud model) and a line of gist: what is close
+  or big, what moves, and what bears on his body (cold draws the eye to light and warmth, thirst to water, hunger to
+  food) or on what he means to do. The rest is there to notice if he looks. Nothing tells him what to do with it.
+- **Words, never numbers** (spatial_words.py): "ahead of me and to my left", "a short way off", "very tall". The
+  world's own measurements in what he remembers are retold the same way: "about 7.3 m tall" becomes "very tall",
+  "about 30% still on the branches" becomes "about a third", "3 m off" becomes "a few steps away".
+- **Picking things by his own words:** to examine something or fell a tree he chooses from what he can see, by his
+  phrase for it ("a tall oak with bare branches, behind me and to my left, a short way off"), not by an id; trees to
+  fell are the ones in sight from the woods. His own things are "my purse", "my axe".
+- "From here I can see light in the reading cabin and the café" is no longer said from everywhere: lit windows are
+  seen when they are actually in sight.
+
+Read-only and deterministic: the same moment always gives the same view, and seeing changes nothing. Test:
+tests/test_seeing.py (plain words with no coordinates, ids, metres or per cent anywhere in his view; walls hide;
+dark shortens sight; thirst draws the eye to water; his phrases map back to the right things; within budget).
+Next: v0.36.0, the remembered map.
