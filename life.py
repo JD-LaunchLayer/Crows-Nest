@@ -17,6 +17,7 @@ def ensure(state):
     state.setdefault('body', {'reserve': float(state.get('energy',85)), 'stomach': 12.,
         'hydration': 85., 'sleep_debt': 1., 'exertion': 0., 'active_hours': 0.})
     state['body'].setdefault('chill', 0.)   # v0.30.18: how cold he has got, 0 warm .. 1 cold through
+    state['body'].setdefault('heat', 0.)    # v0.31.3: how hot he has got, 0 comfortable .. 1 overheated
     state.setdefault('provisions', {'pantry': 24., 'berries': 8., 'berry_capacity': 12.,
         'water_litres': 40., 'water_capacity': 40.})
     state.setdefault('practical', {'control_hours': 0., 'methods': [], 'trials': [], 'next_trial_id': 1})
@@ -86,16 +87,26 @@ def advance(state, seconds, action):
     # and warms faster in a warm place or under the covers. Being chilled makes him shiver, which burns a little food.
     import senses
     felt=senses.felt_temp(state,action)
-    cold=clamp((10-felt)/10,0,1)
+    # v0.31.3: how warm he really is comes from where he is AND what he is doing. Hard work makes heat (in winter it
+    # keeps him warm outdoors; in summer it makes him hot); sitting still makes little. Sun on him in the open adds
+    # warmth. He drifts toward what that feels like: slowly into cold or heat, faster back to comfortable, and the
+    # further from comfortable it is, the faster he goes. Warmth he has built up indoors lasts him a while outside.
+    work_heat=0 if action=='sleep' else 12*effort(action)
+    sun=3 if (state.get('location') not in ('cabin','library','cafe','shop') and state.get('daylight',0)>.35
+              and senses.weather(state)['sky']=='clear') else 0
+    feels=felt+work_heat+sun
+    cold=clamp((12-feels)/12,0,1)
+    hot=clamp((feels-24)/10,0,1)
     while remaining>0:
         dt=min(remaining,60.)/3600;remaining-=dt*3600
         sleeping=action=='sleep';resting=action in ['sleep','rest'];work=effort(action)
         digested=min(body['stomach'],18*dt)
         body['stomach']-=digested
-        chill=body.get('chill',0.)
-        body['chill']=chill+(min(cold-chill,.6*dt) if cold>chill else max(cold-chill,-1.5*dt))
+        chill=body.get('chill',0.);heat=body.get('heat',0.)
+        body['chill']=chill+(min(cold-chill,(.4+.6*cold)*dt) if cold>chill else max(cold-chill,-1.5*dt))
+        body['heat']=heat+(min(hot-heat,(.5+.6*hot)*dt) if hot>heat else max(hot-heat,-1.2*dt))
         body['reserve']=clamp(body['reserve']+digested-(2.5+5*work+1.2*body['chill'])*dt)
-        body['hydration']=clamp(body['hydration']-(2+4*work)*dt)
+        body['hydration']=clamp(body['hydration']-(2+4*work+3*body['heat'])*dt)   # sweating dries him out
         # Sleepiness comes mostly from what he does (v0.27): hard outdoor work tires him far more than sitting,
         # talking or reading; being awake a long time adds a little whatever he does. Sleep clears it.
         # v0.28 body clock: awake in the dark late hours, drowsiness builds faster, as it does for anyone.
@@ -183,6 +194,10 @@ def perceive(state):
     if b['sleep_debt']>8:sensations.append('Heavy sleepiness and difficulty concentrating.')
     elif b['sleep_debt']>4:sensations.append('Beginning to feel sleepy.')
     if b['exertion']>.45:sensations.append('Muscles feel tired from recent effort.')
+    h=b.get('heat',0)
+    if h>.65:sensations.append('Overheated: sweating hard, head pounding.')
+    elif h>.35:sensations.append('Hot and sweating.')
+    elif h>.15:sensations.append('A little too warm.')
     c=b.get('chill',0)
     if c>.65:sensations.append('Cold through and shivering.')
     elif c>.35:sensations.append('Cold; hands and feet numb.')
@@ -209,6 +224,8 @@ def consume(state, action, ident, food=''):
         if amount<=.001:return {'success':False,'text':'No water was consumed; the basin is empty or hydration is already sufficient.'}
         stock['water_litres']-=amount;b['hydration']=clamp(b['hydration']+35*amount)
         text=f'Drank {amount:.2f} litres from the spring basin.'
+        if b.get('heat',0)>.15:   # v0.31.3: cold spring water cools a hot body a little
+            b['heat']=max(0.,b['heat']-.25);text+=' The cold water cooled me.'
     else:
         key={'food_store':'pantry','berry_patch':'berries'}.get(ident)
         if key is None:return {'success':False,'text':'That object is not a known edible food source.'}

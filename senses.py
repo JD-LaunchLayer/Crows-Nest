@@ -166,16 +166,18 @@ def felt_temp(state, action=None):
     w = weather(state)
     _, _, hour = _when(state)
     loc = state.get('location')
+    t = w['temp']
     if action == 'sleep' or (action == 'rest' and state.get('in_bed') and loc == 'cabin'):
-        return 18.   # under the covers
+        return max(18., t)   # under the covers (and no cooler than the night)
+    # v0.31.3: on a cold day a stove warms a room; on a hot day a roof's shade keeps it a little cooler than outside.
     if loc in ('cafe', 'library'):
-        return 19.
+        return 19. if t < 17 else t - 2
     if loc == 'shop' and 7 <= hour < 19:
-        return 17.
+        return 17. if t < 15 else t - 2
     if loc == 'cabin' and stove_lit(state):
-        return 16.   # warm through, though the open south side lets some of it out
+        return max(16., t)   # warm through, though the open south side lets some of it out
     if loc in ('cabin', 'shop'):
-        return w['temp'] + 2.
+        return t + 2. if t < 14 else t - 2.
     return w['temp'] - (2 if w['wind'] == 'windy' else 0) - (2 if w['rain'] else 0)
 
 

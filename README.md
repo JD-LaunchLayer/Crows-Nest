@@ -1659,3 +1659,19 @@ dry stream bed.
 
 Not yet: anything to do with these materials beyond gathering them (that is phase 2: heat, fire,
 working them), and the sheep, which come with the animals in phase 3.
+
+## v0.31.3 — warmth both ways
+
+Warmth is now a real balance, not just cold or not. How warm he is comes from where he is and what he
+is doing:
+
+- **Work makes heat.** Felling, gathering or digging in the cold keeps him warm; sitting still out there
+  chills him. In summer the same work makes him hot.
+- **Warmth lasts a while.** He drifts slowly into cold or heat and back faster to comfortable, so time
+  warming up by a stove or in bed buys him time outside; the further from comfortable it is (wind, rain,
+  a bitter night), the faster it bites.
+- **Too hot is real.** Sun on him in the open adds warmth. Getting hot and sweating dries him out
+  faster; he feels "a little too warm", "hot and sweating" or "overheated: sweating hard, and my head is
+  pounding". Shade and rest cool him, a roof keeps a hot day a little cooler inside, and cold spring
+  water cools him when he drinks.
+- Nothing tells him what to do about any of it; how he deals with cold and heat, if he does, is his.

@@ -29,7 +29,9 @@ BODY = {'Persistent hunger; little food is being digested.': "I'm properly hungr
         'Beginning to feel sleepy.': "I'm getting sleepy.", 'Muscles feel tired from recent effort.': "My muscles ache from work.",
         'No strong bodily discomfort.': "My body feels fine.",
         'Cold through and shivering.': "I'm cold through and can't stop shivering.",
-        'Cold; hands and feet numb.': "I'm cold; my hands and feet are numb with it.", 'A little cold.': "I'm a little cold."}
+        'Cold; hands and feet numb.': "I'm cold; my hands and feet are numb with it.", 'A little cold.': "I'm a little cold.",
+        'Overheated: sweating hard, head pounding.': "I'm overheated: sweating hard, and my head is pounding.",
+        'Hot and sweating.': "I'm hot and sweating.", 'A little too warm.': "I'm a little too warm."}
 
 # What he could do, in his own words. The keys are only labels for the choice he makes.
 import actions   # v0.31.0: his words for each action come from the one registry
