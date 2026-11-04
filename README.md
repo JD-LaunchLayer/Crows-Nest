@@ -1820,3 +1820,11 @@ brackets: "Handled the radish seeds (I'm going to eat my bread now…). Nothing 
 felt about it afterwards, he read that as having eaten, and was "quietly relieved to be eating at last" while still
 hungry. Now it reads: "Handled the radish seeds. What he meant to do ("…") did not come of it. Nothing in particular
 happened." His history stays as it happened. Test: tests/test_meant_vs_happened.py.
+
+## v0.34.3 — warmth is felt, not only cold
+
+On 21 December he lay in bed from midnight to past midday, each time "letting my hands and feet warm up before I get
+up". Under the covers he had warmed through within the hour, but his body only ever reported cold, never warmth, so
+nothing told him the thing he was waiting for had happened, while every moment reminded him the room was cold. Now,
+warm in bed, he feels it: "I'm warm through under the covers; my hands and feet are warm again." Out of bed in the
+cold cabin he still chills as before. Test: tests/test_warm_in_bed.py.

@@ -252,6 +252,10 @@ def perceive(state):
     if c>.65:sensations.append('Cold through and shivering.')
     elif c>.35:sensations.append('Cold; hands and feet numb.')
     elif c>.15:sensations.append('A little cold.')
+    elif c<.05 and state.get('in_bed') and state.get('action') in ('rest','sleep') and state.get('location')=='cabin':
+        # v0.34.3: warmth is felt too, not only its absence. In bed he warmed through within the hour but was never
+        # told so, and lay there a whole morning "letting my hands and feet warm".
+        sensations.append('Warm through under the covers; hands and feet warm.')
     sensations+=injury_lines(state)
     if not sensations:sensations.append('No strong bodily discomfort.')
     return {'sensations':sensations,'work_impairment':round(fatigue(state),2),
