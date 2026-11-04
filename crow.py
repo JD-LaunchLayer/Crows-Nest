@@ -48,7 +48,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.30.6'
+APP_VERSION = '0.30.7'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -419,6 +419,18 @@ def model_call(prompt, schema, limit=650, purpose='other', system=None):
 
 
 TALK_TURNS = 8   # v0.30.5: a talk lasts until he leaves (up to eight exchanges); three cut him off mid-page
+
+
+def notebook_on(text, limit=3):
+    """v0.30.7: he carries his notebook, so at Edda's counter he can open it to what they are talking about.
+    The pages that best match the talk, as he wrote them; or plainly that nothing in it is about this."""
+    pages=state.get('notebook',[])
+    if not pages:return 'my notebook is empty'
+    terms=set(re.findall(r'\b\d{1,2}-\d{1,2}\b',text))|memory_recall.words(text)
+    scored=[(len(terms&(set(re.findall(r'\b\d{1,2}-\d{1,2}\b',p['title']+' '+p['text']))|memory_recall.words(p['title']+' '+p['text']))),p) for p in pages]
+    best=[p for n,p in sorted(scored,key=lambda x:(x[0],x[1]['id']),reverse=True) if n>=2][:limit]
+    if not best:return 'nothing I have written is about this'
+    return [f"page {p['id']} (written {inner.tidy(str(p.get('at',''))[:16].replace('T',' '))}) \"{p['title']}\": {p['text'][:500]}" for p in sorted(best,key=lambda p:p['id'])]
 
 
 class MindAway(Exception):
@@ -1604,7 +1616,7 @@ def talk_session(opening, hope):
         answer,_=model_call('You are talking with Edda Thorne at the trading post. Say your next line naturally (or a brief goodbye). '
             'accept_offer agrees to the offer on the table, if any; leave ends the conversation. Deals are settled when you leave. '
             'promise: only if this line promises her something new, in your words; otherwise empty. '
-            +json.dumps({'your_hope':hope[:200],'your_money':town.money(credit),'your_goods':goods,'offer_on_the_table':describe_offer(offer) if offer else 'none',
+            +json.dumps({'your_hope':hope[:200],'your_notebook_on_this':notebook_on(hope+' '+' '.join(c['text'] for c in convo[-2:])),'your_money':town.money(credit),'your_goods':goods,'offer_on_the_table':describe_offer(offer) if offer else 'none',
                          'conversation':convo},ensure_ascii=False),
             fields_schema({'say':STRING,'accept_offer':{'type':'boolean'},'leave':{'type':'boolean'},'promise':STRING}),250,'talk')
         if str(answer.get('promise','')).strip():promises.append(str(answer['promise']))

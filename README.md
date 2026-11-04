@@ -1457,3 +1457,11 @@ After v0.30.5 his world stood still at 14:02: every choice named his woodland sc
 slightly different words, two of his titles were close to it, the choice was refused, and he dozed
 and tried again. Now the clearly closest title is taken, and if none is clearly closest the choice
 goes ahead with no particular project. A choice is never thrown away over a project name.
+
+## v0.30.7 — his notebook at Edda's counter
+
+He kept going back to Edda to read her "my line" for 3 December, but in a talk he could not see his
+own notebook, so he never had anything to read and the check could never finish. He carries his
+notebook, so now, when he talks with her, it is open to the pages that match what they are talking
+about, as he wrote them (with the day he wrote them), or he finds plainly that nothing he has
+written is about it. Nothing is added to or changed in his notebook.

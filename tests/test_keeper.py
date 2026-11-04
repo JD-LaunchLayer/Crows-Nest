@@ -62,3 +62,27 @@ with tempfile.TemporaryDirectory() as td:
     assert m['world_result']['conversation'][1]['who']=='Edda'
 print('PASS: furnished café and post (also for old saves); Edda bargains within the board, buys only goods he has, agrees favours he can do as jobs, '
       'gives rarely; her own memory and warmth; pace slows with exhaustion and outdoor darkness, lantern helps; conversations settle real deals.')
+# v0.30.7: at Edda's counter he can open his notebook to what they are talking about, or find nothing written on it.
+import contextlib as _c, importlib.util as _iu, io as _io, shutil as _sh, tempfile as _tf
+from pathlib import Path as _P
+from datetime import datetime as _dt
+with _tf.TemporaryDirectory() as td:
+    _sh.copy(ROOT/'crow.py',_P(td)/'crow.py')
+    sp=_iu.spec_from_file_location('crow_nb',_P(td)/'crow.py');app=_iu.module_from_spec(sp)
+    with _c.redirect_stdout(_io.StringIO()):sp.loader.exec_module(app)
+    app.CLOCK_OVERRIDE=lambda:_dt(2026,12,9,14,0,tzinfo=app.TZ);app.clock();st=app.state
+    assert app.notebook_on('the 12-03 bread line')=='my notebook is empty'
+    st['notebook']=[{'id':1,'at':'2026-12-06T11:21:00','title':'12-03 cord bundle notes','text':'Writing the 12-03 cord bundle lines in my own words.'},
+                    {'id':2,'at':'2026-12-06T12:00:00','title':'Birds','text':'A small brown bird at the spring.'}]
+    got=app.notebook_on('Edda, read me your 12-03 bread line against my cord bundle notes')
+    assert isinstance(got,list) and len(got)==1 and 'cord bundle notes' in got[0] and '6 Dec' in got[0], got
+    assert app.notebook_on('the price of a whetstone')=='nothing I have written is about this'
+    seen=[]
+    def fake(p,s,l,purpose,*a,**k):
+        seen.append((purpose,p))
+        if purpose=='keeper':return {'reply':'Read me your line.','proposal':{'kind':'none','item':'','quantity':1,'credit':0,'minutes':15,'task':''},'note_about_crow':'','warmth':.5},1
+        return {'say':'Here it is.','accept_offer':False,'leave':True,'promise':''},1
+    app.model_call=fake
+    app.talk_session('Edda, shall we go through my 12-03 cord bundle notes?','Go through the 12-03 cord bundle notes with Edda')
+    talk=[p for purpose,p in seen if purpose=='talk'][0];assert 'your_notebook_on_this' in talk and 'cord bundle notes' in talk
+print('PASS v0.30.7: his notebook is open to him at her counter.')
