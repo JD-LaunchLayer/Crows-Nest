@@ -98,6 +98,9 @@ NEEDS = {'drink': (('thirst', 'drink', 'spring'), ('thirst',)),
          # Resting while a meal settles (v0.26.3): done once nothing is still digesting.
          'rest': (('digest', 'digesting', 'digestion', 'meal', 'eaten', 'eating'), ('digesting', 'full'))}
 REST_WORDS = ('rest', 'settle', 'pause', 'quiet', 'quietly', 'stay', 'sit', 'wait')
+# v0.36.3: lying down is resting too. "Lie back down under the covers and rest until it gets light" began with a word
+# not on the list above, so it was never seen as a rest and stayed "in the middle of" for 109 steps over two days.
+LYING_WORDS = ('lie', 'lying', 'lay', 'covers', 'bed', 'blanket', 'blankets')
 
 
 def settle_need(state, memory, sensations):
@@ -105,8 +108,9 @@ def settle_need(state, memory, sensations):
     story = next((s for s in state.get('stories', []) if s['id'] == memory.get('story_id')), None)
     # A rest is a pause, not a pursuit (v0.27): a story that is only about resting is done once he has rested.
     if memory.get('action') in ('rest', 'sleep') and story and story['stage'] in ('started', 'pursuing', 'dormant'):
-        first = re.findall(r'[a-z]+', story['title'].lower())[:1]
-        if first and first[0] in REST_WORDS and all(st.get('action') in ('rest', 'sleep') for st in story['steps'][-3:]):
+        words = re.findall(r'[a-z]+', story['title'].lower())
+        restful = (words[:1] and words[0] in REST_WORDS) or any(w in LYING_WORDS for w in words[:6])
+        if restful and all(st.get('action') in ('rest', 'sleep') for st in story['steps'][-3:]):
             story['stage'] = 'done'
             story['ended'] = memory.get('at', '')
             story['ended_by'] = 'he rested'

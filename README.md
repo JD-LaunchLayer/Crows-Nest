@@ -1923,3 +1923,11 @@ sweeping" and she kept offering him the warm spot by the stove instead. Both job
 time. Now, when he asks her plainly about work (a posted job or a favour he has agreed), she answers plainly: whether
 it is there today, what it pays, and that he can start it at the post whenever he likes. She still never volunteers
 work or ideas he has not asked about. Test: tests/test_edda_elf.py.
+
+## v0.36.3 — a rest is done once he has rested, however he words it
+
+His story "Lie back down under the covers and rest until it gets light" stayed "in the middle of" for 109 steps over
+two days and two nights, and was put in front of him every moment as something still to carry on with. A story that
+is only about resting has been closed once he has rested since v0.27, but only if it began with a word such as
+"rest" or "stay"; "lie" was not among them. Lying down, the covers and bed now count too. Stories about anything
+else are untouched. His record stays as it is. Test: tests/test_rest_story.py.
