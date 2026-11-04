@@ -27,7 +27,9 @@ BODY = {'Persistent hunger; little food is being digested.': "I'm properly hungr
         'Strong thirst; mouth feels dry.': "I'm very thirsty; my mouth is dry.", 'Noticeable thirst.': "I'm thirsty.",
         'Heavy sleepiness and difficulty concentrating.': "I'm heavy with sleepiness and badly need sleep; my thoughts keep slipping.",
         'Beginning to feel sleepy.': "I'm getting sleepy.", 'Muscles feel tired from recent effort.': "My muscles ache from work.",
-        'No strong bodily discomfort.': "My body feels fine."}
+        'No strong bodily discomfort.': "My body feels fine.",
+        'Cold through and shivering.': "I'm cold through and can't stop shivering.",
+        'Cold; hands and feet numb.': "I'm cold; my hands and feet are numb with it.", 'A little cold.': "I'm a little cold."}
 
 # What he could do, in his own words. The keys are only labels for the choice he makes.
 CHOICES = {'rest': 'sit or lie quietly in my cabin, awake', 'sleep': 'go to bed and sleep until I wake rested',

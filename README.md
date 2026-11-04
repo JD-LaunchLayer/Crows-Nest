@@ -1553,3 +1553,14 @@ Seasons change what there is (birdsong at spring dawns, insects in summer). Indo
 inside. Whether he comes to love frosty nights or warm afternoons is his to find out. It is worked
 out from his own date and hour, so nothing is saved and reading it changes nothing. Your report
 shows the same line under "What he can sense around him".
+
+## v0.30.18 — cold and warmth
+
+He now feels the cold, and where he is decides how warm he is. Out in the open he chills slowly
+(faster in wind and rain); his cabin keeps off the weather but has no fire and is open on its south
+side, so it is barely warmer than outside; under the covers his bed is warm; the café and the
+reading cabin have stoves; Edda's post is warm by day. He feels it as "a little cold", "cold; my
+hands and feet are numb" or "cold through and shivering", warms up faster than he chills, and while
+he is cold he shivers, which burns a little more food. Indoors he is told plainly what the room is
+like for warmth. Nothing says what he should do about it. A fire of his own would be a new thing
+for him to have, so it waits on his wants.

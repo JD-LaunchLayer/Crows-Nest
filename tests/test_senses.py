@@ -31,3 +31,18 @@ st={'clock':{'iso':'2026-12-18T02:00:00','date':'Fri 18 Dec','time':'02:00'},'da
 assert 'From inside I can hear' in senses.outside(st)
 assert senses.outside(st) in inner.scene(st,{},{})
 print('PASS v0.30.17: weather, warmth, sky and sounds by day and night, plainly, unchanged by reading.')
+# v0.30.18: warmth where he is: cold in the open and (no fire) in his cabin; warm in bed, the cafe, the reading cabin.
+import contextlib, importlib.util, io, shutil, tempfile
+with tempfile.TemporaryDirectory() as td:
+    shutil.copy(ROOT/'crow.py',Path(td)/'crow.py')
+    spec=importlib.util.spec_from_file_location('crow_cold',Path(td)/'crow.py');app=importlib.util.module_from_spec(spec)
+    with contextlib.redirect_stdout(io.StringIO()):spec.loader.exec_module(app)
+    app.CLOCK_OVERRIDE=lambda:datetime(2026,12,20,2,0,tzinfo=app.TZ);app.clock();st=app.state;b=st['body']
+    st['location']='woods';b['chill']=0;app.life.advance(st,3*3600,'explore');out=b['chill']
+    assert out>.35 and any('cold' in x.lower() for x in app.life.perceive(st)['sensations']), out
+    st['location']='cabin';app.life.advance(st,3*3600,'sleep');assert b['chill']<.05, 'under the covers he warms up'
+    st['location']='cafe';b['chill']=.8;app.life.advance(st,3600,'browse');assert b['chill']<.1
+    st['location']='cabin';line=senses.outside(st);assert 'no fire' in line and 'bed is the warm place' in line, line
+    st['location']='cafe';assert 'warm in here from the stove' in senses.outside(st)
+    assert "I'm cold" in inner.BODY['Cold; hands and feet numb.']
+print('PASS v0.30.18: cold in the open and his fireless cabin; warm in bed and by the stoves.')

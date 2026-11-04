@@ -16,6 +16,7 @@ def clamp(value, low=0, high=100):
 def ensure(state):
     state.setdefault('body', {'reserve': float(state.get('energy',85)), 'stomach': 12.,
         'hydration': 85., 'sleep_debt': 1., 'exertion': 0., 'active_hours': 0.})
+    state['body'].setdefault('chill', 0.)   # v0.30.18: how cold he has got, 0 warm .. 1 cold through
     state.setdefault('provisions', {'pantry': 24., 'berries': 8., 'berry_capacity': 12.,
         'water_litres': 40., 'water_capacity': 40.})
     state.setdefault('practical', {'control_hours': 0., 'methods': [], 'trials': [], 'next_trial_id': 1})
@@ -81,12 +82,19 @@ def advance(state, seconds, action):
     # Wild fruit (v0.23): the bushes bear from mid-July to mid-October; nothing grows on them the rest of
     # the year, and from November what is left goes over or is taken by birds, about a tenth a day.
     fruiting=196<=doy<=288;spoiling=doy>=305 or doy<=59
+    # v0.30.18: cold. Where he is, and whether he is in bed, decides how warm it is; he chills slowly in the cold
+    # and warms faster in a warm place or under the covers. Being chilled makes him shiver, which burns a little food.
+    import senses
+    felt=senses.felt_temp(state,action)
+    cold=clamp((10-felt)/10,0,1)
     while remaining>0:
         dt=min(remaining,60.)/3600;remaining-=dt*3600
         sleeping=action=='sleep';resting=action in ['sleep','rest'];work=effort(action)
         digested=min(body['stomach'],18*dt)
         body['stomach']-=digested
-        body['reserve']=clamp(body['reserve']+digested-(2.5+5*work)*dt)
+        chill=body.get('chill',0.)
+        body['chill']=chill+(min(cold-chill,.6*dt) if cold>chill else max(cold-chill,-1.5*dt))
+        body['reserve']=clamp(body['reserve']+digested-(2.5+5*work+1.2*body['chill'])*dt)
         body['hydration']=clamp(body['hydration']-(2+4*work)*dt)
         # Sleepiness comes mostly from what he does (v0.27): hard outdoor work tires him far more than sitting,
         # talking or reading; being awake a long time adds a little whatever he does. Sleep clears it.
@@ -175,6 +183,10 @@ def perceive(state):
     if b['sleep_debt']>8:sensations.append('Heavy sleepiness and difficulty concentrating.')
     elif b['sleep_debt']>4:sensations.append('Beginning to feel sleepy.')
     if b['exertion']>.45:sensations.append('Muscles feel tired from recent effort.')
+    c=b.get('chill',0)
+    if c>.65:sensations.append('Cold through and shivering.')
+    elif c>.35:sensations.append('Cold; hands and feet numb.')
+    elif c>.15:sensations.append('A little cold.')
     if not sensations:sensations.append('No strong bodily discomfort.')
     return {'sensations':sensations,'work_impairment':round(fatigue(state),2),
             'supplies':{'ready_food_servings':round(state['provisions']['pantry'],2),

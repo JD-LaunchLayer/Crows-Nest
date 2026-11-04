@@ -140,7 +140,46 @@ def outside(state):
         parts.append('Mist hangs low over the clearing.')
     if w['temp'] < 6 and not indoors:
         parts.append('My breath shows in the air.')
+    if indoors and inside_line(state):
+        parts.append(inside_line(state))
     heard = _sounds(state, w, dark, indoors)
     if heard:
         parts.append(('From inside I can hear ' if indoors else 'I can hear ') + ' and '.join(heard) + '.')
     return ' '.join(parts)
+
+
+WARM_INSIDE = {'cafe': 'It is warm in here from the stove.', 'library': 'It is warm in here from the stove.'}
+
+
+def felt_temp(state, action=None):
+    """How warm it is where he is, in degrees (kept to himself). Sleeping is under the covers in his bed, which is
+    warm; the cabin has no fire and is open on its south side, so it is barely warmer than outside; the cafe and the
+    reading cabin have stoves; Edda's post is warm while she is there by day."""
+    w = weather(state)
+    _, _, hour = _when(state)
+    loc = state.get('location')
+    if action == 'sleep':
+        return 18.
+    if loc in ('cafe', 'library'):
+        return 19.
+    if loc == 'shop' and 7 <= hour < 19:
+        return 17.
+    if loc in ('cabin', 'shop'):
+        return w['temp'] + 2.
+    return w['temp'] - (2 if w['wind'] == 'windy' else 0) - (2 if w['rain'] else 0)
+
+
+def inside_line(state):
+    """Indoors: what the room itself is like for warmth, plainly."""
+    loc = state.get('location')
+    _, _, hour = _when(state)
+    if loc in WARM_INSIDE:
+        return WARM_INSIDE[loc]
+    if loc == 'shop' and 7 <= hour < 19:
+        return "It is warm in the post from Edda's stove."
+    if loc == 'cabin':
+        t = felt_temp(state)
+        if t < 12:
+            return ('Inside my cabin it is almost as ' + _warmth(t) + ' as outside: there is no fire, and the open south '
+                    'side lets the air in. Under the covers, my bed is the warm place here.')
+    return ''
