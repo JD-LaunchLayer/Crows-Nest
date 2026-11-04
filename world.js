@@ -204,11 +204,14 @@ function syncResources(view){
 // v0.32.0: his heaps and fires: a pile of wood and stems, flames and a warm light when lit, grey ash after.
 const fireGroup=new T.Group();scene.add(fireGroup);let fireKey='';const fireLights=[];
 function syncFires(view){
- if(!view)return;const key=JSON.stringify(view.map(f=>[f.id,f.lit,Math.round(f.kg*2),f.ash>0]));if(key===fireKey)return;fireKey=key;
+ if(!view)return;const key=JSON.stringify(view.map(f=>[f.id,f.lit,Math.round(f.kg*2),f.ash>0,!!f.covered]));if(key===fireKey)return;fireKey=key;
  while(fireGroup.children.length){const c=fireGroup.children[0];fireGroup.remove(c);c.geometry?.dispose()}fireLights.length=0;
  for(const f of view){const {x,z}=f,h=Math.min(.6,.12+f.kg*.06);
   if(f.ash>0&&!f.lit&&f.kg<.05){const a=mesh(new T.CylinderGeometry(.45,.5,.02,9),'#8d8a84',x,.01,z,fireGroup);a.castShadow=false;continue;}
   if(f.kg>.02)mesh(new T.ConeGeometry(.45,h,7),'#6b4e2e',x,h/2,z,fireGroup);
+  if(f.lit&&f.covered){const m=mesh(new T.SphereGeometry(.55,9,6),'#6e5a44',x,.05,z,fireGroup);m.scale.y=.5;
+   const sm=mesh(new T.ConeGeometry(.08,.7,5),'#b9b4ac',x,.6,z,fireGroup);sm.castShadow=false;sm.material=new T.MeshStandardMaterial({color:'#b9b4ac',transparent:true,opacity:.45,flatShading:true});
+   const l=new T.PointLight('#ff7a30',.6,2.5);l.position.set(x,.3,z);fireGroup.add(l);fireLights.push(l);continue;}
   if(f.lit){mesh(new T.ConeGeometry(.22,.55,6),'#ff9a3a',x,h+.2,z,fireGroup).castShadow=false;mesh(new T.ConeGeometry(.12,.35,5),'#ffd36a',x,h+.25,z,fireGroup).castShadow=false;
    const l=new T.PointLight('#ffb060',4,8);l.position.set(x,h+.6,z);fireGroup.add(l);fireLights.push(l);}
  }

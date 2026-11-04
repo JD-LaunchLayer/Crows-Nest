@@ -18,6 +18,7 @@ def ensure(state):
         'hydration': 85., 'sleep_debt': 1., 'exertion': 0., 'active_hours': 0.})
     state['body'].setdefault('chill', 0.)   # v0.30.18: how cold he has got, 0 warm .. 1 cold through
     state['body'].setdefault('heat', 0.)    # v0.31.3: how hot he has got, 0 comfortable .. 1 overheated
+    state['body'].setdefault('injuries', [])   # v0.33.0: cuts and burns, each healing at its own pace
     state.setdefault('provisions', {'pantry': 24., 'berries': 8., 'berry_capacity': 12.,
         'water_litres': 40., 'water_capacity': 40.})
     state.setdefault('practical', {'control_hours': 0., 'methods': [], 'trials': [], 'next_trial_id': 1})
@@ -122,6 +123,7 @@ def advance(state, seconds, action):
         supplies['water_litres']=min(supplies['water_capacity'],supplies['water_litres']+2*dt)
         for signal in state['affect']['signals']:signal['age_hours']+=dt
         wear(state,action,dt)
+        heal(state,dt)
     refresh_affect(state)
     sync_energy(state)
 
@@ -139,6 +141,7 @@ def work_rate(state, action):
     rate = 1 / (1 + .6 * max(0., fatigue(state) - .2))
     if action in OUTDOOR_WORK and state.get('daylight', 1) < .12 and not state.get('possessions', {}).get('lantern'):
         rate *= .5
+    rate *= hand_rate(state)
     edge = state.get('tool_condition', {})
     if action == 'fell_tree':
         rate *= .4 + .6 * edge.get('axe', 1.)
@@ -147,6 +150,53 @@ def work_rate(state, action):
     elif action == 'construct':
         rate *= .85 + .15 * edge.get('axe', 1.)
     return rate
+
+
+# ---- Cuts and burns (v0.33.0) ----
+# Real hurts from real causes: a sharp flake, a hot thing picked up, a hand in a fire. They are small, they sting or
+# smart rather than torment, they slow work done with that hand, and they heal by themselves over days. Nothing here
+# can kill him or lay him up. A cut heals faster than a burn; a deeper one takes longer.
+HEAL_PER_DAY = {'cut': .3, 'burn': .18}
+
+
+def injure(state, kind, where, severity):
+    """Record a cut or burn. A second hurt to the same place adds to the first instead of listing twice."""
+    ensure(state)
+    severity = round(clamp(severity, 0, .6), 3)
+    hurts = state['body']['injuries']
+    same = next((i for i in hurts if i['kind'] == kind and i['where'] == where), None)
+    if same:
+        same['severity'] = round(min(.6, same['severity'] + severity * .7), 3)
+        return same
+    hurt = {'kind': kind, 'where': where, 'severity': severity, 'at': state.get('clock', {}).get('iso', '')}
+    hurts.append(hurt)
+    return hurt
+
+
+def heal(state, hours):
+    hurts = state['body'].get('injuries') or []
+    for i in hurts:
+        i['severity'] = round(i['severity'] - HEAL_PER_DAY.get(i['kind'], .25) * hours / 24 * (.5 + i['severity']), 4)
+    state['body']['injuries'] = [i for i in hurts if i['severity'] > .02]
+
+
+def hand_rate(state):
+    """How much hurt hands slow work done with them (1 = not at all)."""
+    sev = sum(i['severity'] for i in state.get('body', {}).get('injuries', []) if i['where'] in ('hand', 'thumb', 'fingers', 'palm'))
+    return 1 / (1 + 1.2 * sev)
+
+
+def injury_lines(state):
+    out = []
+    for i in state.get('body', {}).get('injuries', []):
+        w, s = i['where'], i['severity']
+        if i['kind'] == 'cut':
+            out.append(f'A cut on my {w} smarts when I grip anything.' if s > .3 else f'A small cut on my {w} stings a little.' if s > .1
+                       else f'The cut on my {w} has closed and is healing.')
+        else:
+            out.append(f'A burn on my {w} is red, tight and tender.' if s > .3 else f'A burn on my {w} is pink and sore to touch.' if s > .1
+                       else f'The burn on my {w} is healing, the skin a little shiny.')
+    return out
 
 
 # Blades dull with use (per active hour of that work) and stay dull until something restores the edge.
@@ -202,6 +252,7 @@ def perceive(state):
     if c>.65:sensations.append('Cold through and shivering.')
     elif c>.35:sensations.append('Cold; hands and feet numb.')
     elif c>.15:sensations.append('A little cold.')
+    sensations+=injury_lines(state)
     if not sensations:sensations.append('No strong bodily discomfort.')
     return {'sensations':sensations,'work_impairment':round(fatigue(state),2),
             'supplies':{'ready_food_servings':round(state['provisions']['pantry'],2),

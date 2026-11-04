@@ -1719,3 +1719,37 @@ with no payment went through. Then he sold 12 kg for 4 gold. In all he handed ov
 12. He read the 4 kg line as wood he had taken from her, and has been going through the book with her since.
 Now a deal for his goods must pay at least seven tenths of what they are worth, or it is not offered.
 His history stays as it happened. Test: tests/test_edda_pays.py.
+
+## v0.33.0 — mud, earth over a fire, edges, cuts and burns (phase 2b)
+
+Five more things he can do with his hands, offered alongside the others in plain words: **press** something in
+his hands into a shape he describes in his own words (optionally working something else into it); **wet**
+something with water from the spring basin; **cover** a heap or fire with something; **take** back up what lies
+in a heap; **rub** one thing against another for a while. Nothing names what any of it might make.
+
+What the world does:
+
+- **The grey-brown mud from the spring** takes a shape only at the right dampness: too dry it crumbles, too wet
+  it slumps. He knows the result by the words he gave it ("what I shaped from the grey-brown mud: \"a small
+  bowl\""). Grit worked into it feels grittier and cracks less later. Dried too fast by a fire it can crack;
+  wetted heavily before firing it slumps back into mud.
+- **In a fire**, a shape that is still damp hisses, steams and bursts into pieces. A dry one held long enough
+  (40 minutes or more) changes for good: harder, a new colour, and it rings when struck. Sometimes it cracks;
+  practice and grit make that rarer. Afterwards water only soaks in slowly and it stays hard. It is very hot
+  for a while, and struck hard against stone it can break.
+- **Earth heaped over a burning fire** (enough to hide the flames) smothers it to a smoulder: thin smoke seeps
+  out, rain cannot reach it, and over hours the wood under it turns to light black lumps (about a quarter of
+  its weight) before it goes out. Too little earth and the flames burn through. An open fire that burns out
+  leaves a few black, charred ends in the ash. The black lumps burn slower and much hotter than wood.
+- **Steel edges**: striking the glassy stone on his axe or knife chips the edge a little each time. Rubbing the
+  edge along ordinary stone grows it keener, faster if the stone is wet and better with practice (not quite as
+  keen as new). On the glassy stone it only skates and scratches. Two sticks rubbed together get hot and
+  scorched, and give no ember.
+- **Cuts and burns**: a flake can slice his thumb, handling flakes can nick a finger, picking up something still
+  hot burns his fingers (things he holds say "still hot" until they cool, within about an hour), reaching into
+  an open fire burns his hand, and a flame can lick his hand as he feeds a fire. They sting or feel tender, they
+  slow work done with his hands, and they heal by themselves over days, cuts faster than burns. Nothing is serious.
+- A smothered fire is drawn as a low mound of earth with a thread of smoke and a faint glow.
+
+Test: tests/test_clay_fire.py. Not yet (phase 3): snares, drying and salting food, hides, cord, clothing, the
+sheep, and moving hunt/butcher/preserve to plain verbs.

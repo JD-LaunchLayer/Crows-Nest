@@ -52,7 +52,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.32.2'
+APP_VERSION = '0.33.0'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -847,7 +847,9 @@ def parameter_request(d):
                 'shape works inventory material; split divides an existing solid; stack arranges two loose objects; '
                 'place_on puts an object on a face; sit/lie use a face for that posture; '
                 'pile puts some of what you have into a heap where you are; strike hits one thing you have against another, over a heap if you name one; '
-                'feed adds some of what you have to a heap or fire; heat holds something in a fire for a while; dry leaves something to dry for a while. '
+                'feed adds some of what you have to a heap or fire; heat holds something in a fire for a while; dry leaves something to dry for a while; '
+                'press squeezes and works something in your hands into a shape you describe; wet pours water from the spring basin over something; '
+                'cover heaps something over a heap or fire; take takes back up what lies in a heap; rub rubs one thing against another for a while. '
                 'Targets and methods are chosen next.',
                 {'verb':{'type':'string','enum':interactions.VERBS+handwork.VERBS}},
                 {'objects':interactions.context(state,4),'recent_work':interactions.learning_context(state,limit=2),
@@ -1059,10 +1061,13 @@ def choose_hand_detail(d, verb):
         context={'to_hand':list(hand),'heaps_here':list(heaps),'where':state.get('location'),
                  'memories':memory_recall.recall(state,700,limit=3,focus=d['intention'])}
     props={'hypothesis':STRING,'prediction':STRING,'what':{'type':'string','enum':list(hand) or ['nothing']}}
-    if verb=='strike':props['against']={'type':'string','enum':list(hand) or ['nothing']}
-    if verb in ('strike','feed','heat'):props['heap']={'type':'string','enum':['']+list(heaps)}
-    if verb in ('pile','feed'):props['kg']={'type':'number','minimum':.05,'maximum':20}
-    if verb in ('heat','dry'):props['minutes']={'type':'number','minimum':5,'maximum':240}
+    if verb=='take':props.pop('what')
+    if verb in ('strike','rub'):props['against']={'type':'string','enum':list(hand) or ['nothing']}
+    if verb=='press':props.update(shape=STRING,work_in={'type':'string','enum':['']+list(hand)},work_in_kg={'type':'number','minimum':0,'maximum':10})
+    if verb in ('strike','feed','heat','cover','take'):props['heap']={'type':'string','enum':['']+list(heaps)}
+    if verb in ('pile','feed','cover','press'):props['kg']={'type':'number','minimum':.05,'maximum':20}
+    if verb=='wet':props['litres']={'type':'number','minimum':.05,'maximum':2}
+    if verb in ('heat','dry','rub'):props['minutes']={'type':'number','minimum':5,'maximum':240}
     prompt=('You chose to '+verb+' for '+d['intention']+'. Choose what, and the rest, from what you have to hand. '
             'hypothesis and prediction are your own expectations BEFORE acting, and can be empty if none. '
             'What actually happens is what the world does; describing it does not make it so. '+json.dumps(context,ensure_ascii=False))
@@ -1070,7 +1075,7 @@ def choose_hand_detail(d, verb):
     raw={k:v for k,v in raw.items() if k in props}
     return {'verb':verb,'hypothesis':raw.pop('hypothesis',''),'prediction':raw.pop('prediction',''),'object_id':'','other_id':'',
             'procedure_id':'','interaction_params':raw,'hand':{'what':hand.get(raw.get('what')),'against':hand.get(raw.get('against')),
-            'heap':heaps.get(raw.get('heap',''),'')}}
+            'work_in':hand.get(raw.get('work_in','')),'heap':heaps.get(raw.get('heap',''),'')}}
 
 
 def choose_interaction(d, verb):
@@ -1118,7 +1123,9 @@ def choose_interaction(d, verb):
 def handwork_duration(d):
     pr=d.get('interaction_params') or {}
     mins=lambda:max(5,min(240,float(pr.get('minutes') or 30)))
-    return {'pile':300,'strike':300,'feed':120,'heat':int(mins()*60),'dry':int(mins()*60)}[d['verb']]
+    base={'pile':300,'strike':300,'feed':120,'heat':int(mins()*60),'dry':int(mins()*60),'press':900,'wet':120,'cover':300,
+          'take':180,'rub':int(mins()*60)}[d['verb']]
+    return base if d['verb'] in ('heat','dry') else int(base/life.hand_rate(state))   # hurt hands work slower (v0.33.0)
 
 
 def do_handwork(d):
@@ -1131,6 +1138,14 @@ def do_handwork(d):
         return handwork.strike(state,tuple(h['what']),tuple(h['against']),h.get('heap',''))
     if v=='feed':return handwork.feed(state,h.get('heap',''),lot,pr.get('kg'))
     if v=='heat':return handwork.heat(state,h.get('heap',''),lot,float(pr.get('minutes') or 30))
+    if v=='press':
+        w=h.get('work_in');return handwork.press(state,lot,pr.get('shape',''),w[1] if w and w[0]=='lot' else None,pr.get('work_in_kg') or 0,pr.get('kg'))
+    if v=='wet':return handwork.wet(state,lot if lot is not None else (what[1] if what else None),pr.get('litres'))
+    if v=='cover':return handwork.cover(state,h.get('heap',''),lot,pr.get('kg'))
+    if v=='take':return handwork.take(state,h.get('heap',''))
+    if v=='rub':
+        if not h.get('what') or not h.get('against'):return {'success':False,'text':'He did not have that to hand.'}
+        return handwork.rub(state,tuple(h['what']),tuple(h['against']),float(pr.get('minutes') or 20))
     return handwork.dry(state,lot,float(pr.get('minutes') or 30))
 
 
