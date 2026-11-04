@@ -1564,3 +1564,13 @@ hands and feet are numb" or "cold through and shivering", warms up faster than h
 he is cold he shivers, which burns a little more food. Indoors he is told plainly what the room is
 like for warmth. Nothing says what he should do about it. A fire of his own would be a new thing
 for him to have, so it waits on his wants.
+
+## v0.30.19 — a stove on Edda's shelves
+
+Edda now stocks a small cast-iron wood stove with a flue pipe, for 14 gold. Nothing tells him it is
+there beyond the board and her shelves, as with anything else she sells. Once he owns it, it stands
+in his cabin with its pipe up through the roof. He lights it by using it, with his own wood (about
+four and a half kilos unless he says how much); it burns about a kilo and a half an hour, keeps the
+cabin warm while it burns, and goes out when the wood is gone. Edda knows what it does and how much
+it burns if he asks. Fallen wood from the woods and the post's seasoned wood both burn, so warmth
+now competes with selling wood for bread: his choice.

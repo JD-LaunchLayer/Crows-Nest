@@ -42,6 +42,7 @@ STARTING_STOCK = {
     'harp': {'name': 'Small harp in a cloth case', 'price': 12, 'qty': 1, 'effect': 'possession:harp'},
     'hunting_bow': {'name': 'Hunting bow (ash longbow)', 'price': 10, 'qty': 1, 'effect': 'possession:hunting_bow'},
     'arrows': {'name': 'Broadhead arrow', 'price': 1, 'qty': 12, 'effect': 'possession:arrows'},
+    'stove': {'name': 'Small cast-iron wood stove with a flue pipe', 'price': 14, 'qty': 1, 'effect': 'possession:stove'},
 }
 # Not on the shelves, but the post will buy them (about half this price) and sell them on at it.
 OTHER_PRICES = {'hide': 4}
@@ -122,7 +123,7 @@ def ensure(state):
     post = state.setdefault('trading', {'credit': 0., 'stock': {k: dict(v) for k, v in STARTING_STOCK.items()},
                                         'requests': [], 'ledger': []})
     state.setdefault('possessions', {})
-    for k in ('hunting_bow', 'arrows'):          # v0.26: on her shelves from now on
+    for k in ('hunting_bow', 'arrows', 'stove'):          # v0.26: on her shelves from now on (the stove from v0.30.19)
         post['stock'].setdefault(k, dict(STARTING_STOCK[k]))
     if not world.get('town_added'):
         objects = world['objects']
@@ -709,6 +710,7 @@ POSSESSION_LOOKS = {
     'hunting_bow': 'A plain ash longbow about as tall as he is, with a linen string and a leather grip; it takes a firm pull.',
     'arrows': 'Wooden arrows fletched with grey feathers, each with a broad, flat, sharpened steel head.',
     'hide': 'A raw animal hide, reddish-grey on the hair side, heavy and damp, rolled up.',
+    'stove': 'A squat black cast-iron stove on four short legs, with a hinged door, a small ash tray and a pipe that runs up through the roof of his cabin.',
 }
 # What Edda knows about her goods (only she is told this).
 ITEM_KNOWLEDGE = {
@@ -735,9 +737,13 @@ ITEM_KNOWLEDGE = {
              'raises it half a step, which is how you get sharps. Tunes are written as note names with how long each lasts; '
              'beginners start with simple folk tunes and get steadier with practice. Fast tunes, big jumps and lots of lever '
              'changes are harder. Music for it can be copied from sheets, made up, or found written down somewhere'),
+    'stove': ('a small cast-iron wood stove with a flue pipe: set up in a cabin, it warms the room through for as long as it burns. '
+              'It needs lighting and feeding with dry wood, about a kilo and a half an hour, and goes out when the wood is gone. '
+              'Fallen wood from the woods burns, and so does the seasoned wood the post sells by the kilo'),
     'whetstone': 'for sharpening blades: drawn along an axe or carving knife it restores a dulled edge; dull blades make chopping slow and carving rough',
 }
 TOOLS = {'axe', 'carving_knife'}
+STOVE_KG_PER_HOUR = 1.5
 
 
 def use_item(state, item, target, how):
@@ -752,6 +758,25 @@ def use_item(state, item, target, how):
         return {'success': True, 'text': f'Drew the {name} along the whetstone for a while. The edge now looks bright and even.'}
     if item == 'whetstone':
         return {'success': True, 'text': 'Turned the stone over and rubbed it with his thumb. Nothing else happened.'}
+    if item == 'stove':   # v0.30.19: lit and fed with his own wood; it burns as long as the wood lasts
+        import re
+        from datetime import datetime, timedelta
+        wood = state.get('materials', 0)
+        if wood < 1:
+            return {'success': False, 'text': 'Opened the stove door, but he has no wood to burn in it.'}
+        m = re.search(r'(\d+(?:\.\d+)?)\s*kg', str(how))
+        kg = round(min(wood, max(1., float(m.group(1)) if m else 4.5), 12.), 1)
+        state['materials'] = round(wood - kg, 2)
+        try:
+            now = datetime.fromisoformat(state['clock']['iso'])
+            old = datetime.fromisoformat(state.get('stove_until', '')) if state.get('stove_until') else now
+        except (KeyError, ValueError):
+            return {'success': False, 'text': 'The stove would not draw.'}
+        until = max(now, old) + timedelta(hours=kg / STOVE_KG_PER_HOUR)
+        state['stove_until'] = until.isoformat()
+        hours = (until - now).total_seconds() / 3600
+        return {'success': True, 'text': f'Laid {kg:g} kg of wood in the stove and lit it. It draws well; the cabin is warming, '
+                                         f'and there is enough in it to burn for about {round(hours)} hour{"s" if round(hours) != 1 else ""}.'}
     if item == 'lantern':
         return {'success': True, 'text': 'Lit the lantern: a small warm pool of light. He keeps it with him after dark.'}
     return {'success': True, 'text': f'Handled the {item.replace("_", " ")} ({" ".join(str(how).split())[:80] or "idly"}). Nothing in particular happened.'}

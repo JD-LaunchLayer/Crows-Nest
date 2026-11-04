@@ -148,6 +148,14 @@ def outside(state):
     return ' '.join(parts)
 
 
+def stove_lit(state):
+    """Is his stove burning (v0.30.19)? It burns until the wood he put in is gone."""
+    try:
+        return bool(state.get('stove_until')) and datetime.fromisoformat(state['clock']['iso']) < datetime.fromisoformat(state['stove_until'])
+    except (KeyError, ValueError, TypeError):
+        return False
+
+
 WARM_INSIDE = {'cafe': 'It is warm in here from the stove.', 'library': 'It is warm in here from the stove.'}
 
 
@@ -164,6 +172,8 @@ def felt_temp(state, action=None):
         return 19.
     if loc == 'shop' and 7 <= hour < 19:
         return 17.
+    if loc == 'cabin' and stove_lit(state):
+        return 16.   # warm through, though the open south side lets some of it out
     if loc in ('cabin', 'shop'):
         return w['temp'] + 2.
     return w['temp'] - (2 if w['wind'] == 'windy' else 0) - (2 if w['rain'] else 0)
@@ -177,8 +187,13 @@ def inside_line(state):
         return WARM_INSIDE[loc]
     if loc == 'shop' and 7 <= hour < 19:
         return "It is warm in the post from Edda's stove."
+    if loc == 'cabin' and stove_lit(state):
+        return 'The stove is burning, and the cabin is warm.'
     if loc == 'cabin':
         t = felt_temp(state)
+        if t < 12 and state.get('possessions', {}).get('stove'):
+            return ('Inside my cabin it is almost as ' + _warmth(t) + ' as outside: the stove is cold, and the open south '
+                    'side lets the air in. Under the covers, my bed is the warm place here.')
         if t < 12:
             return ('Inside my cabin it is almost as ' + _warmth(t) + ' as outside: there is no fire, and the open south '
                     'side lets the air in. Under the covers, my bed is the warm place here.')
