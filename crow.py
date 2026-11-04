@@ -12,6 +12,7 @@ import consolidation
 import experience
 import interactions
 import town
+import materials
 import story
 import garden
 import music
@@ -49,7 +50,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.31.0'
+APP_VERSION = '0.31.1'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -109,6 +110,9 @@ if SAVE.exists():
     if state.get('version',0)<5:
         migration_backup=ROOT/'crow-save-before-v0.5.json'
         if not migration_backup.exists():migration_backup.write_bytes(old_bytes)
+    if 'stock' not in state:   # v0.31.1: a copy of his life as it was, before the item ledger first runs
+        migration_backup=ROOT/'crow-save-before-v0.31.json'
+        if not migration_backup.exists():migration_backup.write_bytes(old_bytes)
     backup = ROOT / 'crow-save-before-v0.4.json'
     if not backup.exists():
         backup.write_bytes(old_bytes)
@@ -155,6 +159,8 @@ ecology.ensure(state)
 ecology.backfill_recorded(state)  # v0.24.2: his field notebook, from what he already recorded
 consolidation.ensure(state)
 town.ensure(state)
+materials.load()   # v0.31.1: the world's materials, checked; a malformed data file stops him starting rather than misleading him
+materials.ensure(state)
 if not state['trading'].get('money_note'):
     # v0.27: the post counts in gold and silver. Said once, plainly, in the post's ledger; his past entries keep their words.
     state['trading']['money_note']=True
@@ -1446,6 +1452,7 @@ def finish_action(geometry=None):
         reading_journal.record_reading(state,m,p,ROOT)
     state['pending']=None
     state['reflection_pending']=m['id']
+    materials.reconcile(state)   # whatever the action did to his wood or stone is kept in the ledger
     persist()
     return m
 

@@ -1609,3 +1609,28 @@ experiences changes in this version.
 
 Implemented now: the registry and the test. Planned next (phase 1): the materials data, the item stock
 ledger with the old wood, stone and possessions kept as views, seeded resource nodes, and gathering.
+
+## v0.31.1 — the materials data and the item ledger
+
+Phase 1, step 2. Nothing Crow experiences changes yet; this is the groundwork the next steps build on.
+
+- **data/materials.json** holds the hidden physics of twenty materials: six timbers (oak, ash, hazel,
+  birch, hornbeam, holly) and plain mixed wood, stone and flint, clay, sand and gravel, iron, copper and
+  tin ores, flax, nettle and reed fibre, wool and hide. Each has density, strength along and across the
+  grain, hardness, toughness, how it burns, how well it insulates, how it takes up water, how workable
+  it is, how fast it rots, where it melts, and its look, feel and sound. It is checked when he starts:
+  a missing field, a duplicate, a value out of range or broken JSON stops him starting rather than
+  letting the world mislead him. He never sees any of it.
+- **His stock is now a ledger of lots** (`state['stock']`): each lot its own thing, with what it is,
+  how much, its quality, condition and dampness, and where it came from. It began from what he already
+  had: one lot of plain wood and one of stone. His familiar totals are unchanged and kept in step, so
+  everything that reads or changes his wood and stone works exactly as before; anything that changes a
+  total directly is reconciled into the ledger after each action. Mass is conserved; reading the
+  ledger never changes anything; running the switchover twice changes nothing the second time.
+- **A backup first:** the first time the ledger runs on a life, a copy of the save is kept as
+  crow-save-before-v0.31.json (git-ignored, like every save).
+- Your report gains a "Stock ledger" line.
+
+Implemented now: data, checking, the ledger and its tests. Planned next (phase 1, step 3): the raw
+materials placed in the woods (seeded once, never moved), gathering them with what he has to hand,
+and drawing them in the world.

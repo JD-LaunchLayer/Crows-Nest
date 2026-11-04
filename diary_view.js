@@ -224,6 +224,7 @@ export function createDiary({document,player=null}){
     L.push(`Wildlife: ${alive} deer in the herd · hunts ${w.hunts||0} · carcasses waiting ${(w.carcasses||[]).length}`+(tr.length?' · birds trusting him: '+tr.map(([k,t])=>`${k} ${t.toFixed(2)}`).join(', '):''));}}
   const trees=Object.values(s.built_world?.trees||{}),standing=trees.filter(t=>t.stage==='standing'),near=standing.map(t=>Math.hypot(t.x,t.z)).sort((a,b)=>a-b)[0];
   L.push(`Woods: ${standing.length} standing · ${trees.filter(t=>t.stage==='felled').length} stumps · ${trees.filter(t=>t.stage==='young').length} planted · nearest tree ${near?Math.round(near):'-'} m from centre · fallen timber ${s.built_world?.sources?.wood?.stock??'-'} kg · wood carried ${s.materials??0} kg`);
+  {const lots=s.stock?.lots||[],by={};for(const l of lots)by[l.material]=(by[l.material]||0)+l.mass_kg;const parts=Object.entries(by).map(([m,kg])=>`${m.replace('_',' ')} ${Math.round(kg*10)/10} kg`);if(parts.length)L.push(`Stock ledger (${lots.length} lots): ${parts.join(' · ')}`);}
   if(s.model_spend)L.push(`Model: spend today $${(s.model_spend.usd||0).toFixed(3)} · ${s.model_spend.calls||0} calls · ${s.model_spend.fallbacks||0} fallbacks${s.model_spend.last_fallback?' · last fallback: '+cut(s.model_spend.last_fallback,140):''}`);
   const started=(s.memories||[]).filter(m=>m.kind==='started').slice(-30),counts={};for(const m of started)counts[m.action]=(counts[m.action]||0)+1;
   L.push('Last 30 choices: '+Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([a,n])=>`${a} ${n}`).join(', '));
