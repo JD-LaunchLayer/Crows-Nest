@@ -1490,3 +1490,9 @@ With nothing to eat, eating was rightly off his list, but out of habit he still 
 answer was refused and he dozed, again and again. Now, if he reaches for something he can't do,
 he realises why in his own terms ("I thought of eating, but I can't: there is nothing to eat: my
 food chest is empty and the bushes are bare") and decides again in the same moment.
+
+## v0.30.11 — insisting on food finds the empty chest
+
+If, after realising there is nothing to eat, he still reaches for food, he now goes and looks: the
+world tells him plainly the chest is empty, a few minutes pass, and he decides again with that fresh
+in mind. Before, that second choice was refused as invalid and his life stood still.

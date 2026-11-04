@@ -123,3 +123,15 @@ with tempfile.TemporaryDirectory() as td:
     app.model_call=fake
     d,_=app.choose_action();assert d['action']=='trade' and len(asked)==2 and 'nothing to eat' in asked[1]
 print('PASS v0.30.10: an impossible choice is realised and remade, never a stall.')
+# v0.30.11: if he insists on eating after realising there's nothing, he goes and finds the chest empty; never a stall.
+with tempfile.TemporaryDirectory() as td:
+    shutil.copy(ROOT/'crow.py',Path(td)/'crow.py')
+    spec=importlib.util.spec_from_file_location('crow_insist',Path(td)/'crow.py');app=importlib.util.module_from_spec(spec)
+    with contextlib.redirect_stdout(io.StringIO()):spec.loader.exec_module(app)
+    app.CLOCK_OVERRIDE=lambda:datetime(2026,12,17,16,0,tzinfo=app.TZ);app.clock();st=app.state
+    st['provisions']['pantry']=0.;st['provisions']['larder']=[];st['provisions']['berries']=0.;st['paused']=False
+    app.model_call=lambda p,s,*a,**k:({'action':'eat','intention':'i','reason':'r','next_step':'','wish':'','wish_reason':'','project':'none','which_project':''},1)
+    d,_=app.choose_action();assert d['action']=='eat'
+    app.start_action({**app.DECISION_DEFAULTS,**d},1);st['pending']['remaining']=0;m=app.finish_action(None)
+    assert 'chest is empty' in m['event'], m['event']
+print('PASS v0.30.11: insisting on food with none finds the empty chest, never a stall.')

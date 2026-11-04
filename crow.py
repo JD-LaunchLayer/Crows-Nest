@@ -48,7 +48,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.30.10'
+APP_VERSION = '0.30.11'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -676,7 +676,9 @@ def choose_action():
         seconds+=more
     for k in ['intention','reason','next_step','wish','wish_reason']:
         if not isinstance(d.get(k),str):raise ValueError('Invalid decision text: '+k)
-    if d.get('action') not in allowed:raise ValueError('Invalid action')
+    # v0.30.11: if he still reaches for food after realising there is none, he goes and looks: the world answers
+    # (the chest is empty), a few minutes pass, and he decides again with that fresh in mind. Never a stall.
+    if d.get('action') not in allowed and d.get('action')!='eat':raise ValueError('Invalid action')
     if d.get('project') not in ['none','continue','start','pause','abandon']:raise ValueError('Invalid project choice')
     # v0.30: he names a project by its title, never a number; and he cites nothing (he sees no IDs).
     if 'which_project' in d:d['project_id']=titles.get(d.pop('which_project'),0)
