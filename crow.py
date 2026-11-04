@@ -17,6 +17,7 @@ import resources
 import handwork
 import layout
 import perception
+import mind_map
 import story
 import garden
 import music
@@ -54,7 +55,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.35.0'
+APP_VERSION = '0.36.0'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -172,6 +173,7 @@ resources.ensure(state)   # v0.31.2: raw materials placed in his woods once, fro
 handwork.ensure(state)    # v0.32.0: his heaps, fires and practice
 layout.get()              # v0.34.0: the one world layout, checked; a malformed file stops him starting rather than misleading him
 layout.follow(state)      # v0.34.0: a real position, from where he already is
+mind_map.seed(state)      # v0.36.0: his remembered map, begun faintly from what his life already shows he knows
 if not state['trading'].get('money_note'):
     # v0.27: the post counts in gold and silver. Said once, plainly, in the post's ledger; his past entries keep their words.
     state['trading']['money_note']=True
@@ -791,12 +793,14 @@ def decision_context():
                    'open_favours':[f"{f['id']}: {f['task']} ({f['minutes']} min, pays {town.money(f['credit'])}). "
                                    f"Done by working at the trading post: trade, job {f['id']}." for f in town.keeper(state)['favours']]}],
         # v0.35.0: what he can actually make out from where he stands (lit windows after dark included), in plain words.
-        'around_me':perception.lines(state,WIDE)}
+        'around_me':perception.lines(state,WIDE),
+        # v0.36.0: what comes back to him about places, on cue, and what he has just noticed is not as he remembered.
+        'comes_back_to_me':mind_map.recall(state,WIDE),'not_as_i_remembered':mind_map.changes(state)}
     context=compact(context)
     # Recent events are what just happened to him: give them room (180 characters cut most observations
     # to their first finding and hid any closing statement). The budget below still trims if needed.
     context['recent_events']=[{k:m.get(k) for k in ['id','time']}|{'event':cut(str(m.get('event','')),700 if WIDE else 320)} for m in recent]
-    return fit(context,CONTEXT_BUDGET,['your_field_notebook','around_me','interests','wishes','self_notes','research','projects','paused_work','patterns_in_your_record','left_open','held_most_strongly','your_ongoing_stories','recent_events','relevant_memories'])
+    return fit(context,CONTEXT_BUDGET,['your_field_notebook','comes_back_to_me','around_me','interests','wishes','self_notes','research','projects','paused_work','patterns_in_your_record','left_open','held_most_strongly','your_ongoing_stories','recent_events','relevant_memories'])
 
 
 def inner_extras():
@@ -873,7 +877,7 @@ def parameter_request(d):
     if a=='fell_tree':
         # v0.35.0: a tree he can see from the woods, picked by his own words for it, never by an id.
         x,z=layout.stand('woods')
-        trees=perception.handles(state,kinds={'tree'},at=(x,z,layout._facing(x,z)),limit=14,
+        trees=perception.handles(state,kinds={'tree'},at=(x,z,layout.facing('woods')),limit=14,
                                  test=lambda h:world['trees'].get(h,{}).get('stage')=='standing')
         return ('Choose a standing tree you can see from the woods. Felling takes long effort, leaves a stump and finite timber at the site; no regrowth.',
                 {'object_id':{'type':'string','enum':list(trees) or ['none']}},
@@ -1544,6 +1548,7 @@ def finish_action(geometry=None):
     state['pending']=None
     state['reflection_pending']=m['id']
     materials.reconcile(state)   # whatever the action did to his wood or stone is kept in the ledger
+    mind_map.update(state,a,senses.felt_temp(state,a))   # v0.36.0: what he noticed and found here, remembered
     persist()
     return m
 
@@ -2074,7 +2079,7 @@ class Handler(BaseHTTPRequestHandler):
             cached=STATE_CACHE.get(viewer)
             if not cached or time.monotonic()-cached[0]>1.5:
                 with LOCK:
-                    clock();body=json.dumps({**state,'ecology_view':ecology.view(state,now().timetuple().tm_yday),'birds_view':birds.view(state,ecology,state.get('daylight',0)),'deer_view':wildlife.view(state,ecology,state.get('daylight',0)),'resources_view':resources.view(state),'fires_view':handwork.view(state),'outside_now':senses.outside(state),'reading_log':reading_journal.page(state)['items'],
+                    clock();body=json.dumps({**({k:v for k,v in state.items() if k!='mind_map'} if viewer=='visitor' else {**state,'mind_map_view':mind_map.view(state)}),'ecology_view':ecology.view(state,now().timetuple().tm_yday),'birds_view':birds.view(state,ecology,state.get('daylight',0)),'deer_view':wildlife.view(state,ecology,state.get('daylight',0)),'resources_view':resources.view(state),'fires_view':handwork.view(state),'outside_now':senses.outside(state),'reading_log':reading_journal.page(state)['items'],
                         'reading_count':len(state['reading_log']),'runtime':runtime,'viewer':viewer,
                         'maintenance_enabled':owner and ACCESS_TOKEN is not None and (ROOT/'.git').exists()}).encode()
                 cached=STATE_CACHE[viewer]=(time.monotonic(),body,gzip.compress(body,5))

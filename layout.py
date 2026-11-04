@@ -99,8 +99,9 @@ def ensure_position(state):
     """Give him a real position, worked out from where he already is. Additive; a second run changes nothing."""
     if state.get('spatial_version') == 1 and isinstance(state.get('position'), dict):
         return state['position']
-    x, z = stand(state.get('location', 'cabin'))
-    state['position'] = {'x': float(x), 'z': float(z), 'heading': _facing(x, z), 'since': state.get('clock', {}).get('iso', '')}
+    place = state.get('location', 'cabin')
+    x, z = stand(place)
+    state['position'] = {'x': float(x), 'z': float(z), 'heading': facing(place), 'since': state.get('clock', {}).get('iso', '')}
     state['spatial_version'] = 1
     return state['position']
 
@@ -113,8 +114,18 @@ def follow(state):
     if region_of(pos['x'], pos['z']) == place:
         return pos
     x, z = stand(place)
-    pos.update(x=float(x), z=float(z), heading=_facing(x, z), since=state.get('clock', {}).get('iso', ''))
+    pos.update(x=float(x), z=float(z), heading=facing(place), since=state.get('clock', {}).get('iso', ''))
     return pos
+
+
+def facing(place):
+    """Which way he faces at a place's usual spot: as the layout says (into the woods, towards the target), or else
+    into the middle of the clearing."""
+    p = get()['places'].get(place, {})
+    if 'facing' in p:
+        return p['facing']
+    x, z = stand(place)
+    return _facing(x, z)
 
 
 def _facing(x, z):

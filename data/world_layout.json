@@ -53,14 +53,16 @@
     10,
     -8
    ],
-   "words": "the archery range by the target"
+   "words": "the archery range by the target",
+   "facing": 3.142
   },
   "woods": {
    "stand": [
     13,
     10
    ],
-   "words": "the woods"
+   "words": "the woods",
+   "facing": 1.571
   },
   "shop": {
    "stand": [

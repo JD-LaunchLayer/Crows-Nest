@@ -1877,3 +1877,26 @@ Read-only and deterministic: the same moment always gives the same view, and see
 tests/test_seeing.py (plain words with no coordinates, ids, metres or per cent anywhere in his view; walls hide;
 dark shortens sight; thirst draws the eye to water; his phrases map back to the right things; within budget).
 Next: v0.36.0, the remembered map.
+
+## v0.36.0 — the remembered map (mapping phase 3)
+
+He now keeps a remembered map (mind_map.py), built only from what he has perceived and done, never from the world's
+layout:
+
+- **Landmarks:** the things he noticed around him are remembered by their look ("a tall oak with bare branches",
+  "the provisions chest"), with where he was when he saw them. They grow clearer each time he sees them again and
+  fade when he does not; after a few weeks unseen they are forgotten.
+- **Places:** each place he has been keeps what he found there: whether he was warm there (by a stove, not in bed),
+  whether he drank or ate there, whether he bought food there.
+- **Out of date until he looks:** if the world changes (a tree felled, a thing moved) the old memory stands until he
+  sees it again; then he notices it ("The tall oak I remembered is the stump of a felled oak now.").
+- **Coming back to mind, on cue (approved):** when he is cold, somewhere he has really been warm comes back ("I remember
+  it being warm in the trading post, by Edda's stove"); thirsty, where he has drunk; hungry, where he has eaten or
+  bought food; and landmarks that match what he means to do. Only ever what he has experienced, as memory, never as
+  advice, within a small budget, in plain words.
+- **Begun from his life so far:** on first start his past visits seed the places faintly (he has been warm in the
+  café, the reading cabin, and the post by day), and the raw-material places he has recorded become faint landmarks.
+  Nothing he never experienced is added.
+- Visitors to the public page do not receive his map; your own view of the page gets a summary of it.
+
+Places at the woods and the range now face into the woods and towards the target. Test: tests/test_remembered_map.py.

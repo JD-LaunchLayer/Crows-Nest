@@ -290,6 +290,10 @@ def scene(state, ctx, extras):
     out.append(' '.join(body) + ' ' + mood(ctx.get('affect', {})))
     if ctx.get('around_me'):   # v0.35.0: what he can make out from where he stands, a few things as anyone notices them
         out.append('What I can make out around me:\n' + '\n'.join('- ' + x for x in ctx['around_me']))
+    if ctx.get('not_as_i_remembered'):   # v0.36.0: something is not as he remembered it
+        out.append(' '.join(ctx['not_as_i_remembered']))
+    if ctx.get('comes_back_to_me'):   # v0.36.0: places and things that come back to mind on cue (memory, not advice)
+        out.append('What comes back to me:\n' + '\n'.join('- ' + x for x in ctx['comes_back_to_me']))
     if extras.get('dream'):
         out.append('Last night I dreamt: ' + extras['dream'])
     if extras.get('thoughts'):

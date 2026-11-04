@@ -46,7 +46,7 @@ def observer(state):
     if isinstance(pos, dict) and 'x' in pos:
         return pos['x'], pos['z'], pos.get('heading', 0.)
     x, z = layout.stand(loc)
-    return x, z, layout._facing(x, z)
+    return x, z, layout.facing(loc)
 
 
 # ---- What there is to see ----
