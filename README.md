@@ -1753,3 +1753,12 @@ What the world does:
 
 Test: tests/test_clay_fire.py. Not yet (phase 3): snares, drying and salting food, hides, cord, clothing, the
 sheep, and moving hunt/butcher/preserve to plain verbs.
+
+## v0.33.1 — the post can pay back what it owes him
+
+Left to him and Edda, the 19 December wood mix-up still had a gap: even if they worked out that the post took
+4 kg of his wood for nothing, the world gave Edda no way to pay it back (only a gift of at most 1 gold).
+Now Edda is told what her own book shows the post owes him (wood or stone it took from him for less than the
+posted rate, less anything already paid back), and she may pay some or all of it with a new kind of deal,
+make_good, if he raises it or they come to it going through those entries. It cannot pay more than the book
+shows is owed. Nothing in the book is changed; a payment back is a new line. Test: tests/test_post_owes.py.

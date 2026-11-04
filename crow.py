@@ -52,7 +52,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.33.0'
+APP_VERSION = '0.33.1'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -1819,7 +1819,8 @@ def describe_offer(p):
     return {'sell_item':f"Edda would sell you {p['quantity']} × {p['item']} for {town.money(p['credit'])}",
             'buy_goods':f"Edda would take {p['quantity']} of your {p['item']} for {town.money(p['credit'])}",
             'favour':f"Edda asks/accepts a favour: {p['task']} ({p['minutes']} minutes) for {town.money(p['credit'])}",
-            'gift':f"Edda offers you {town.money(p['credit'])} as a gift"}.get(p.get('kind'),'')
+            'gift':f"Edda offers you {town.money(p['credit'])} as a gift",
+            'make_good':f"Edda would pay you {town.money(p['credit'])} that the post owes you"}.get(p.get('kind'),'')
 
 
 def talk_session(opening, hope):
@@ -1839,9 +1840,10 @@ def talk_session(opening, hope):
             'proposal is ONE optional deal (kind none if you are just talking): sell_item (item = a stock id, credit = total price in gold; you '
             'may haggle but not below 70% of the board), buy_goods (item = wood, stone or one of his carving ids he has mentioned; '
             'quantity in kg or 1), favour (task, minutes 15-180, pay up to about 1 gold 5 silver per 30 minutes; you may ask him for help or '
-            'accept help he offers), or gift (at most 1 gold, rarely). note_about_crow is what you would remember about him from this; '
+            'accept help he offers), gift (at most 1 gold, rarely), or make_good (credit = some or all of what your book shows the post owes him; '
+            'only if it owes him anything). note_about_crow is what you would remember about him from this; '
             'warmth -1..1 is how you feel towards him now. '+json.dumps({'board':board,'his_money':town.money(credit),'what_you_remember':kp['notes'][-10:],
-            'open_favours':kp['favours'],'next_delivery_due':town.next_delivery(state),
+            'open_favours':kp['favours'],'next_delivery_due':town.next_delivery(state),'what_your_book_shows_the_post_owes_him':town.post_owes(state),
             'your_ledger_for_days_he_mentions':{q:town.ledger_lookup(state,q,20) for q in set(re.findall(r'\d{4}-\d{1,2}-\d{1,2}|\b\d{1,2}-\d{1,2}\b',' '.join(c['text'] for c in convo if c['who']=='Crow')))},
             'your_ledger_last_three_days':[f"{str(l.get('at',''))[:16].replace('T',' ')} · {l['text']}" for l in state['trading']['ledger'] if str(l.get('at',''))[:10]>=(now()-timedelta(days=3)).date().isoformat()][-30:],'what_your_goods_are_for':town.ITEM_KNOWLEDGE,'conversation':convo},ensure_ascii=False),keeper_schema,350,'keeper',system=town.KEEPER_PERSONA)
         reply=' '.join(str(last.get('reply','')).split())[:400]

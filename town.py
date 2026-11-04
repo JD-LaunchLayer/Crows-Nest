@@ -8,6 +8,7 @@ finite; only Jordan restocks it (tools/stock_shop.py). Items Crow asks for are
 recorded as requests so Jordan can decide whether to stock them.
 """
 import math
+import re
 
 from world_state import part
 
@@ -245,7 +246,10 @@ KEEPER_PERSONA = ('You are Edda Thorne, keeper of the small trading post beside 
     'agreed and the goods go with him then, so nobody ever owes you a balance, and you never say they do. '
     'If he asks to pay part now and part later, you say no to the tab kindly. '
     'Your book is what you are told of it: when he asks about a day, go by those entries exactly, read him every one if he '
-    'wants them, and never agree that something is in your book, or that money is missing or owed, when it is not.')
+    'wants them, and never agree that something is in your book, or that money is missing or owed, when it is not. '
+    'You are also told what your book shows the post owes HIM, if anything: goods you took from him and paid less than '
+    'they were worth. That is a real debt of the post\'s; if he raises it, or you come to it going through those entries, '
+    'say so plainly and you may pay it back with a make_good proposal.')
 
 
 def keeper(state):
@@ -253,7 +257,7 @@ def keeper(state):
                                        'favours': [], 'next_favour': 1, 'last_gift': ''})
 
 
-PROPOSAL_KINDS = ['none', 'sell_item', 'buy_goods', 'favour', 'gift']
+PROPOSAL_KINDS = ['none', 'sell_item', 'buy_goods', 'favour', 'gift', 'make_good']
 
 
 def proposal_schema():
@@ -402,6 +406,11 @@ def check_proposal(state, p, day):
         if p['credit'] > p['minutes'] / 30 * 1.5 + 1e-9:
             return False, 'more pay than the post can give for that work'
         return True, ''
+    if kind == 'make_good':
+        owed = post_owes(state)['total']
+        if p['credit'] <= 0 or p['credit'] > owed + 1e-9:
+            return False, f'the post owes him {money(owed)} by its book'
+        return True, ''
     if kind == 'gift':
         if keeper(state)['last_gift'] == day:
             return False, 'she has already given something today'
@@ -437,6 +446,10 @@ def apply_proposal(state, p, at, day):
         kp['favours'] = (kp['favours'] + [fav])[-6:]
         text = (f'Agreed a favour for Edda: "{fav["task"]}" ({fav["minutes"]} minutes, {money(fav["credit"])}). '
                 f'It is done by working at the trading post as job {fav["id"]}; whatever the work needs is there.')
+    elif kind == 'make_good':
+        post['credit'] = round(post['credit'] + p['credit'], 2)
+        post.setdefault('made_good', []).append({'at': at, 'credit': p['credit']})
+        text = f'Edda paid him {money(p["credit"])} that the post owed him for goods it took from him underpaid.'
     else:
         kp['last_gift'] = day
         post['credit'] = round(post['credit'] + p['credit'], 2)
@@ -534,6 +547,33 @@ def ledger_lookup(state, query, limit=15):
         words = [w for w in re.findall(r'[a-z]+', q) if len(w) > 2]
         hits = [l for l in book if words and all(w in l['text'].lower() for w in words)]
     return [f"{str(l.get('at', ''))[:16].replace('T', ' ')} · {l['text']}" for l in hits[-limit:]]
+
+
+def _parse_money(text):
+    if text.strip() == 'nothing':
+        return 0.
+    g = re.search(r'(\d+) gold', text)
+    sv = re.search(r'(\d+) silver', text)
+    return (int(g.group(1)) if g else 0) + (int(sv.group(1)) / 10 if sv else 0)
+
+
+def post_owes(state):
+    """v0.33.1: what the post's own book shows it owes him: wood or stone it took from him in a deal for less than
+    the posted rate, less anything already made good. Read-only. Before v0.32.2 a deal could take goods for nothing."""
+    post = ensure(state)
+    lines, short = [], 0.
+    for l in post.get('ledger', []):
+        m = re.match(r'Edda took ([\d.]+) kg of (wood|stone) for (.+?)\.$', l.get('text', ''))
+        if not m:
+            continue
+        worth = int(float(m.group(1)) / SELL_RATES[m.group(2)]['kg_per_credit'] * 10 + 1e-6) / 10
+        paid = _parse_money(m.group(3))
+        if worth - paid > .05:
+            short += worth - paid
+            lines.append(f"{str(l.get('at', ''))[:16].replace('T', ' ')} · took {m.group(1)} kg of {m.group(2)} worth {money(worth)} at the posted rate, paid {money(paid)}")
+    made = sum(x['credit'] for x in post.get('made_good', []))
+    total = round(max(0., short - made), 1)
+    return {'total': total, 'entries': lines if total > 0 else [], 'already_made_good': money(made) if made else 'nothing'}
 
 
 def _record(post, text, at):
