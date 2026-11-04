@@ -1496,3 +1496,11 @@ food chest is empty and the bushes are bare") and decides again in the same mome
 If, after realising there is nothing to eat, he still reaches for food, he now goes and looks: the
 world tells him plainly the chest is empty, a few minutes pass, and he decides again with that fresh
 in mind. Before, that second choice was refused as invalid and his life stood still.
+
+## v0.30.12 — a plan to eat what isn't there ends
+
+After his chest ran out he kept going back "to eat the last bit of bread slowly". That plan was being
+kept open as a story he was in the middle of, and every failed visit added a step to it (76), so it
+was shown back to him each moment as something under way, as if the bread were waiting. Now a plan to
+eat ends when he finds the source empty or bare ("there was nothing there to eat"), as it would for
+anyone. His memory of looking is untouched.

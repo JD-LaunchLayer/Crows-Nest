@@ -113,6 +113,14 @@ def settle_need(state, memory, sensations):
             return
     if not need or not story or story['stage'] not in ('started', 'pursuing', 'dormant'):
         return
+    result = memory.get('world_result') if isinstance(memory.get('world_result'), dict) else {}
+    if memory.get('action') == 'eat' and result.get('success') is False and re.search(r'empty|bare', str(result.get('text', ''))):
+        # v0.30.12: a plan to eat what is no longer there ends when he finds nothing; it is not carried on as
+        # something he is in the middle of (which kept telling him "the last bit of bread" was still waiting).
+        story['stage'] = 'left'
+        story['ended'] = memory.get('at', '')
+        story['ended_by'] = 'there was nothing there to eat'
+        return
     title = story['title'].lower()
     felt = ' '.join(sensations).lower()
     words = set(re.findall(r'[a-z]+', title))

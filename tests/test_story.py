@@ -91,3 +91,8 @@ for i in range(8):
 story.update_beliefs(_st2,'t')
 assert not any(b['key'].endswith(':eat') for b in _st2['beliefs']), _st2['beliefs']
 print('PASS v0.30.8: an empty chest is not a meal in his record.')
+# v0.30.12: a plan to eat the last bread ends when the chest turns out empty; it is not shown as still under way.
+_st3={'stories':[{'id':1,'title':'Eat the last bit of bread slowly here in my cabin','stage':'pursuing','steps':[]}]}
+story.settle_need(_st3,{'action':'eat','story_id':1,'at':'t','world_result':{'success':False,'text':'Nothing was eaten: the provisions chest is empty.'}},['Persistent hunger; little food is being digested.'])
+assert _st3['stories'][0]['stage']=='left' and 'nothing there' in _st3['stories'][0]['ended_by']
+print('PASS v0.30.12: a plan to eat what is not there ends when he finds nothing.')
