@@ -1837,3 +1837,15 @@ chose, staying put cost nothing. Now hours of lying awake (not sleeping) are fel
 "my limbs are stiff from lying still so long", after five "I'm stiff and restless from lying still for hours; I can't
 settle". Being up and about loosens him again (an hour clears most of it). When he is sleepy, lying still is no bother,
 and sleep neither stiffens nor loosens him. Nothing tells him what to do about it. Test: tests/test_restless.py.
+
+## v0.34.5 — Edda, an elf woman; and a warmth meter for Jordan
+
+**Edda** is now an elf like Crow, modelled with the same care: tall, older than him, a long chestnut braid going grey
+at the temples, green eyes, pointed ears, a moss-green shawl over a rust-brown dress, a worn leather apron, her hands
+resting on the counter; she breathes, glances about and her braid sways. Crow sees her when he is at the post, in
+plain words, with what her hands are busy with at that hour (opening the shutters in the morning, writing in her
+ledger, sorting seed packets, counting coins by lamplight, dozing by the banked stove at night). Her own character
+knows she is an elf and never remarks on it. She stays a shopkeeper: no needs or life of her own.
+
+**Warmth meter** (Jordan's panel only, under Fed and Rested): blue is chilled, the middle comfortable, red too hot,
+with a word beside it. It moves as slowly as his body does. Crow never sees it. Test: tests/test_edda_elf.py.

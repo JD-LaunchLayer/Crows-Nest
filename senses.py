@@ -142,6 +142,8 @@ def outside(state):
         parts.append('My breath shows in the air.')
     if indoors and inside_line(state):
         parts.append(inside_line(state))
+    if state.get('location') == 'shop':
+        parts.append(edda_line(state))
     heard = _sounds(state, w, dark, indoors)
     if heard:
         parts.append(('From inside I can hear ' if indoors else 'I can hear ') + ' and '.join(heard) + '.')
@@ -182,6 +184,21 @@ def felt_temp(state, action=None):
     if loc in ('cabin', 'shop'):
         return t + 2. if t < 14 else t - 2.
     return w['temp'] - (2 if w['wind'] == 'windy' else 0) - (2 if w['rain'] else 0)
+
+
+# v0.34.5: Edda as he sees her: an elf woman behind her counter, and what her hands are busy with at this hour.
+EDDA_LOOK = ('Edda is behind her counter: a tall elf woman, older than me, her chestnut hair in a long braid with grey '
+             'at the temples, a moss-green shawl over a rust-brown dress and a worn leather apron')
+EDDA_BUSY = {(5, 9): 'stoking the stove and opening the shutters', (9, 12): 'writing slowly in her ledger, her pen scratching',
+             (12, 14): 'eating a heel of bread and cheese at the end of the counter', (14, 17): 'sorting seed packets into their trays',
+             (17, 20): 'sweeping round the stove and banking it up', (20, 24): 'counting the day\'s coins by lamplight',
+             (0, 5): 'dozing in her chair by the banked stove, a blanket over her knees'}
+
+
+def edda_line(state):
+    _, _, hour = _when(state)
+    busy = next(v for (a, b), v in EDDA_BUSY.items() if a <= hour < b)
+    return f'{EDDA_LOOK}; she is {busy}.'
 
 
 def inside_line(state):

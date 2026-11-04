@@ -306,12 +306,35 @@ for(const x of [-.17,.17]){box(.34,.025,.43,'#79523c',x,0,0,heldBook);box(.30,.0
 const pagePivot=new T.Group();pagePivot.position.y=.065;heldBook.add(pagePivot);box(.31,.004,.38,'#faf0d4',.155,0,0,pagePivot);
 const crowTag=new T.Sprite(new T.SpriteMaterial({map:(()=>{const c=document.createElement('canvas');c.width=256;c.height=64;const ctx=c.getContext('2d');ctx.font='36px Georgia';ctx.fillStyle='#fff5d7';ctx.textAlign='center';ctx.fillText('Crow',128,45);return new T.CanvasTexture(c)})(),depthTest:true}));crowTag.position.y=2.3;crowTag.scale.set(1.8,.45,1);crow.add(crowTag);
 // Edda Thorne, keeper of the trading post, behind her counter. Shown once the post exists in his world.
+// v0.34.5: Edda Thorne, an elf woman, keeper of the trading post, behind her counter (built to the same care as Crow).
+// Tall, older than him: chestnut braid greying at the temples, moss-green shawl, rust-brown dress, worn leather apron.
 const edda=new T.Group();edda.position.set(-3,0,-18.25);edda.visible=false;scene.add(edda);
-mesh(new T.CylinderGeometry(.22,.3,1.0,7),'#5d4a6b',0,.55,0,edda);mesh(new T.CylinderGeometry(.24,.2,.5,7),'#7a6a55',0,1.3,0,edda);
-mesh(new T.IcosahedronGeometry(.18,1),'#e0bea0',0,1.72,0,edda);mesh(new T.SphereGeometry(.19,8,5,0,Math.PI*2,0,Math.PI*.5),'#9a9a95',0,1.76,-.02,edda);
-mesh(new T.SphereGeometry(.1,6,5),'#9a9a95',0,1.78,-.17,edda);
-for(const x of [-.06,.06])box(.03,.03,.02,'#3b2f2a',x,1.75,.17,edda);
-for(const x of [-.3,.3])mesh(new T.CylinderGeometry(.06,.05,.55,6),'#7a6a55',x,1.22,0,edda);
+const E_SKIN='#dcb894',E_DRESS='#7a4a32',E_SHAWL='#5f7448',E_APRON='#8a6a46',E_HAIR='#7a4b2c',E_GREY='#a59b8e',E_BOOTS='#3a2c22';
+cyl(.2,.34,.95,E_DRESS,0,.5,0,edda,9);                                   // long skirt
+cyl(.22,.2,.5,E_DRESS,0,1.2,0,edda,8);                                    // bodice
+box(.34,.72,.03,E_APRON,0,.72,.27,edda).rotation.x=-.12;                 // apron front
+mesh(new T.TorusGeometry(.215,.025,4,10),E_APRON,0,1.0,0,edda).rotation.x=Math.PI/2; // apron strings at the waist
+const shawl=cyl(.3,.24,.24,E_SHAWL,0,1.38,0,edda,8);shawl.scale.z=.85;     // shawl over the shoulders
+box(.08,.34,.03,E_SHAWL,-.1,1.18,.21,edda).rotation.z=.12;box(.08,.34,.03,E_SHAWL,.1,1.18,.21,edda).rotation.z=-.12; // shawl ends
+cyl(.065,.075,.14,E_SKIN,0,1.53,0,edda);                                  // neck
+const eddaHead=new T.Group();eddaHead.position.y=1.7;edda.add(eddaHead);
+mesh(new T.IcosahedronGeometry(.18,2),E_SKIN,0,.03,0,eddaHead).scale.set(.9,1.14,.98);
+const eHair=mesh(new T.SphereGeometry(.195,10,6,0,Math.PI*2,0,Math.PI*.56),E_HAIR,0,.075,-.03,eddaHead);eHair.rotation.x=-.32;
+for(const x of [-.15,.15])cyl(.035,.025,.22,E_HAIR,x,-.04,-.06,eddaHead,5);   // locks falling beside her face
+for(const x of [-.13,.13])mesh(new T.SphereGeometry(.05,6,4),E_GREY,x,.08,.06,eddaHead);              // grey at the temples
+const braid=new T.Group();braid.position.set(0,-.02,-.17);eddaHead.add(braid);                          // a long braid down her back
+for(let i=0;i<6;i++)mesh(new T.IcosahedronGeometry(.055-i*.004,0),E_HAIR,0,-i*.09,-.02*i,braid);
+mesh(new T.ConeGeometry(.03,.08,5),'#5a3a22',0,-.56,-.12,braid).rotation.x=Math.PI;                     // tied end
+for(const x of [-.18,.18]){const ear=mesh(new T.ConeGeometry(.04,.24,4),E_SKIN,x,.05,-.01,eddaHead);ear.rotation.z=x>0?-1.0:1.0;ear.rotation.x=-.3;}
+for(const x of [-.065,.065]){box(.045,.026,.02,'#f4efe2',x,.06,.168,eddaHead);box(.02,.024,.02,'#4f6b3a',x,.06,.176,eddaHead);box(.06,.012,.02,'#6b4a33',x,.1,.172,eddaHead).rotation.z=x>0?-.12:.12;}
+mesh(new T.ConeGeometry(.022,.065,4),E_SKIN,0,.01,.19,eddaHead).rotation.x=Math.PI/2;                   // nose
+box(.06,.012,.01,'#a0624f',0,-.06,.172,eddaHead);                                                      // mouth
+const eddaArms=[];
+for(const x of [-.27,.27]){const sh=new T.Group();sh.position.set(x,1.36,0);edda.add(sh);eddaArms.push(sh);
+ cyl(.06,.055,.3,E_DRESS,0,-.15,0,sh);const el=new T.Group();el.position.y=-.3;sh.add(el);
+ cyl(.055,.05,.24,E_DRESS,0,-.12,0,el);mesh(new T.IcosahedronGeometry(.048,0),E_SKIN,0,-.27,0,el);sh.userData.elbow=el;}
+eddaArms[0].rotation.x=-.5;eddaArms[0].userData.elbow.rotation.x=-.7;eddaArms[1].rotation.x=-.35;eddaArms[1].userData.elbow.rotation.x=-.9; // hands on the counter
+for(const x of [-.09,.09])box(.11,.07,.2,E_BOOTS,x,.035,.08,edda);       // boot toes under the hem
 const eddaTag=new T.Sprite(new T.SpriteMaterial({map:(()=>{const c=document.createElement('canvas');c.width=256;c.height=64;const ctx=c.getContext('2d');ctx.font='32px Georgia';ctx.fillStyle='#fff5d7';ctx.textAlign='center';ctx.fillText('Edda',128,45);return new T.CanvasTexture(c)})(),depthTest:true}));eddaTag.position.y=2.2;eddaTag.scale.set(1.2,.3,1);edda.add(eddaTag);
 // Motions are visual only. AI choices, real activity timers and saved outcomes are unchanged.
 const anim={steps:[],pose:'idle',elapsed:0,book:false,seated:0,floor:0,desired:null,key:null,returning:false,activeAction:'rest'};
@@ -475,7 +498,10 @@ if(clientVersion&&s.runtime.version&&clientVersion!==s.runtime.version){globalTh
 const maintenance=s.runtime.maintenance||{status:'idle'};if(updateRequested&&maintenance.status==='complete'){globalThis.location?.reload?.();return;}const updating=['checking','backing_up','pulling','restarting'].includes(maintenance.status);
 if($('updateCrow')){ $('updateCrow').disabled=updating||!s.maintenance_enabled; $('updateCrow').textContent=updating?'Updating…':'Back up and update';txt('updateStatus',maintenance.message||(s.maintenance_enabled?'Ready. Your private life data stays on the PC.':'Start Crow with --lan from its Git checkout to enable authenticated updates.'));}
 if(['complete','up_to_date','failed','interrupted'].includes(maintenance.status))updateRequested=false;
-txt('toggle',s.paused?'Begin life':'Pause');{const visitor=s.viewer==='visitor';$('toggle').hidden=visitor;const up=$('updateCrow')?.closest?.('section');if(up)up.hidden=visitor;document.body?.classList?.toggle('visitor',visitor);}txt('clock',`${s.clock.date} · ${s.clock.time} · ${s.twin?'twin clock':s.crow_clock?`Crow's time${s.crow_clock.scale>1?' ('+s.crow_clock.scale+'× speed)':''}`:'UK time'}`);txt('status',s.runtime.status+(s.last_seconds!==null?' · Last choice '+s.last_seconds+'s':''));txt('error',s.last_error);$('toggle').disabled=updating;txt('activity',({eat:'Eating',drink:'Drinking',rest:'Resting',practise:'Practising archery',explore:'Exploring',craft:'Making a carving',read:'Reading Wikipedia',sleep:'Sleeping',observe:'Watching the woodland',reflect:'Reflecting',gather:'Gathering materials',plan:'Preparing a construction plan',construct:'Constructing',move_object:'Carrying and placing an object',inspect:'Inspecting an object',fell_tree:'Felling a tree',interact:'Working with objects',browse:'Browsing the web',talk:'Talking with Edda',trade:'At the trading post',use_item:'Using an item',garden:'Working in the garden',plant_tree:'Planting a tree',play_music:'Playing the harp',resume_work:'Returning to his work',hunt:'Out with the bow',butcher:'Cutting up a carcass',preserve:'Smoking meat',put_out_food:'Putting food out and waiting quietly',notebook:'Writing in his notebook'})[s.action]||s.action);txt('reason',s.reason);{const b=s.body||{};$('energy').value=b.reserve??s.energy;if($('rested'))$('rested').value=Math.max(0,Math.min(100,100-(b.sleep_debt||0)*100/12-(b.exertion||0)*40));}txt('resources',`Wood: ${s.materials} kg · Stone: ${s.stone||0} kg · Archery sessions: ${s.skills.archery} · Carvings: ${s.skills.craft}`);txt('intention',s.current_intention||'Crow has not expressed an intention yet.');
+txt('toggle',s.paused?'Begin life':'Pause');{const visitor=s.viewer==='visitor';$('toggle').hidden=visitor;const up=$('updateCrow')?.closest?.('section');if(up)up.hidden=visitor;document.body?.classList?.toggle('visitor',visitor);}txt('clock',`${s.clock.date} · ${s.clock.time} · ${s.twin?'twin clock':s.crow_clock?`Crow's time${s.crow_clock.scale>1?' ('+s.crow_clock.scale+'× speed)':''}`:'UK time'}`);txt('status',s.runtime.status+(s.last_seconds!==null?' · Last choice '+s.last_seconds+'s':''));txt('error',s.last_error);$('toggle').disabled=updating;txt('activity',({eat:'Eating',drink:'Drinking',rest:'Resting',practise:'Practising archery',explore:'Exploring',craft:'Making a carving',read:'Reading Wikipedia',sleep:'Sleeping',observe:'Watching the woodland',reflect:'Reflecting',gather:'Gathering materials',plan:'Preparing a construction plan',construct:'Constructing',move_object:'Carrying and placing an object',inspect:'Inspecting an object',fell_tree:'Felling a tree',interact:'Working with objects',browse:'Browsing the web',talk:'Talking with Edda',trade:'At the trading post',use_item:'Using an item',garden:'Working in the garden',plant_tree:'Planting a tree',play_music:'Playing the harp',resume_work:'Returning to his work',hunt:'Out with the bow',butcher:'Cutting up a carcass',preserve:'Smoking meat',put_out_food:'Putting food out and waiting quietly',notebook:'Writing in his notebook'})[s.action]||s.action);txt('reason',s.reason);{const b=s.body||{};$('energy').value=b.reserve??s.energy;if($('rested'))$('rested').value=Math.max(0,Math.min(100,100-(b.sleep_debt||0)*100/12-(b.exertion||0)*40));
+ // v0.34.5: his warmth for Jordan (he never sees it): chill pulls the mark left, heat right, comfortable in the middle.
+ const w=Math.max(-1,Math.min(1,(b.heat||0)-(b.chill||0)));if($('warmthMark')?.style)$('warmthMark').style.left=(50+w*50)+'%';
+ txt('warmthWord',w<-.65?'· cold through':w<-.35?'· cold':w<-.15?'· a little cold':w>.65?'· overheated':w>.35?'· hot':w>.15?'· a little warm':'· comfortable');}txt('resources',`Wood: ${s.materials} kg · Stone: ${s.stone||0} kg · Archery sessions: ${s.skills.archery} · Carvings: ${s.skills.craft}`);txt('intention',s.current_intention||'Crow has not expressed an intention yet.');
 setActivity(s);
 $('feed').replaceChildren();for(const m of s.memories.slice(-16).reverse())entry($('feed'),m.event,[m.at?new Date(m.at).toLocaleString('en-GB',{timeZone:'Europe/London'}):`Earlier prototype · Day ${m.day} · ${m.time}`,m.intention?'Aim: '+m.intention:'',m.reason?'Why: '+m.reason:'',m.next_step?'Tentative next step: '+m.next_step:''].filter(Boolean).join(' · '));
 $('wishes').replaceChildren();for(const w of s.wishes.slice(-10).reverse())entry($('wishes'),w.text,`${w.reason} · First expressed day ${w.day} · ${w.mentions} mention(s)`);if(!s.wishes.length)entry($('wishes'),'No wishes expressed yet.');
@@ -539,7 +565,7 @@ if(inBed){anim.inBed=true;crow.position.set(-11.5,.82,-9.25);crow.rotation.set(-
  for(let i=0;i<2;i++){legs[i].rotation.x=0;knees[i].rotation.x=0;arms[i].rotation.x=0;elbows[i].rotation.x=0}}
 else if(anim.inBed){anim.inBed=false;crow.rotation.x=0;crow.position.set(BEDSIDE.x,0,BEDSIDE.z);}
 blanket.visible=inBed;
-torso.scale.y=1+Math.sin(anim.elapsed*1.8)*.008;edda.rotation.y=Math.sin(anim.elapsed*.3)*.25;
+torso.scale.y=1+Math.sin(anim.elapsed*1.8)*.008;edda.rotation.y=Math.sin(anim.elapsed*.3)*.25;eddaHead.rotation.x=Math.sin(anim.elapsed*.7)*.06;eddaArms[1].rotation.x=-.35+Math.sin(anim.elapsed*1.1)*.12;braid.rotation.x=Math.sin(anim.elapsed*.9)*.05;
 heldBook.visible=anim.book;if(shelfBook)shelfBook.visible=!anim.book;heldAxe.visible=anim.pose==='fell_tree'&&!moving;bow.visible=anim.pose==='practise'&&!anim.book&&!seated&&!heldAxe.visible;
 const turn=anim.elapsed%24;pagePivot.rotation.z=anim.pose.startsWith('reading')&&turn<1.8?Math.PI*T.MathUtils.smoothstep(turn,0,1.8):0;
 if(anim.pose==='practise'&&!moving){arms[0].rotation.x=-1.25;arms[1].rotation.x=-1.1;elbows[1].rotation.x=-.8;}
