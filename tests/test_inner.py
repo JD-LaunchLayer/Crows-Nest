@@ -139,3 +139,11 @@ print('PASS v0.30.11: insisting on food with none finds the empty chest, never a
 assert 'awake' in inner.CHOICES['rest'] and 'sleep' in inner.CHOICES['sleep']
 assert 'need sleep' in inner.BODY['Heavy sleepiness and difficulty concentrating.']
 print('PASS v0.30.15: rest is awake; heavy sleepiness is felt as a need for sleep.')
+# v0.30.21: the same open question, reworded, is on his mind once.
+lo={'threads':[{'text':'Whether the 2 gold 3 silver covers the 3 gold bread bundle, and the 5 silver question I promised Edda to check.'},
+               {'text':'Whether the 2 gold 3 silver covers the 3 gold bread bundle, and the 5 remains unsettled until I count in daylight.'},
+               {'text':'Whether the 2 gold 3 silver covers the 3 gold bread bundle, and the 5 remaining unresolved; the empty food chest.'},
+               {'text':'Where the next firewood comes from.'}]}
+v=inner.scene({'clock':{'iso':'2026-12-19T05:40:00','date':'Sat 19 Dec','time':'05:40'},'location':'cabin','daylight':0},{'left_open':lo},{})
+assert v.count('2 gold 3 silver')==1 and 'firewood' in v, v
+print('PASS v0.30.21: one line per open question.')

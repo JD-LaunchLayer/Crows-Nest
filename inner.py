@@ -315,7 +315,11 @@ def scene(state, ctx, extras):
     if stories:
         out.append("What I've been in the middle of:\n" + '\n'.join('- ' + s for s in stories))
     lo = ctx.get('left_open') or {}
-    threads = distinct([clip(tidy(t['text']), 200) for t in reversed(lo.get('threads', []))], limit=3)
+    threads = []
+    for t in [clip(tidy(t['text']), 200) for t in reversed(lo.get('threads', []))]:
+        if not any(alike(t, x) or same_promise(t, x) for x in threads):
+            threads.append(t)   # v0.30.21: one line per open question, in its newest wording
+    threads = threads[:3]
     if threads:
         out.append('Still on my mind:\n' + '\n'.join('- ' + t for t in threads))
     promises = []

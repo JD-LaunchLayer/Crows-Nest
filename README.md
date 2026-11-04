@@ -1580,3 +1580,10 @@ now competes with selling wood for bread: his choice.
 He rested through a cold night "under the covers", but only sleeping counted as being in bed, so
 the world chilled him while he lay there. Now a rest he describes as in bed, lying down or under the
 covers is warm, as it would be; sitting up awake in his fireless cabin is still cold.
+
+## v0.30.21 — one line per open question
+
+The same open question, reworded ("whether the 2 gold 3 silver covers the bread bundle"), had been
+stored four times and shown to him again and again, so a purse figure from the day before kept
+outvoting the true count in his purse. Now a reworded question is not stored again, and he sees each
+open question once, in its newest wording. His history is unchanged.

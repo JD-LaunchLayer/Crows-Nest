@@ -177,8 +177,10 @@ def context(state, limit=4):
 def add_thread(state, text, place, source_id, at):
     ensure(state)
     text = ' '.join(str(text).split())[:200]
-    if not text or any(memory_recall.similar(t['text'], text) for t in state['threads'] if t['status'] == 'open'):
-        return None
+    import inner
+    if not text or any(memory_recall.similar(t['text'], text) or inner.same_promise(t['text'], text)
+                       for t in state['threads'] if t['status'] == 'open'):
+        return None   # v0.30.21: the same open question reworded is the same question, not another one
     thread = {'id': state['next_thread_id'], 'text': text, 'place': place, 'at': at, 'source_id': source_id, 'status': 'open', **_phantom(text)}
     state['next_thread_id'] += 1
     state['threads'].append(thread)
