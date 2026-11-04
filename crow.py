@@ -48,7 +48,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.30.13'
+APP_VERSION = '0.30.14'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -260,12 +260,14 @@ MISSING = object()
 CONFORM_FAILURE = ''
 
 
-def conform(value, schema):
+def conform(value, schema, soften=True):
     """Fit a cloud answer to the requested structure, or return MISSING.
 
     The local model is grammar-constrained; the cloud model's tool input is not, so it can
     return a null number or an out-of-list choice. Small slips get neutral values (empty
-    text, no project, an empty list); anything that cannot be fitted makes the call fall back."""
+    text, no project, an empty list). A title written a little differently is still that
+    title. During a choice (soften=False) a value he actually gave, which is not a near-match,
+    is left unfit so it can be asked again instead of being swapped for a neutral option."""
     global CONFORM_FAILURE
     kind = schema.get('type')
     if kind == 'object':
@@ -273,22 +275,26 @@ def conform(value, schema):
             return MISSING
         out = {}
         for key, sub in schema.get('properties', {}).items():
-            fitted = conform(value[key], sub) if key in value else MISSING
+            fitted = conform(value[key], sub, soften) if key in value else MISSING
             if fitted is MISSING:
                 CONFORM_FAILURE = f"{key}={json.dumps(value.get(key, '(absent)'), ensure_ascii=False)[:80]}"
             if fitted is MISSING and key in schema.get('required', []):
                 options = sub.get('enum', [])
+                # A value he actually gave, which is not a near-match, is not quietly swapped for a
+                # neutral option during a choice. A field he left out is still a slip.
+                supplied = key in value and value.get(key) not in (None, '')
+                hide = soften or not supplied
                 if sub.get('type') == 'string' and not options:
                     fitted = ''
                 elif sub.get('type') == 'array':
                     fitted = []
-                elif 'none' in options:
+                elif hide and 'none' in options:
                     fitted = 'none'
-                elif '' in options:   # v0.30.6: an unclear choice of project is no particular project, never a stalled life
+                elif hide and '' in options:   # an absent project name is no particular project
                     fitted = ''
-                elif 'not_applicable' in options:
+                elif hide and 'not_applicable' in options:
                     fitted = 'not_applicable'
-                elif 0 in options and sub.get('type') == 'integer':
+                elif hide and 0 in options and sub.get('type') == 'integer':
                     fitted = 0
                 else:
                     return MISSING
@@ -298,7 +304,7 @@ def conform(value, schema):
     if kind == 'array':
         if not isinstance(value, list):
             return MISSING
-        items = [conform(v, schema.get('items', {})) for v in value]
+        items = [conform(v, schema.get('items', {}), soften) for v in value]
         return [v for v in items if v is not MISSING][:schema.get('maxItems', 10**6)]
     if kind == 'boolean':
         if isinstance(value, str) and value.lower() in ('true', 'false'):
@@ -337,7 +343,7 @@ def conform(value, schema):
     return value
 
 
-def anthropic_call(prompt, schema, limit, purpose, system=None):
+def anthropic_call(prompt, schema, limit, purpose, system=None, soften=True):
     """Claude via the Messages API, forced to answer through one tool whose input schema is the requested JSON."""
     key = os.environ.get('ANTHROPIC_API_KEY') or SETTINGS.get('anthropic_api_key', '')
     if not key:
@@ -361,16 +367,16 @@ def anthropic_call(prompt, schema, limit, purpose, system=None):
     block = next((b for b in result.get('content', []) if b.get('type') == 'tool_use'), None)
     if block is None or not isinstance(block.get('input'), dict):
         raise ValueError('The cloud model returned no structured answer')
-    fitted = conform(block['input'], schema)
+    fitted = conform(block['input'], schema, soften)
     if fitted is MISSING and result.get('stop_reason') == 'max_tokens' and limit < 2400:
         used = result.get('usage', {})  # the cut-off attempt was still paid for
         wasted = int(used.get('input_tokens', 0)) / 1e6 * PRICE['input'] + int(used.get('output_tokens', 0)) / 1e6 * PRICE['output']
         with LOCK:
             ledger = spend();ledger['usd'] = round(ledger['usd'] + wasted, 6);ledger['total_usd'] = round(ledger['total_usd'] + wasted, 6)
-        return anthropic_call(prompt, schema, max(limit, 400) * 2, purpose, system)
+        return anthropic_call(prompt, schema, max(limit, 400) * 2, purpose, system, soften)
     if fitted is MISSING:
         cut = ' (answer was cut off)' if result.get('stop_reason') == 'max_tokens' else ''
-        raise ValueError(f'The cloud answer did not fit the requested structure{cut}: {CONFORM_FAILURE}')
+        raise StructureError(f'The cloud answer did not fit the requested structure{cut}: {CONFORM_FAILURE}', block.get('input'))
     block['input'] = fitted
     used = result.get('usage', {})
     tokens_in, tokens_out = int(used.get('input_tokens', 0)), int(used.get('output_tokens', 0))
@@ -390,6 +396,33 @@ def spend():
     return ledger
 
 
+class StructureError(ValueError):
+    """The model answered, but not in the shape that was asked for. Not an outage."""
+    def __init__(self, message, raw=None):
+        super().__init__(message)
+        self.raw = raw
+
+
+class NotAllowed(Exception):
+    """He named something the world cannot accept. Asked again; he does not doze."""
+    def __init__(self, message, raw=None):
+        super().__init__(message)
+        self.raw = raw if isinstance(raw, dict) else None
+
+
+class Unsettled(Exception):
+    """Told once, and the next answer still did not fit. One honest moment, then he chooses again."""
+
+
+# Set while he is choosing an action, project or detail. A wrong shape is then handed back to be
+# asked again in his own words, instead of the same call being repeated and then dozed on.
+_STRICT_CHOICE = False
+
+
+def _shape_slip(exc):
+    return 'did not fit the requested structure' in str(exc)
+
+
 def model_call(prompt, schema, limit=650, purpose='other', system=None):
     """One structured answer from his model: the cloud model when configured and within budget, else local Qwen."""
     usage = None
@@ -398,19 +431,26 @@ def model_call(prompt, schema, limit=650, purpose='other', system=None):
             ledger = spend();within = ledger['usd'] < DAILY_BUDGET
         if within:
             try:
+                soften = not _STRICT_CHOICE
                 try:
-                    data, seconds, usage = anthropic_call(prompt, schema, limit, purpose, system)
+                    data, seconds, usage = anthropic_call(prompt, schema, limit, purpose, system, soften)
                 except ValueError as slip:
-                    # v0.30.13: an answer in the wrong shape is a slip, not his mind being away: ask once more at
-                    # once (paid as usual) before dozing. Outages and money troubles still doze straight away.
-                    if 'did not fit the requested structure' not in str(slip):raise
+                    # A wrong shape is not his mind being away. During a choice, the general path asks
+                    # once more and says why. Every other call keeps v0.30.13: the same question once
+                    # more, paid as usual, and only then a doze. Outages and money troubles doze at once.
+                    if not _shape_slip(slip):
+                        raise
+                    if _STRICT_CHOICE:
+                        raise NotAllowed(str(slip)[:200], getattr(slip, 'raw', None))
                     with LOCK:
                         ledger = spend();ledger['retries'] = ledger.get('retries', 0) + 1;ledger['last_retry'] = (purpose+': '+str(slip))[:400]
-                    data, seconds, usage = anthropic_call(prompt, schema, limit, purpose, system)
+                    data, seconds, usage = anthropic_call(prompt, schema, limit, purpose, system, soften)
                 with LOCK:
                     ledger = spend();ledger['usd'] = round(ledger['usd'] + usage['cost_usd'], 6)
                     ledger['total_usd'] = round(ledger['total_usd'] + usage['cost_usd'], 6);ledger['calls'] += 1
-            except Exception as exc:  # outage, rate limit, no credit or a bad answer
+            except NotAllowed:
+                raise
+            except Exception as exc:  # outage, rate limit, no credit, or a second wrong shape
                 with LOCK:
                     ledger = spend();ledger['fallbacks'] += 1;ledger['last_fallback'] = (purpose+': '+str(exc))[:400]
                 # v0.30: no stand-in mind ever acts as him. He dozes until his own mind is reachable again.
@@ -529,24 +569,158 @@ if not state.get('rehearsal_tidied'):  # v0.29.2: recall counts built up by goin
     state['rehearsal_tidied']=True
 
 
+def unavailable_reasons():
+    """Actions he might reach for that the world cannot carry out right now, and why, in his words.
+
+    The same conditions as available_actions. Impossibility is a world rule, not a preference."""
+    world=world_state.ensure(state);reasons={}
+    if state['materials']<1:reasons['craft']="I have no wood to carve"
+    if not state['suspended_work']:reasons['resume_work']="I have nothing half-done to pick up"
+    if not any(p['status'] in ['proposed','in_progress'] for p in world['plans']):reasons['construct']="I have no plan to build from"
+    if not any(o.get('portable') for o in world['objects'].values()):reasons['move_object']="there is nothing here I can pick up"
+    if not any(state.get('possessions',{}).values()):reasons['use_item']="I have nothing of my own to use"
+    if not any(state.get('possessions',{}).get(k) for k in world_state.SAPLINGS):reasons['plant_tree']="I have no young tree to plant"
+    owned=state.get('possessions',{})
+    if not (owned.get('hunting_bow') and owned.get('arrows')):reasons['hunt']="I have no bow and arrows"
+    if not state.get('wildlife',{}).get('carcasses'):reasons['butcher']="there is no carcass to cut up"
+    if 'venison' not in foods.kinds(state):reasons['preserve']="I have no fresh meat to smoke"
+    if not foods.kinds(state):reasons['put_out_food']="I have no food to put out"
+    # v0.30.8: with nothing to eat anywhere (chest empty, bushes bare), eating is not something he can do now.
+    if not foods.kinds(state) and state['provisions'].get('berries',0)<=.001:
+        reasons['eat']="there is nothing to eat: my food chest is empty and the bushes are bare"
+    if not owned.get('harp'):reasons['play_music']="I have no harp"
+    return reasons
+
+
 def available_actions():
     """Actions the world can currently carry out. Impossibility is a world rule, not a preference."""
-    world=world_state.ensure(state);allowed=list(ACTIONS)
-    if state['materials']<1:allowed.remove('craft')
-    if not state['suspended_work']:allowed.remove('resume_work')
-    if not any(p['status'] in ['proposed','in_progress'] for p in world['plans']):allowed.remove('construct')
-    if not any(o.get('portable') for o in world['objects'].values()):allowed.remove('move_object')
-    if not any(state.get('possessions',{}).values()):allowed.remove('use_item')
-    if not any(state.get('possessions',{}).get(k) for k in world_state.SAPLINGS):allowed.remove('plant_tree')
-    owned=state.get('possessions',{})
-    if not (owned.get('hunting_bow') and owned.get('arrows')):allowed.remove('hunt')
-    if not state.get('wildlife',{}).get('carcasses'):allowed.remove('butcher')
-    if 'venison' not in foods.kinds(state):allowed.remove('preserve')
-    if not foods.kinds(state):allowed.remove('put_out_food')
-    # v0.30.8: with nothing to eat anywhere (chest empty, bushes bare), eating is not something he can do now.
-    if not foods.kinds(state) and state['provisions'].get('berries',0)<=.001 and 'eat' in allowed:allowed.remove('eat')
-    if not state.get('possessions',{}).get('harp'):allowed.remove('play_music')
-    return allowed
+    blocked=unavailable_reasons()
+    return [a for a in ACTIONS if a not in blocked]
+
+
+UNSETTLED_SECONDS = 180  # a few minutes pass; his clock is not frozen and his life is not paused
+
+
+def _near_enum(value, options):
+    """The option he meant, when the words are clearly the same title. Otherwise None."""
+    kind='string' if isinstance(value, str) else 'integer'
+    fitted=conform(value, {'type': kind, 'enum': options}, soften=False)
+    return None if fitted is MISSING else fitted
+
+
+def _choice_problems(data, schema, blocked):
+    """Fields whose value is not one he is allowed to give. A clear near-match is kept."""
+    if not isinstance(data, dict):
+        return [('choice', '', "that wasn't a choice I could use")]
+    found=[]
+    for key, sub in schema.get('properties', {}).items():
+        if not isinstance(sub, dict) or 'enum' not in sub or key not in data:
+            continue
+        value=data[key]
+        if key=='action' and value in blocked:
+            found.append((key, value, blocked[value]))
+            continue
+        matched=_near_enum(value, sub['enum'])
+        if matched is None:
+            if key=='action' and value in ACTIONS:
+                reason="it isn't something I can do just now"
+            elif key=='action':
+                reason="that isn't something I can do here"
+            else:
+                reason="that isn't one of the choices I have for that"
+            found.append((key, value, reason))
+        elif matched!=value:
+            data[key]=matched
+    return found
+
+
+def _phrase(field, value):
+    if field=='action':
+        return 'doing that ('+inner.CHOICES.get(value, str(value).replace('_',' '))+')'
+    return field.replace('_',' ')+f' “{value}”'
+
+
+def _drop_enum_value(schema, field, value):
+    """The same question, with the value he just gave taken off the list."""
+    schema=copy.deepcopy(schema)
+    sub=schema.get('properties', {}).get(field)
+    if isinstance(sub, dict) and isinstance(sub.get('enum'), list) and value in sub['enum']:
+        kept=[x for x in sub['enum'] if x!=value]
+        if kept:
+            sub['enum']=kept
+    return schema
+
+
+def _give_up_text(field, value, reason):
+    if field=='action':
+        what=inner.CHOICES.get(value, str(value).replace('_',' '))
+        return f"I reached again for {what}, but I can't: {reason}. I set it aside and will choose again."
+    return f"I reached again for {_phrase(field, value)}, but I can't: {reason}. I set it aside and will choose again."
+
+
+def _looks_anyway(field, value, reason):
+    """v0.30.11: insisting on food, with nothing there, is him going to look. The chest answers."""
+    return field=='action' and value=='eat' and 'nothing to eat' in str(reason)
+
+
+def _hear(prompt, schema, limit, purpose):
+    """One answer. A cloud answer that does not fit comes back raw, so the choice can be asked again."""
+    try:
+        return model_call(prompt, schema, limit, purpose)
+    except NotAllowed as exc:
+        if isinstance(exc.raw, dict):
+            return exc.raw, 0
+        raise
+
+
+def ask_allowed(prompt, schema, limit, purpose, blocked=None):
+    """Ask for a structured choice. Anything not allowed is named, taken off the list, and asked once more.
+
+    This is the one re-ask for a choice (action, project, or detail), for the local model and the paid
+    one. v0.30.13's same-question retry stays on every other call. A second miss is Unsettled, except
+    insisting on food with an empty chest, which is him going to look. An outage or a spent budget
+    still raises MindAway."""
+    global _STRICT_CHOICE
+    blocked=blocked or {}
+    _STRICT_CHOICE=True
+    try:
+        try:
+            data, seconds=_hear(prompt, schema, limit, purpose)
+        except NotAllowed:
+            data, seconds=None, 0
+        bad=_choice_problems(data, schema, blocked)
+        if not bad:
+            return data, seconds
+        field, value, reason=bad[0]
+        narrowed=_drop_enum_value(schema, field, value)
+        if field=='action':
+            enum=narrowed['properties']['action'].get('enum', [])
+            kept=[a for a in enum if a not in blocked and a!=value]
+            narrowed['properties']['action']['enum']=kept or [a for a in ACTIONS if a not in blocked]
+        told=prompt+f"\n\nI thought of {_phrase(field, value)}, but I can't: {reason}."
+        try:
+            data2, more=_hear(told, narrowed, limit, purpose)
+        except NotAllowed:
+            data2, more=None, 0
+        bad2=_choice_problems(data2, narrowed, blocked)
+        if bad2:
+            f, v, r=bad2[0]
+            if _looks_anyway(f, v, r):
+                return data2, seconds+more
+            raise Unsettled(_give_up_text(f, v, r))
+        return data2, seconds+more
+    finally:
+        _STRICT_CHOICE=False
+
+
+def note_unsettled(exc):
+    """One honest record that the choice did not fit, then a few minutes of his life. He is not paused and he does not doze."""
+    event(str(exc), '', 'unsettled')
+    pass_time(UNSETTLED_SECONDS)
+    life.advance(state, UNSETTLED_SECONDS, 'reflect')
+    clock()
+    runtime['status']='Setting that aside and choosing again'
+    persist()
 
 
 def cut(text,limit):
@@ -657,7 +831,7 @@ def inner_extras():
 
 def choose_action():
     with LOCK:
-        allowed=available_actions();context=decision_context()
+        blocked=unavailable_reasons();allowed=[a for a in ACTIONS if a not in blocked];context=decision_context()
         extras=inner_extras();titles={p['title']:p['id'] for p in state['projects'] if p.get('status') in ['active','paused']}
         view=inner.scene(state,context,extras)
     # v0.30: his life as he knows it, in the first person, with no machinery; he decides as himself.
@@ -669,25 +843,18 @@ def choose_action():
         'Only the people, places and things you know of here exist. Going somewhere is part of doing anything. '
         'Reading about something is not the same as being able to do it. You will be asked for any details after you choose.'
         '\n\nThings I could do now:\n'+inner.choices(allowed)+'\n\n'+view)
-    # Eating is the one thing he reaches for from habit when it is impossible (v0.30.10): accepted, then realised.
-    schema=fields_schema({'action':{'type':'string','enum':allowed+([] if 'eat' in allowed else ['eat'])},'intention':STRING,'reason':STRING,'next_step':STRING,
+    # Only what he can do is offered. Naming something else is explained and asked once more (v0.30.14).
+    schema=fields_schema({'action':{'type':'string','enum':allowed},'intention':STRING,'reason':STRING,'next_step':STRING,
         'wish':STRING,'wish_reason':STRING,'project':{'type':'string','enum':['none','continue','start','pause','abandon']},
         'which_project':{'type':'string','enum':['']+list(titles)}})
-    d,seconds=model_call(prompt,schema,320,'choose_action')
-    if d.get('action') in ACTIONS and d.get('action') not in allowed:
-        # v0.30.10: he reached for something he can't do now (eating with nothing to eat). He realises why, as anyone
-        # would, and decides again in the same moment; the choice is never thrown away (which made him doze).
-        why=("there is nothing to eat: my food chest is empty and the bushes are bare" if d['action']=='eat'
-             else "it isn't something I can do just now")
-        d,more=model_call(prompt+f"\n\nI thought of doing that ({inner.CHOICES.get(d['action'],d['action'].replace('_',' '))}), "
-                          f"but I can't: {why}.",schema,320,'choose_action')
-        seconds+=more
+    d,seconds=ask_allowed(prompt,schema,320,'choose_action',blocked)
     for k in ['intention','reason','next_step','wish','wish_reason']:
-        if not isinstance(d.get(k),str):raise ValueError('Invalid decision text: '+k)
-    # v0.30.11: if he still reaches for food after realising there is none, he goes and looks: the world answers
-    # (the chest is empty), a few minutes pass, and he decides again with that fresh in mind. Never a stall.
-    if d.get('action') not in allowed and d.get('action')!='eat':raise ValueError('Invalid action')
-    if d.get('project') not in ['none','continue','start','pause','abandon']:raise ValueError('Invalid project choice')
+        if not isinstance(d.get(k),str):raise Unsettled("I could not settle on what to do next. I will choose again.")
+    # v0.30.11: if he still reaches for food after being told there is none, he goes and looks.
+    if d.get('action') not in allowed and d.get('action')!='eat':
+        raise Unsettled(_give_up_text('action', d.get('action'), blocked.get(d.get('action'), "it isn't something I can do just now")))
+    if d.get('project') not in ['none','continue','start','pause','abandon']:
+        raise Unsettled("I could not settle on the project. I will choose again.")
     # v0.30: he names a project by its title, never a number; and he cites nothing (he sees no IDs).
     if 'which_project' in d:d['project_id']=titles.get(d.pop('which_project'),0)
     d.setdefault('project_id',0)
@@ -878,7 +1045,7 @@ def choose_parameters(d):
         mind=('\nWhat comes to mind:\n'+'\n'.join('- '+inner.memory_line(m,state['clock']['iso']) for m in recalled)) if recalled else ''
         prompt=(f"I've decided to {inner.CHOICES.get(d['action'],d['action'])}: {d['intention']} (because {d['reason']}). "
                 'Now the details. '+instruction+mind+'\nWhat I can see and have to hand: '+json.dumps(compact(context,240),ensure_ascii=False))
-        params,_=model_call(prompt,fields_schema(props),420,'parameters:'+d['action'])
+        params,_=ask_allowed(prompt,fields_schema(props),420,'parameters:'+d['action'])
         # Only the requested detail fields are accepted, so this step can never change the chosen action.
         params={k:v for k,v in params.items() if k in props}
     params.update(single)
@@ -934,7 +1101,7 @@ def choose_interaction(d, verb):
             'hypothesis and prediction are your own expectations BEFORE acting, and can be empty if none. '
             'What actually happens to the material is what the world does; describing it does not make it so. '+
             json.dumps(context,ensure_ascii=False))
-    raw,_=model_call(prompt,fields_schema(props),650,'interaction:'+verb)
+    raw,_=ask_allowed(prompt,fields_schema(props),650,'interaction:'+verb)
     raw={k:v for k,v in raw.items() if k in props}
     generic={'object_id','other_id','creation_name','hypothesis','prediction','procedure_id'}
     out={k:v for k,v in raw.items() if k in generic}
@@ -1655,9 +1822,15 @@ REVIEWABLE=['craft','construct','fell_tree','practise','gather','explore','move_
 def decide_and_start(generation):
     """Choose, prepare and begin the next activity; shared by the live loop and the time-lapse twin.
 
-    Returns the started decision, or None when nothing started (a failed search
-    is recorded as an honest event instead)."""
-    d,seconds=choose()
+    Returns the started decision, or None when nothing started (a failed search,
+    or a choice that still did not fit, is recorded as an honest event instead)."""
+    try:
+        d,seconds=choose()
+    except Unsettled as exc:
+        with LOCK:
+            if state['paused'] or generation!=runtime['generation']:return None
+            note_unsettled(exc)
+        return None
     prepare_attempt(d)
     reading=None
     if d['action'] in ('read','browse'):
@@ -1727,6 +1900,15 @@ def loop():
                 generation=runtime['generation'];runtime.update(thinking=True,status='Choosing what matters next…')
             if decide_and_start(generation) is not None:
                 with LOCK:runtime['failures']=0;runtime.pop('away_since',None)
+        except Unsettled as exc:
+            # A choice that still does not fit is one honest moment. It does not doze him and it does not pause his life.
+            with LOCK:
+                note_unsettled(exc)
+            processing_started=time.monotonic()
+        except NotAllowed:
+            with LOCK:
+                note_unsettled(Unsettled("I could not settle on a choice. I will choose again."))
+            processing_started=time.monotonic()
         except MindAway as exc:
             with LOCK:
                 runtime.update(dozing_until=time.time()+DOZE_SECONDS,
@@ -1734,7 +1916,8 @@ def loop():
                 runtime['away_since']=runtime.get('away_since') or now().isoformat();persist()
             processing_started=time.monotonic()
         except Exception as exc:
-            # A bad answer or brief outage is retried rather than stopping his life; repeated failure still pauses.
+            # A real fault is retried rather than stopping his life; repeated failure still pauses.
+            # A bad answer never reaches here.
             with LOCK:
                 runtime['failures']=runtime.get('failures',0)+1;state['last_error']=str(exc)[:300]
                 if runtime['failures']>=8:

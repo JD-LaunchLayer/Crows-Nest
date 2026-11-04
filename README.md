@@ -1511,3 +1511,14 @@ An answer from his mind in the wrong shape was treated like his mind being out o
 for five minutes and his world waited, and the same slip could repeat. Now a wrong-shaped answer is
 asked for once more straight away (paid as usual, counted in the spending record as a retry); only
 if that also fails does he doze. Outages, no credit and the daily budget still doze at once.
+
+## v0.30.14 — any choice that does not fit is said plainly, then made again
+
+Whatever he names that he cannot do — an action, a project, or a detail — he is told in his own words
+what he reached for and why it cannot be done, and he chooses once more without that option. If he
+insists, that moment is written down, a few minutes pass, and he chooses again. It does not freeze
+him, and it does not count toward pausing his life. Insisting on food when the chest is empty is
+still him going to look, and a plan to eat ends when he finds nothing. A project title that is
+clearly the one he means is still taken as that title. On any call that is not a choice, a
+wrong-shaped answer is still asked once more straight away before a doze, as in v0.30.13; a choice
+uses this one explained re-ask instead of both.
