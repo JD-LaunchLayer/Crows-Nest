@@ -135,3 +135,7 @@ with tempfile.TemporaryDirectory() as td:
     app.start_action({**app.DECISION_DEFAULTS,**d},1);st['pending']['remaining']=0;m=app.finish_action(None)
     assert 'chest is empty' in m['event'], m['event']
 print('PASS v0.30.11: insisting on food with none finds the empty chest, never a stall.')
+# v0.30.15: resting is plainly being awake, and heavy sleepiness is felt as needing sleep.
+assert 'awake' in inner.CHOICES['rest'] and 'sleep' in inner.CHOICES['sleep']
+assert 'need sleep' in inner.BODY['Heavy sleepiness and difficulty concentrating.']
+print('PASS v0.30.15: rest is awake; heavy sleepiness is felt as a need for sleep.')

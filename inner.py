@@ -25,12 +25,12 @@ BODY = {'Persistent hunger; little food is being digested.': "I'm properly hungr
         'Some hunger.': "I'm a bit hungry.", 'Stomach feels full.': "My stomach is full.",
         'Food is still digesting.': "I've eaten not long ago.",
         'Strong thirst; mouth feels dry.': "I'm very thirsty; my mouth is dry.", 'Noticeable thirst.': "I'm thirsty.",
-        'Heavy sleepiness and difficulty concentrating.': "I'm worn out with tiredness; my thoughts keep slipping.",
+        'Heavy sleepiness and difficulty concentrating.': "I'm heavy with sleepiness and badly need sleep; my thoughts keep slipping.",
         'Beginning to feel sleepy.': "I'm getting sleepy.", 'Muscles feel tired from recent effort.': "My muscles ache from work.",
         'No strong bodily discomfort.': "My body feels fine."}
 
 # What he could do, in his own words. The keys are only labels for the choice he makes.
-CHOICES = {'rest': 'have a quiet rest in my cabin', 'sleep': 'go to bed and sleep until I wake',
+CHOICES = {'rest': 'sit or lie quietly in my cabin, awake', 'sleep': 'go to bed and sleep until I wake rested',
            'eat': 'eat something', 'drink': 'drink at the spring',
            'observe': 'look closely at one part of the woods or the clearing', 'reflect': 'sit and think in my cabin',
            'explore': 'walk through part of the woods, picking up loose wood as I go', 'practise': 'practise archery at the range',

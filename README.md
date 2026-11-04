@@ -1522,3 +1522,12 @@ still him going to look, and a plan to eat ends when he finds nothing. A project
 clearly the one he means is still taken as that title. On any call that is not a choice, a
 wrong-shaped answer is still asked once more straight away before a doze, as in v0.30.13; a choice
 uses this one explained re-ask instead of both.
+
+## v0.30.15 — resting is being awake
+
+Night after night he meant to "lie down and sleep through the dark", but chose a rest each time
+(about thirteen in one night), so his heavy sleepiness never lifted. A rest was described to him as
+"have a quiet rest in my cabin", which sounds close to sleeping. Now it reads as what it is: "sit or
+lie quietly in my cabin, awake"; sleeping is "go to bed and sleep until I wake rested"; and heavy
+sleepiness is felt as it is: "I'm heavy with sleepiness and badly need sleep". Whether he sleeps is
+still his choice.
