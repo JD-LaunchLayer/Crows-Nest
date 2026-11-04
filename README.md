@@ -1710,3 +1710,12 @@ the number as gold and took 12 kg for 4 gold. He noticed the shortfall and went 
 gives when selling wood or stone is now kilograms: he hands over exactly that (or all he has, if less) and is
 paid in whole silver at the posted rate, rounded down (4 kg of wood: 1 gold 3 silver). Too little to earn a
 silver is refused and nothing leaves him. His history stays as it happened. Test: tests/test_sell_by_kg.py.
+
+## v0.32.2 — Edda pays for what she takes
+
+A second world bug from the same evening. At 18:48 a talk with Edda settled as "Edda took 4 kg of wood for
+nothing": the deal check had a ceiling on what the post pays for his goods but no floor, so a deal written
+with no payment went through. Then he sold 12 kg for 4 gold. In all he handed over 16 kg and was paid for
+12. He read the 4 kg line as wood he had taken from her, and has been going through the book with her since.
+Now a deal for his goods must pay at least seven tenths of what they are worth, or it is not offered.
+His history stays as it happened. Test: tests/test_edda_pays.py.

@@ -386,6 +386,8 @@ def check_proposal(state, p, day):
             return False, 'he does not have those goods'
         if p['credit'] > 1.3 * value + 1e-9:
             return False, 'more than the post can pay for them'
+        if p['credit'] < .7 * value - 1e-9:   # v0.32.2: the post buys goods; it does not take them for nothing
+            return False, 'below what the goods are worth; the post pays for what it takes'
         return True, ''
     if kind == 'favour':
         if not 15 <= p['minutes'] <= 180 or not p['task'].strip():
