@@ -1931,3 +1931,10 @@ two days and two nights, and was put in front of him every moment as something s
 is only about resting has been closed once he has rested since v0.27, but only if it began with a word such as
 "rest" or "stay"; "lie" was not among them. Lying down, the covers and bed now count too. Stories about anything
 else are untouched. His record stays as it is. Test: tests/test_rest_story.py.
+
+## v0.36.4 — rest named anywhere in a story
+
+Another resting story ran on for 99 steps: "Stop the notebook copy loop for tonight; rest in the cabin and come back to
+the cord bundle check in daylight". Its rest was not at the start. A story that names rest, lying down or bed anywhere
+in it is now done once his last three steps (at least three) were all rest or sleep, so he really has rested. A walk
+"after a pause", or a meal left to digest, is not ended by one rest. Test: tests/test_rest_story.py.

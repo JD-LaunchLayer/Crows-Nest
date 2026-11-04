@@ -109,7 +109,10 @@ def settle_need(state, memory, sensations):
     # A rest is a pause, not a pursuit (v0.27): a story that is only about resting is done once he has rested.
     if memory.get('action') in ('rest', 'sleep') and story and story['stage'] in ('started', 'pursuing', 'dormant'):
         words = re.findall(r'[a-z]+', story['title'].lower())
-        restful = (words[:1] and words[0] in REST_WORDS) or any(w in LYING_WORDS for w in words[:6])
+        # v0.36.4: anywhere in it, not only at the start ("Stop the notebook copy loop for tonight; rest in the cabin…"
+        # ran 99 steps). Only ever closed when his last three steps were all rest or sleep, so he really has rested.
+        restful = ((words[:1] and words[0] in REST_WORDS) or any(w in LYING_WORDS for w in words[:6])
+                   or (len(story['steps']) >= 3 and any(w in REST_WORDS or w in LYING_WORDS for w in words)))
         if restful and all(st.get('action') in ('rest', 'sleep') for st in story['steps'][-3:]):
             story['stage'] = 'done'
             story['ended'] = memory.get('at', '')
