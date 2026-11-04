@@ -55,7 +55,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.36.6'
+APP_VERSION = '0.36.7'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -1285,6 +1285,13 @@ def start_action(d, seconds, reading=None):
     layout.follow(state)   # v0.34.0: he stands where he now is
     # v0.30.20: resting can be in bed under the covers, if that is what he says he is doing; then he is warm.
     state['in_bed']=action=='sleep' or (action=='rest' and bool(re.search(r'\b(bed|covers|blankets?|lie|lying|lay)\b',str(d.get('intention','')),re.I)))
+    # v0.36.7: lying in bed in the dark with nothing pressing (warm, fed enough, not thirsty, not sleepy) is a longer
+    # stretch, as it is for anyone at night; he is not up deciding again every quarter of an hour (and his budget lasts).
+    b=state['body']
+    if (action=='rest' and state['in_bed'] and state.get('daylight',1)<.12 and b.get('chill',0)<.15 and b.get('sleep_debt',0)<4
+            and b.get('hydration',100)>=65 and not (b.get('reserve',100)<65 and b.get('stomach',20)<8)):
+        state['pending']['remaining']=state['pending']['duration']=duration=45*60
+        state['pending']['ends_at']=time.time()+duration
     if action=='use_item' and d.get('use_item')=='whetstone' and d.get('use_on'):
         state['pending']['remaining']=state['pending']['duration']=1200
     if action=='trade' and d.get('trade_mode')=='job' and d.get('trade_item') in town.JOBS and town.job_open(state,d['trade_item'],dt.isoformat())[0]:
@@ -1547,7 +1554,12 @@ def finish_action(geometry=None):
     if a in ('read','browse'):
         reading_journal.record_reading(state,m,p,ROOT)
     state['pending']=None
-    state['reflection_pending']=m['id']
+    # v0.36.7: a routine moment that only repeats the last one (another rest, another drink, with nothing new in it) is
+    # not reflected on: he is not asked how it felt every time. Anything new, failed or different still is.
+    prev=next((x for x in reversed(state['memories'][:-1]) if x.get('kind')=='experience'),None)
+    routine=(a in ('rest','drink') and prev is not None and prev.get('action')==a
+             and (result is None or result.get('success',True)))
+    state['reflection_pending']=None if routine else m['id']
     materials.reconcile(state)   # whatever the action did to his wood or stone is kept in the ledger
     mind_map.update(state,a,senses.felt_temp(state,a))   # v0.36.0: what he noticed and found here, remembered
     persist()

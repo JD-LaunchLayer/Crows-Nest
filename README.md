@@ -1958,3 +1958,18 @@ and were put in front of him as things he was in the middle of. As was done in v
 then (Tam, the cracked board), stories, threads and promises that rest on the soup are now left with a plain note from
 the world beside them ("Edda has no soup or meal of her own to give; she spoke of one by mistake. Food at the post is
 what is on her shelves, at its price."). His words are kept exactly. Runs once. Test: tests/test_phantom_soup.py.
+
+## v0.36.7 — more life from the same budget
+
+Running at 24× speed, he reached the daily spending limit by evening; Jordan chose to keep the limit. Two changes make
+each day of his life cost less without changing who he is:
+
+- **Routine repeats are not reflected on.** After a rest or a drink that only repeats the one before (and went as
+  expected), he is not asked how it felt; those reflections were nearly always "settled and warm" again. Anything new,
+  different or failed is still reflected on. This cuts roughly a third of the calls on quiet stretches.
+- **A quiet night in bed is a longer stretch.** In bed in the dark, warm, fed enough, not thirsty and not sleepy, a rest
+  lasts about 45 minutes instead of about 18, so he is not up deciding every quarter of an hour all night. Hungry,
+  thirsty, cold, sleepy or by day, rests are as before.
+
+When the budget is reached he still dozes and his world waits with him until it resets after midnight. Test:
+tests/test_budget_savers.py.
