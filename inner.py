@@ -32,19 +32,8 @@ BODY = {'Persistent hunger; little food is being digested.': "I'm properly hungr
         'Cold; hands and feet numb.': "I'm cold; my hands and feet are numb with it.", 'A little cold.': "I'm a little cold."}
 
 # What he could do, in his own words. The keys are only labels for the choice he makes.
-CHOICES = {'rest': 'sit or lie quietly in my cabin, awake', 'sleep': 'go to bed and sleep until I wake rested',
-           'eat': 'eat something', 'drink': 'drink at the spring',
-           'observe': 'look closely at one part of the woods or the clearing', 'reflect': 'sit and think in my cabin',
-           'explore': 'walk through part of the woods, picking up loose wood as I go', 'practise': 'practise archery at the range',
-           'read': 'look something up or read in the reading cabin', 'inspect': 'take a close look at something',
-           'gather': 'gather wood or stone', 'fell_tree': 'fell a tree with my axe', 'craft': 'carve something small from wood',
-           'plan': 'sketch a plan for something to build', 'construct': 'work on building something I planned',
-           'move_object': 'carry something somewhere else', 'resume_work': 'pick up something I left half-done',
-           'browse': 'search the web at the café', 'trade': 'go to the trading post: buy, sell, work, or look at the ledger',
-           'talk': 'go and talk with Edda', 'use_item': 'use one of my things', 'interact': 'work with my hands: shape, split, stack, place, sit or lie on something',
-           'garden': 'work in my garden', 'plant_tree': 'plant a young tree', 'play_music': 'play my harp',
-           'hunt': 'go out with my bow', 'butcher': 'cut up the carcass by my cabin', 'preserve': 'smoke meat over a slow fire',
-           'put_out_food': 'put a little food down outdoors and wait quietly', 'notebook': 'write in my notebook, or read it back'}
+import actions   # v0.31.0: his words for each action come from the one registry
+CHOICES = actions.choices()
 
 
 def first_person(text):

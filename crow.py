@@ -49,7 +49,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.30.21'
+APP_VERSION = '0.31.0'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -77,8 +77,9 @@ def pass_time(seconds):
         own['virtual'] = (datetime.fromisoformat(own['virtual']) + timedelta(seconds=seconds)).isoformat()
 
 
-ACTIONS = {'rest': 'cabin', 'sleep': 'cabin', 'practise': 'range', 'explore': 'woods', 'craft': 'workbench', 'read': 'library', 'observe': 'woods', 'reflect': 'cabin', 'gather': 'woods', 'plan': 'workbench', 'construct': 'workbench', 'move_object': 'workbench', 'inspect': 'workbench', 'fell_tree': 'woods', 'eat':'cabin', 'drink':'cabin', 'resume_work':'cabin', 'browse':'cafe', 'trade':'shop', 'talk':'shop', 'use_item':'workbench', 'interact':'workbench', 'garden':'garden', 'plant_tree':'woods', 'play_music':'cabin', 'hunt':'woods', 'butcher':'cabin', 'preserve':'cabin', 'put_out_food':'woods', 'notebook':'cabin'}
-DURATIONS = {'rest': 900, 'practise': 1800, 'explore': 1200, 'craft': 2700, 'read': 900, 'observe': 600, 'reflect': 600, 'gather': 1200, 'plan': 600, 'construct': 1800, 'move_object': 300, 'inspect': 60, 'fell_tree': 5400, 'eat':300, 'drink':120, 'browse':900, 'trade':300, 'talk':600, 'use_item':300, 'interact':600, 'garden':900, 'plant_tree':1200, 'play_music':1800, 'hunt':7200, 'butcher':10800, 'preserve':14400, 'put_out_food':2400, 'notebook':900}
+import actions   # v0.31.0: every action defined once; these names are views of that registry
+ACTIONS = actions.places()
+DURATIONS = actions.durations()
 CONFIG = ROOT / 'crow-config.json'
 if CONFIG.exists():
     config = json.loads(CONFIG.read_text())
@@ -503,28 +504,7 @@ DECISION_DEFAULTS={'wish':'','wish_reason':'','object_id':'','plan_id':0,'destin
     'observe_area':'woodland_edge','focus':'','trade_mode':'ask','trade_item':'','trade_quantity':1,'opening':'','hope':'','use_item':'','use_on':'','use_how':'',
     'verb':'','other_id':'','procedure_id':'','hypothesis':'','prediction':'','bed':1,'garden_task':'look','sow_item':'','sapling':'','music_mode':'practise','title':'','notes':'','tempo':80,'piece_id':0,'songbook':'','explore_area':'woodland_edge','hunt_area':'deeper_woods','food':'','put_area':'clearing','notebook_mode':'read','note_title':'','note_text':'','note_query':''}
 # One neutral line per action. Details are requested only after an action is chosen.
-ACTION_MENU={'rest':'quiet rest in the cabin','sleep':'sleep in the cabin until you wake',
-    'eat':'eat from an available food source','drink':'drink from the spring',
-    'observe':'look closely at one part of the woodland or clearing and notice what is actually there','reflect':'think quietly in the cabin',
-    'explore':'walk through part of the woodland, noticing what is there and picking up loose wood','practise':'archery practice at the range; each session counts where the arrows land',
-    'read':'look something up on Wikipedia, or read at leisure','inspect':'examine one object, tree or plant closely',
-    'gather':'carry 3 kg of wood or stone into inventory','fell_tree':'fell a standing tree with the axe; timber stays at the site',
-    'craft':'carve a small piece from 1 kg wood with a measured outcome','plan':'draft a construction blueprint (builds nothing)',
-    'construct':'work on an existing blueprint if materials allow','move_object':'carry a loose object somewhere else',
-    'resume_work':'resume one of your paused jobs with its saved progress',
-    'browse':'use the terminal at the internet café to search the wider web and read pages',
-    'trade':'go to the trading post: buy, sell, do a posted job or a favour you agreed with Edda, or ask for something',
-    'talk':'talk with Edda Thorne, who keeps the trading post: chat, bargain, barter, ask or offer favours',
-    'use_item':'use something you own, in whatever way you choose',
-    'interact':'work material, divide or arrange solids, place things on surfaces, or sit or lie on something',
-    'garden':'work at the garden beds beside the cabin',
-    'plant_tree':'plant a young tree you own somewhere in the woodland; it grows slowly over years',
-    'play_music':'sit and play the harp you own: make up a piece, change one of yours, play one again, or learn one from sheet music you have seen',
-    'hunt':'go out with the bow and arrows you own after an animal',
-    'butcher':'cut up the carcass beside the cabin with your knife',
-    'preserve':'smoke fresh meat slowly over a wood fire so it keeps',
-    'put_out_food':'put a little of your food down somewhere outdoors and wait quietly nearby',
-    'notebook':'write in or read back your notebook'}
+ACTION_MENU=actions.menu()
 # The local 4,096-token model needs a tight context; the cloud model gets roughly three times the room.
 WIDE=PROVIDER=='anthropic'
 CONTEXT_BUDGET=int(os.environ.get('CROW_CONTEXT_CHARS','16000' if WIDE else '5600'))
@@ -573,24 +553,9 @@ if not state.get('rehearsal_tidied'):  # v0.29.2: recall counts built up by goin
 def unavailable_reasons():
     """Actions he might reach for that the world cannot carry out right now, and why, in his words.
 
-    The same conditions as available_actions. Impossibility is a world rule, not a preference."""
-    world=world_state.ensure(state);reasons={}
-    if state['materials']<1:reasons['craft']="I have no wood to carve"
-    if not state['suspended_work']:reasons['resume_work']="I have nothing half-done to pick up"
-    if not any(p['status'] in ['proposed','in_progress'] for p in world['plans']):reasons['construct']="I have no plan to build from"
-    if not any(o.get('portable') for o in world['objects'].values()):reasons['move_object']="there is nothing here I can pick up"
-    if not any(state.get('possessions',{}).values()):reasons['use_item']="I have nothing of my own to use"
-    if not any(state.get('possessions',{}).get(k) for k in world_state.SAPLINGS):reasons['plant_tree']="I have no young tree to plant"
-    owned=state.get('possessions',{})
-    if not (owned.get('hunting_bow') and owned.get('arrows')):reasons['hunt']="I have no bow and arrows"
-    if not state.get('wildlife',{}).get('carcasses'):reasons['butcher']="there is no carcass to cut up"
-    if 'venison' not in foods.kinds(state):reasons['preserve']="I have no fresh meat to smoke"
-    if not foods.kinds(state):reasons['put_out_food']="I have no food to put out"
-    # v0.30.8: with nothing to eat anywhere (chest empty, bushes bare), eating is not something he can do now.
-    if not foods.kinds(state) and state['provisions'].get('berries',0)<=.001:
-        reasons['eat']="there is nothing to eat: my food chest is empty and the bushes are bare"
-    if not owned.get('harp'):reasons['play_music']="I have no harp"
-    return reasons
+    The same conditions as available_actions. Impossibility is a world rule, not a preference (actions.REGISTRY)."""
+    world_state.ensure(state)
+    return actions.unavailable(state)
 
 
 def available_actions():

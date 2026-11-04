@@ -1587,3 +1587,25 @@ The same open question, reworded ("whether the 2 gold 3 silver covers the bread 
 stored four times and shown to him again and again, so a purse figure from the day before kept
 outvoting the true count in his purse. Now a reworded question is not stored again, and he sees each
 open question once, in its newest wording. His history is unchanged.
+
+## v0.31.0 — phase 1 begins: one action registry, and the no-hints rule
+
+The first step of the materials, crafting and building work (see the design doc). Nothing Crow
+experiences changes in this version.
+
+- **One registry for every action** (`actions.py`): where it happens, how long it takes, the neutral
+  menu line, his own words for it, and when and why it can be impossible. `ACTIONS`, `DURATIONS`,
+  `ACTION_MENU`, `inner.CHOICES` and `unavailable_reasons()` are now views of it, with exactly the same
+  values and order as before (tests/test_registry.py checks against a snapshot). The details step and
+  executors move into it as the generic verbs arrive.
+- **The no-hints rule, enforced** (tests/test_no_hints.py): every string he can see, built through the
+  real code (the choice prompt, his scene, the action list, the senses, his body, every details step,
+  Edda's description and a conversation with her), is checked against forbidden phrases (unlock, you can
+  now, learned how, recipe, crafting, try making, you should, you need to, the way out, hint, tip: and
+  more) and, once the materials data arrives, against the name of anything the world can produce.
+- **Edda volunteers nothing.** The v0.30.16 line that had her lay out what the post buys when he is
+  short is removed; she still declines a tab kindly and answers whatever he asks. One line of what she
+  knows about hunting was reworded so it no longer reads as an instruction.
+
+Implemented now: the registry and the test. Planned next (phase 1): the materials data, the item stock
+ledger with the old wood, stone and possessions kept as views, seeded resource nodes, and gathering.

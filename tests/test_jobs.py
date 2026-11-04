@@ -52,7 +52,6 @@ with tempfile.TemporaryDirectory() as td:
     assert 'roof leaks' not in town.KEEPER_PERSONA and 'irregular' not in town.KEEPER_PERSONA and 'debts' not in town.KEEPER_PERSONA
     assert 'go by those entries exactly' in town.KEEPER_PERSONA
 print('PASS v0.30.3: favours for posted work follow its rule; whole silver only; Edda goes by her book.')
-# v0.30.16: short of money, Edda still keeps no tab, and lays out what the post can do, without choosing for him.
-assert 'part now and part later' in town.KEEPER_PERSONA and 'post buys wood, stone, things he has made' in town.KEEPER_PERSONA
-assert 'you do not tell him what to sell' in town.KEEPER_PERSONA
-print('PASS v0.30.16: Edda declines a tab kindly and lays out the options.')
+# v0.31.0: Edda declines a tab kindly, and volunteers nothing; she answers what he asks (the no-hints rule).
+assert 'part now and part later' in town.KEEPER_PERSONA and 'post buys wood' not in town.KEEPER_PERSONA
+print('PASS v0.31.0: Edda declines a tab kindly and volunteers no options.')
