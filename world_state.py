@@ -6,6 +6,7 @@ validation or a full structural physics simulation.
 """
 import copy
 import math
+import layout
 
 DENSITY = {'wood': 500, 'stone': 2200}
 # Any shape can be attempted at any time; how well it turns out is a matter of practice (life.build_parts).
@@ -88,10 +89,9 @@ def add_inventory(state, material, amount):
     state[key]=round(max(0,state[key]+amount),2)
 
 
-# Where he stands at each place, as the 3D view has it (world.js stations). Before v0.33.2 the café, trading post
-# and garden were missing, so "what is near me" there was measured from the middle of the green.
-PLACE_SPOTS={'cabin':[-10,-6],'range':[10,-7],'woods':[13,10],'workbench':[0,10],'library':[-11,5],
-             'cafe':[9,-14.2],'shop':[-3,-14.2],'garden':[-9,-14.2]}
+# Where he stands at each place. Before v0.33.2 the café, trading post and garden were missing, so "what is near
+# me" there was measured from the middle of the green; since v0.34.0 it comes from the one world layout.
+PLACE_SPOTS=layout.place_spots()
 
 
 def nearby(state):
@@ -262,13 +262,9 @@ def intersects_world(world, obj, x, z, ignore_id=None):
 
 # Fixed walls drawn in the scene that are not saved objects (v0.26.4): his cabin's three walls and the range target.
 # Nothing can be put down inside them. (x, z, width, depth)
-STATIC_SOLIDS = [(-10, -12.5, 6, .2), (-13, -10, .2, 5), (-7, -10, .2, 5), (10, -10, 2, .5)]
+STATIC_SOLIDS = layout.solids()   # v0.34.0: from the one world layout (walls, the range target, the spring's pool)
 # Places he can come to know by being there, and what he knows of them (centre, and a plain description).
-PLACES = {
-    'cabin': ((-10, -10), 'inside your cabin: floor from about x -12 to -8 and z -12 to -8, open on the south side'),
-    'workbench': (None, 'the workbench'), 'library': (None, 'the reading cabin'), 'range': ((10, -8), 'the archery range by the target'),
-    'shop': (None, 'the trading post'), 'cafe': (None, 'the internet café'), 'garden': ((-9, -15.6), 'the garden beds'),
-}
+PLACES = {k: (tuple(p['centre']) if 'centre' in p else None, p['words']) for k, p in layout.get()['places'].items() if k != 'woods'}
 PLACE_OBJECT = {'workbench': 'workbench', 'library': 'library', 'shop': 'trading_post', 'cafe': 'internet_cafe'}
 ACTION_OBJECTS = {'eat': ['food_store'], 'drink': ['spring'], 'read': ['library', 'library_chair'], 'sleep': ['cabin_bed'],
                   'play_music': ['cabin_bed'], 'trade': ['trading_post'], 'talk': ['trading_post'], 'browse': ['internet_cafe']}

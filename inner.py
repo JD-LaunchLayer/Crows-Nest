@@ -58,8 +58,7 @@ def first_person(text):
 
 
 COMPASS = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west']
-LANDMARKS = {'my cabin': (-10, -10, 3), 'my garden': (-9, -15.6, 2.5), 'the spring': (-17, -1, 3),
-             'the archery range': (10, -8, 3), 'the tree grove': (17, 10, 6.5)}
+LANDMARKS = __import__('layout').landmarks()   # v0.34.0: from the one world layout
 HIDDEN = {'deer': 'animal'}   # names he has not learned stay unnamed
 MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 

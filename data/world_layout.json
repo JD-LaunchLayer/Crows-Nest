@@ -1,0 +1,798 @@
+{
+ "_about": "The one world layout (v0.34.0): the fixed scenery both Crow's world and the 3D view are built from. Positions in metres, x east, z south; Crow never sees these numbers. Trees, placed objects, raw-material places, heaps and animals live in his save and are looked up alongside this.",
+ "version": 1,
+ "body_radius": 0.3,
+ "bounds": {
+  "walk": 31,
+  "world": 46
+ },
+ "places": {
+  "cabin": {
+   "stand": [
+    -10,
+    -6
+   ],
+   "centre": [
+    -10,
+    -10
+   ],
+   "words": "inside your cabin, open on the south side"
+  },
+  "workbench": {
+   "stand": [
+    0,
+    10
+   ],
+   "object": "workbench",
+   "words": "the workbench"
+  },
+  "library": {
+   "stand": [
+    -11,
+    5
+   ],
+   "object": "library",
+   "words": "the reading cabin"
+  },
+  "range": {
+   "stand": [
+    10,
+    -7
+   ],
+   "centre": [
+    10,
+    -8
+   ],
+   "words": "the archery range by the target"
+  },
+  "woods": {
+   "stand": [
+    13,
+    10
+   ],
+   "words": "the woods"
+  },
+  "shop": {
+   "stand": [
+    -3,
+    -14.2
+   ],
+   "object": "trading_post",
+   "words": "the trading post"
+  },
+  "cafe": {
+   "stand": [
+    9,
+    -14.2
+   ],
+   "object": "internet_cafe",
+   "words": "the internet café"
+  },
+  "garden": {
+   "stand": [
+    -9,
+    -14.2
+   ],
+   "centre": [
+    -9,
+    -15.6
+   ],
+   "words": "the garden beds"
+  }
+ },
+ "doors": {
+  "library": [
+   -11,
+   5
+  ],
+  "shop": [
+   -3,
+   -14.2
+  ],
+  "cafe": [
+   9,
+   -14.2
+  ]
+ },
+ "landmarks": {
+  "my cabin": [
+   -10,
+   -10,
+   3
+  ],
+  "my garden": [
+   -9,
+   -15.6,
+   2.5
+  ],
+  "the spring": [
+   -17.3,
+   1.6,
+   3
+  ],
+  "the archery range": [
+   10,
+   -8,
+   3
+  ],
+  "the tree grove": [
+   17,
+   10,
+   6.5
+  ]
+ },
+ "regions": {
+  "grove": {
+   "name": "the tree grove east of the workbench",
+   "x": 17.0,
+   "z": 10.0,
+   "r": 6.5
+  },
+  "woodland_edge": {
+   "name": "the woodland edge around the clearing",
+   "x": 0.0,
+   "z": 0.0,
+   "r_min": 17.0,
+   "r_max": 31.0
+  },
+  "spring_side": {
+   "name": "the ground around the spring and fruit bushes",
+   "x": -17.0,
+   "z": -1.0,
+   "r": 5.0
+  },
+  "clearing": {
+   "name": "the open clearing",
+   "x": 0.0,
+   "z": 0.0,
+   "r": 15.0
+  },
+  "deeper_woods": {
+   "name": "the deeper woods beyond the edge",
+   "x": 0.0,
+   "z": 0.0,
+   "r_min": 31.0,
+   "r_max": 46.0
+  }
+ },
+ "green": {
+  "x": 0,
+  "z": 0,
+  "r": 7
+ },
+ "ring_lane": {
+  "inner": 7,
+  "outer": 8.3
+ },
+ "square": {
+  "x": 3,
+  "z": -11.9,
+  "w": 4.4,
+  "d": 2.6
+ },
+ "lanes": [
+  {
+   "name": "High Street",
+   "width": 2.3,
+   "kind": "street",
+   "points": [
+    [
+     -6.6,
+     -13.3
+    ],
+    [
+     3,
+     -13.3
+    ],
+    [
+     12.8,
+     -13.3
+    ]
+   ]
+  },
+  {
+   "name": "Garden Lane",
+   "width": 1.4,
+   "kind": "lane",
+   "points": [
+    [
+     -6.6,
+     -13.3
+    ],
+    [
+     -12.6,
+     -13.6
+    ]
+   ]
+  },
+  {
+   "name": "Church Lane",
+   "width": 1.8,
+   "kind": "lane",
+   "points": [
+    [
+     0.4,
+     -8.1
+    ],
+    [
+     1.6,
+     -12.2
+    ]
+   ]
+  },
+  {
+   "name": "Cabin Lane",
+   "width": 1.5,
+   "kind": "lane",
+   "points": [
+    [
+     -6.4,
+     -3.9
+    ],
+    [
+     -8.6,
+     -6.1
+    ],
+    [
+     -10,
+     -7.4
+    ]
+   ]
+  },
+  {
+   "name": "Back Lane",
+   "width": 1.2,
+   "kind": "lane",
+   "points": [
+    [
+     -8.6,
+     -6.1
+    ],
+    [
+     -6.3,
+     -8.4
+    ],
+    [
+     -6.3,
+     -12.4
+    ]
+   ]
+  },
+  {
+   "name": "Library Lane",
+   "width": 1.5,
+   "kind": "lane",
+   "points": [
+    [
+     -6.7,
+     3.6
+    ],
+    [
+     -9.4,
+     5.2
+    ],
+    [
+     -11,
+     6.6
+    ]
+   ]
+  },
+  {
+   "name": "Workshop Path",
+   "width": 1.4,
+   "kind": "lane",
+   "points": [
+    [
+     0,
+     8.1
+    ],
+    [
+     0,
+     10.6
+    ]
+   ]
+  },
+  {
+   "name": "Chime Walk",
+   "width": 0.9,
+   "kind": "footpath",
+   "points": [
+    [
+     0,
+     10.2
+    ],
+    [
+     -2.6,
+     12.2
+    ],
+    [
+     -4.4,
+     13.2
+    ]
+   ]
+  },
+  {
+   "name": "Spring Path",
+   "width": 1.1,
+   "kind": "footpath",
+   "points": [
+    [
+     -8.1,
+     -0.6
+    ],
+    [
+     -12,
+     -1.2
+    ],
+    [
+     -15.2,
+     -1.4
+    ]
+   ]
+  },
+  {
+   "name": "Butts Path",
+   "width": 1.1,
+   "kind": "footpath",
+   "points": [
+    [
+     5.5,
+     -5.6
+    ],
+    [
+     8.2,
+     -6.6
+    ],
+    [
+     10,
+     -7.6
+    ]
+   ]
+  },
+  {
+   "name": "Stones Path",
+   "width": 0.9,
+   "kind": "footpath",
+   "points": [
+    [
+     12.8,
+     -13.3
+    ],
+    [
+     13.4,
+     -13.6
+    ]
+   ]
+  },
+  {
+   "name": "Wood Track",
+   "width": 1.4,
+   "kind": "track",
+   "points": [
+    [
+     6.4,
+     4.1
+    ],
+    [
+     9.6,
+     6.6
+    ],
+    [
+     13,
+     9.2
+    ],
+    [
+     15.4,
+     10.6
+    ]
+   ]
+  }
+ ],
+ "plots": [
+  {
+   "id": "high_street_middle",
+   "x": 3,
+   "z": -17.5,
+   "note": "between the trading post and café, facing the High Street"
+  },
+  {
+   "id": "green_west",
+   "x": -14.5,
+   "z": -6.5,
+   "note": "west of the cabin, off Cabin Lane"
+  },
+  {
+   "id": "green_north_east",
+   "x": 7.5,
+   "z": 12.5,
+   "note": "past the workshop, off the Wood Track"
+  }
+ ],
+ "items": [
+  {
+   "id": "cabin_floor",
+   "kind": "floor",
+   "x": -10,
+   "z": -10,
+   "w": 6,
+   "d": 5,
+   "h": 0.15,
+   "colour": "#806c4b",
+   "blocks": "passable",
+   "look": "the plank floor of my cabin"
+  },
+  {
+   "id": "cabin_back_wall",
+   "kind": "wall",
+   "x": -10,
+   "z": -12.5,
+   "w": 6,
+   "d": 0.2,
+   "h": 3,
+   "colour": "#76644b",
+   "blocks": "solid",
+   "look": "the back wall of my cabin"
+  },
+  {
+   "id": "cabin_west_wall",
+   "kind": "wall",
+   "x": -13,
+   "z": -10,
+   "w": 0.2,
+   "d": 5,
+   "h": 3,
+   "colour": "#806c4b",
+   "blocks": "solid",
+   "look": "the side wall of my cabin"
+  },
+  {
+   "id": "cabin_east_wall",
+   "kind": "wall",
+   "x": -7,
+   "z": -10,
+   "w": 0.2,
+   "d": 5,
+   "h": 3,
+   "colour": "#806c4b",
+   "blocks": "solid",
+   "look": "the side wall of my cabin"
+  },
+  {
+   "id": "cabin_roof",
+   "kind": "roof",
+   "x": -10,
+   "z": -10,
+   "r": 4.5,
+   "h": 2.5,
+   "y": 4,
+   "colour": "#4e5540",
+   "blocks": "passable",
+   "look": "the pointed roof of my cabin"
+  },
+  {
+   "id": "range_target",
+   "kind": "target",
+   "x": 10,
+   "z": -10,
+   "w": 2,
+   "d": 0.5,
+   "h": 2.5,
+   "colour": "#6e593e",
+   "blocks": "solid",
+   "look": "the round straw target on its post, faces turned to the clearing"
+  },
+  {
+   "id": "spring_pool",
+   "kind": "water",
+   "x": -17.8,
+   "z": 2.9,
+   "r": 2.2,
+   "colour": "#789a91",
+   "blocks": "solid",
+   "look": "a small still pool fed by the spring",
+   "sound": "a trickle of running water"
+  }
+ ],
+ "pebbles": [
+  {
+   "x": -5.46,
+   "z": 5.0,
+   "size": 0.19,
+   "colour": "#828771"
+  },
+  {
+   "x": 6.21,
+   "z": 8.1,
+   "size": 0.13,
+   "colour": "#828771"
+  },
+  {
+   "x": -11.42,
+   "z": -2.02,
+   "size": 0.19,
+   "colour": "#b4ac7e"
+  },
+  {
+   "x": 10.97,
+   "z": -6.98,
+   "size": 0.25,
+   "colour": "#828771"
+  },
+  {
+   "x": -3.74,
+   "z": 13.91,
+   "size": 0.13,
+   "colour": "#828771"
+  },
+  {
+   "x": -7.28,
+   "z": -14.02,
+   "size": 0.19,
+   "colour": "#828771"
+  },
+  {
+   "x": 16.15,
+   "z": 5.91,
+   "size": 0.25,
+   "colour": "#b4ac7e"
+  },
+  {
+   "x": -17.2,
+   "z": 7.09,
+   "size": 0.13,
+   "colour": "#828771"
+  },
+  {
+   "x": 8.48,
+   "z": -18.11,
+   "size": 0.19,
+   "colour": "#828771"
+  },
+  {
+   "x": -6.4,
+   "z": -3.71,
+   "size": 0.13,
+   "colour": "#b4ac7e"
+  },
+  {
+   "x": -5.87,
+   "z": 8.34,
+   "size": 0.25,
+   "colour": "#828771"
+  },
+  {
+   "x": 9.94,
+   "z": 8.38,
+   "size": 0.19,
+   "colour": "#b4ac7e"
+  },
+  {
+   "x": 11.21,
+   "z": -11.14,
+   "size": 0.13,
+   "colour": "#828771"
+  },
+  {
+   "x": -11.91,
+   "z": -14.29,
+   "size": 0.25,
+   "colour": "#b4ac7e"
+  },
+  {
+   "x": 19.82,
+   "z": 2.68,
+   "size": 0.13,
+   "colour": "#828771"
+  },
+  {
+   "x": -4.93,
+   "z": 3.42,
+   "size": 0.19,
+   "colour": "#828771"
+  },
+  {
+   "x": 4.37,
+   "z": 7.64,
+   "size": 0.13,
+   "colour": "#b4ac7e"
+  },
+  {
+   "x": -9.71,
+   "z": -3.11,
+   "size": 0.19,
+   "colour": "#828771"
+  },
+  {
+   "x": 10.54,
+   "z": -4.86,
+   "size": 0.25,
+   "colour": "#828771"
+  },
+  {
+   "x": -5.03,
+   "z": 11.99,
+   "size": 0.13,
+   "colour": "#828771"
+  },
+  {
+   "x": -4.86,
+   "z": -13.56,
+   "size": 0.19,
+   "colour": "#b4ac7e"
+  },
+  {
+   "x": 13.98,
+   "z": 7.37,
+   "size": 0.25,
+   "colour": "#828771"
+  },
+  {
+   "x": -16.64,
+   "z": 4.37,
+   "size": 0.13,
+   "colour": "#828771"
+  },
+  {
+   "x": 10.08,
+   "z": -15.63,
+   "size": 0.19,
+   "colour": "#828771"
+  },
+  {
+   "x": 3.36,
+   "z": 19.72,
+   "size": 0.25,
+   "colour": "#b4ac7e"
+  },
+  {
+   "x": -4.74,
+   "z": -3.68,
+   "size": 0.13,
+   "colour": "#828771"
+  },
+  {
+   "x": -5.98,
+   "z": 6.45,
+   "size": 0.25,
+   "colour": "#828771"
+  },
+  {
+   "x": 7.78,
+   "z": 8.6,
+   "size": 0.19,
+   "colour": "#828771"
+  },
+  {
+   "x": 11.48,
+   "z": -8.69,
+   "size": 0.13,
+   "colour": "#828771"
+  },
+  {
+   "x": -2.85,
+   "z": 15.54,
+   "size": 0.19,
+   "colour": "#b4ac7e"
+  },
+  {
+   "x": -9.14,
+   "z": -14.57,
+   "size": 0.25,
+   "colour": "#828771"
+  },
+  {
+   "x": 17.93,
+   "z": 4.94,
+   "size": 0.13,
+   "colour": "#828771"
+  },
+  {
+   "x": -17.81,
+   "z": 9.1,
+   "size": 0.19,
+   "colour": "#828771"
+  },
+  {
+   "x": 2.09,
+   "z": -5.62,
+   "size": 0.25,
+   "colour": "#b4ac7e"
+  },
+  {
+   "x": 2.78,
+   "z": 6.86,
+   "size": 0.13,
+   "colour": "#828771"
+  },
+  {
+   "x": -7.95,
+   "z": -3.78,
+   "size": 0.19,
+   "colour": "#828771"
+  },
+  {
+   "x": 9.75,
+   "z": -2.99,
+   "size": 0.25,
+   "colour": "#828771"
+  },
+  {
+   "x": -5.88,
+   "z": 10.0,
+   "size": 0.13,
+   "colour": "#b4ac7e"
+  },
+  {
+   "x": -2.71,
+   "z": -12.72,
+   "size": 0.19,
+   "colour": "#828771"
+  },
+  {
+   "x": 11.72,
+   "z": 8.36,
+   "size": 0.25,
+   "colour": "#828771"
+  },
+  {
+   "x": 11.17,
+   "z": -13.08,
+   "size": 0.19,
+   "colour": "#b4ac7e"
+  },
+  {
+   "x": -14.01,
+   "z": -14.27,
+   "size": 0.13,
+   "colour": "#828771"
+  },
+  {
+   "x": -5.71,
+   "z": 4.7,
+   "size": 0.25,
+   "colour": "#b4ac7e"
+  },
+  {
+   "x": 5.77,
+   "z": 8.41,
+   "size": 0.19,
+   "colour": "#828771"
+  },
+  {
+   "x": -11.3,
+   "z": -2.63,
+   "size": 0.25,
+   "colour": "#828771"
+  },
+  {
+   "x": 11.32,
+   "z": -6.38,
+   "size": 0.13,
+   "colour": "#b4ac7e"
+  },
+  {
+   "x": -4.47,
+   "z": 13.69,
+   "size": 0.19,
+   "colour": "#828771"
+  },
+  {
+   "x": -6.52,
+   "z": -14.39,
+   "size": 0.25,
+   "colour": "#828771"
+  },
+  {
+   "x": 15.82,
+   "z": 6.75,
+   "size": 0.13,
+   "colour": "#828771"
+  },
+  {
+   "x": -17.55,
+   "z": 6.17,
+   "size": 0.19,
+   "colour": "#b4ac7e"
+  }
+ ]
+}

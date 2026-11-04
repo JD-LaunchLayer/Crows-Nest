@@ -15,6 +15,7 @@ import town
 import materials
 import resources
 import handwork
+import layout
 import story
 import garden
 import music
@@ -52,7 +53,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.33.2'
+APP_VERSION = '0.34.0'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -112,6 +113,9 @@ if SAVE.exists():
     if state.get('version',0)<5:
         migration_backup=ROOT/'crow-save-before-v0.5.json'
         if not migration_backup.exists():migration_backup.write_bytes(old_bytes)
+    if state.get('spatial_version')!=1:   # v0.34.0: a copy of his life as it was, before he is given a real position
+        migration_backup=ROOT/'crow-save-before-v0.34.json'
+        if not migration_backup.exists():migration_backup.write_bytes(old_bytes)
     if 'stock' not in state:   # v0.31.1: a copy of his life as it was, before the item ledger first runs
         migration_backup=ROOT/'crow-save-before-v0.31.json'
         if not migration_backup.exists():migration_backup.write_bytes(old_bytes)
@@ -165,6 +169,8 @@ materials.load()   # v0.31.1: the world's materials, checked; a malformed data f
 materials.ensure(state)
 resources.ensure(state)   # v0.31.2: raw materials placed in his woods once, from a fixed seed
 handwork.ensure(state)    # v0.32.0: his heaps, fires and practice
+layout.get()              # v0.34.0: the one world layout, checked; a malformed file stops him starting rather than misleading him
+layout.follow(state)      # v0.34.0: a real position, from where he already is
 if not state['trading'].get('money_note'):
     # v0.27: the post counts in gold and silver. Said once, plainly, in the post's ledger; his past entries keep their words.
     state['trading']['money_note']=True
@@ -1186,6 +1192,7 @@ def start_action(d, seconds, reading=None):
         action=pending['decision']['action']
         state.update(pending=pending,action=action,location=ACTIONS[action],reason=d['reason'][:350],
                      current_intention=pending['decision']['intention'],next_step=d.get('next_step','')[:300])
+        layout.follow(state)
         state['decisions']+=1;runtime['status']='Resuming '+action
         event('Resumed a paused '+action+' session.',d['reason'],'resumed',action=action)
         persist();return
@@ -1259,6 +1266,7 @@ def start_action(d, seconds, reading=None):
         except ValueError as exc:
             state['pending']['music']={'error':str(exc)};state['pending']['remaining']=state['pending']['duration']=300
     if action=='use_item' and d.get('use_item')=='stove':state['location']='cabin'   # the stove is in his cabin
+    layout.follow(state)   # v0.34.0: he stands where he now is
     # v0.30.20: resting can be in bed under the covers, if that is what he says he is doing; then he is warm.
     state['in_bed']=action=='sleep' or (action=='rest' and bool(re.search(r'\b(bed|covers|blankets?|lie|lying|lay)\b',str(d.get('intention','')),re.I)))
     if action=='use_item' and d.get('use_item')=='whetstone' and d.get('use_on'):
@@ -2047,7 +2055,7 @@ class Handler(BaseHTTPRequestHandler):
         owner=self.authorised()
         if self.path.startswith('/api/') and not owner and not PUBLIC:
             return self.send(401,b'Open the full phone access link from the terminal.','text/plain')
-        static={'/':('index.html','text/html; charset=utf-8'),'/world.js':('world.js','application/javascript'),'/life_view.js':('life_view.js','application/javascript'),'/diary_view.js':('diary_view.js','application/javascript'),'/journal.js':('journal.js','application/javascript'),'/mobile_controls.js':('mobile_controls.js','application/javascript'),'/sky.js':('sky.js','application/javascript'),'/village.js':('village.js','application/javascript'),'/music_player.js':('music_player.js','application/javascript'),'/vendor/astronomy.browser.min.js':('vendor/astronomy.browser.min.js','application/javascript'),'/vendor/three.module.js':('vendor/three.module.js','application/javascript')}
+        static={'/world_layout.json':('data/world_layout.json','application/json'),'/':('index.html','text/html; charset=utf-8'),'/world.js':('world.js','application/javascript'),'/life_view.js':('life_view.js','application/javascript'),'/diary_view.js':('diary_view.js','application/javascript'),'/journal.js':('journal.js','application/javascript'),'/mobile_controls.js':('mobile_controls.js','application/javascript'),'/sky.js':('sky.js','application/javascript'),'/village.js':('village.js','application/javascript'),'/music_player.js':('music_player.js','application/javascript'),'/vendor/astronomy.browser.min.js':('vendor/astronomy.browser.min.js','application/javascript'),'/vendor/three.module.js':('vendor/three.module.js','application/javascript')}
         if self.path in static:
             name,kind=static[self.path];return self.send(200,(ROOT/name).read_bytes(),kind)
         if self.path=='/api/state':

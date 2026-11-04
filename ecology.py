@@ -16,13 +16,7 @@ import hashlib
 import re
 import math
 
-AREAS = {
-    'grove': {'name': 'the tree grove east of the workbench', 'x': 17., 'z': 10., 'r': 6.5},
-    'woodland_edge': {'name': 'the woodland edge around the clearing', 'x': 0., 'z': 0., 'r_min': 17., 'r_max': 31.},
-    'spring_side': {'name': 'the ground around the spring and fruit bushes', 'x': -17., 'z': -1., 'r': 5.},
-    'clearing': {'name': 'the open clearing', 'x': 0., 'z': 0., 'r': 15.},
-    'deeper_woods': {'name': 'the deeper woods beyond the edge', 'x': 0., 'z': 0., 'r_min': 31., 'r_max': 46.},
-}
+AREAS = __import__('layout').regions()   # v0.34.0: from the one world layout
 
 # Approximate UK leaf calendar (day of year): leaf-out, autumn colour start, bare.
 LEAVES = {'oak': (115, 295, 335), 'hornbeam': (105, 290, 330), 'silver birch': (105, 280, 315),

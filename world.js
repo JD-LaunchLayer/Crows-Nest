@@ -1,7 +1,7 @@
 import * as T from '/vendor/three.module.js';
 import {installTouchControls} from '/mobile_controls.js';
 import {createSky} from '/sky.js';
-import {createJournal} from '/journal.js';import {buildVillage,VILLAGE} from '/village.js';import {createPlayer} from '/music_player.js';
+import {createJournal} from '/journal.js';import {buildVillage} from '/village.js';import {createPlayer} from '/music_player.js';
 import {createLifeView} from '/life_view.js';
 import {createDiary} from '/diary_view.js';
 const $=id=>document.getElementById(id),txt=(id,v)=>$(id).textContent=v;
@@ -23,17 +23,24 @@ const sky=createSky({T,scene,camera,sun,skyLight});
 const mats={};function mat(c){return mats[c]??=new T.MeshStandardMaterial({color:c,roughness:1,flatShading:true})}
 function mesh(geo,c,x,y,z,parent=scene){const m=new T.Mesh(geo,mat(c));m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;parent.add(m);return m}
 function box(w,h,d,c,x,y,z,p=scene){return mesh(new T.BoxGeometry(w,h,d),c,x,y,z,p)}
-const obstacles=[];function block(x,z,w,d){obstacles.push({x,z,w:w/2+.3,d:d/2+.3})}
+// v0.34.0: the one world layout (data/world_layout.json), the same file his world is built from.
+const LAYOUT=await (await fetch('/world_layout.json')).json();
+const obstacles=[];function block(x,z,w,d){obstacles.push({x,z,w:w/2+LAYOUT.body_radius,d:d/2+LAYOUT.body_radius})}
 const floor=mesh(new T.PlaneGeometry(110,110,1,1),'#74815a',0,-.03,0);floor.rotation.x=-Math.PI/2;floor.castShadow=false;
-const stations={cabin:new T.Vector3(-10,0,-6),range:new T.Vector3(10,0,-7),woods:new T.Vector3(13,0,10),workbench:new T.Vector3(0,0,10),library:new T.Vector3(-11,0,5),cafe:new T.Vector3(9,0,-14.2),shop:new T.Vector3(-3,0,-14.2),garden:new T.Vector3(-9,0,-14.2)};
-buildVillage({T,scene,mat}); // scenery only: lanes, green and high street (village.js)
-// Open-front cabin: floor and three walls, so it is possible to look inside.
-box(6,.15,5,'#806c4b',-10,.05,-10);box(6,3,.2,'#76644b',-10,1.5,-12.5);box(.2,3,5,'#806c4b',-13,1.5,-10);box(.2,3,5,'#806c4b',-7,1.5,-10);
-block(-10,-12.5,6,.2);block(-13,-10,.2,5);block(-7,-10,.2,5);
-const roof=mesh(new T.ConeGeometry(4.5,2.5,4),'#4e5540',-10,4,-10);roof.rotation.y=Math.PI/4;
+const stations=Object.fromEntries(Object.entries(LAYOUT.places).map(([k,p])=>[k,new T.Vector3(p.stand[0],0,p.stand[1])]));
+buildVillage({T,scene,mat,layout:LAYOUT}); // lanes, green and high street, from the layout (village.js)
+// Fixed scenery from the layout: his open-front cabin (floor, three walls, roof), the range target's post, the spring's pool.
+const layoutMeshes=new Map();
+for(const it of LAYOUT.items){let m;
+ if(it.kind==='floor')m=box(it.w,it.h,it.d,it.colour,it.x,.05,it.z);
+ else if(it.kind==='wall')m=box(it.w,it.h,it.d,it.colour,it.x,it.h/2,it.z);
+ else if(it.kind==='roof'){m=mesh(new T.ConeGeometry(it.r,it.h,4),it.colour,it.x,it.y,it.z);m.rotation.y=Math.PI/4;}
+ else if(it.kind==='target')m=box(.18,it.h,.18,it.colour,it.x,it.h/2,it.z);
+ else if(it.kind==='water'){m=mesh(new T.CylinderGeometry(it.r,it.r,.06,13),it.colour,it.x,.01,it.z);m.castShadow=false;}
+ if(m)layoutMeshes.set(it.id,m);if(it.blocks==='solid'){const [x,z,w,d]=it.r?[it.x,it.z,2*it.r,2*it.r]:[it.x,it.z,it.w,it.d];block(x,z,w,d);}}
 const legacyBed=[box(1.5,.4,2.6,'#a3a782',-11.5,.35,-10.3),box(1.3,.18,.55,'#d5ccb1',-11.5,.65,-11.1)];const blanket=box(1.3,.1,1.6,'#6f7f63',-11.5,.95,-9.7);blanket.visible=false;box(.7,1,.6,'#8c704e',-8.2,.5,-11.5);
-// Range target with concentric faces pointing into the clearing.
-box(.18,2.5,.18,'#6e593e',10,1.25,-10);for(const [r,col,z] of [[1,'#dfd6b4',-9.9],[.7,'#877249',-9.86],[.45,'#d6c99e',-9.82],[.17,'#935d3e',-9.78]]){mesh(new T.CylinderGeometry(r,r,.07,16),'#'+col.replace('#',''),10,2,z).rotation.x=Math.PI/2;}block(10,-10,2,.5);
+// The range target's concentric faces, on the post from the layout, pointing into the clearing.
+for(const [r,col,z] of [[1,'#dfd6b4',-9.9],[.7,'#877249',-9.86],[.45,'#d6c99e',-9.82],[.17,'#935d3e',-9.78]]){mesh(new T.CylinderGeometry(r,r,.07,16),'#'+col.replace('#',''),10,2,z).rotation.x=Math.PI/2;}
 // Workbench, reading cabin and a small quiet pond.
 const benchStart=scene.children.length;box(3,.23,1.4,'#a58c5c',0,1.2,12);for(const x of [-1.2,1.2])for(const z of [11.5,12.5])box(.17,1.2,.17,'#645739',x,.6,z);block(0,12,3,1.4);const legacyBench=scene.children.slice(benchStart),legacyBenchBlock=obstacles.at(-1);
 // Reading cabin: legacy shell is replaced by persistent world geometry on sync.
@@ -79,7 +86,6 @@ lampShade.material=new T.MeshStandardMaterial({color:'#e1c188',emissive:'#d39a44
 const lamp=new T.PointLight('#ffce84',12,9,2);lamp.position.set(-8.15,1.36,9.3);scene.add(lamp);
 mesh(new T.SphereGeometry(.075,8,6),'#fff0c2',-8.15,1.38,9.3);
 const rug=box(2.2,.015,2.2,'#766f52',-9.1,.09,9.2);rug.castShadow=false;
-const pond=mesh(new T.CylinderGeometry(3,3,.06,13),'#789a91',-18,.01,3);pond.castShadow=false;
 const treeMeshes=new Map();let treeNumber=0;
 function tree(x,z,h=5,given=null){
  const id=given||'tree-'+treeNumber++,group=new T.Group();group.position.set(x,0,z);scene.add(group);
@@ -229,10 +235,9 @@ function syncTrees(world){
  }
 }
 
-for(let i=0;i<65;i++){const a=i*2.39996,r=23+(i%7)*1.1;tree(Math.cos(a)*r,Math.sin(a)*r,4+(i%5)*.65)}
-for(const [x,z,h]of [[17,10,5],[15,14,6],[20,12,5],[18,6,4],[-18,-9,5],[-20,-15,6]])tree(x,z,h);
+// v0.34.0: every tree is drawn from his world (syncTrees), never from a copy of its formula here.
 // Small details without textures or outside image services.
-for(let i=0;i<65;i++){let a=i*2.4,r=6+(i%11)*1.4;const x=Math.cos(a)*r,z=Math.sin(a)*r;if(Math.abs(x)<2||Math.abs(z)<2)continue;const stone=mesh(new T.DodecahedronGeometry(.13+(i%3)*.06,0),i%4?'#828771':'#b4ac7e',x,.13,z);stone.scale.y=.6;}
+for(const p of LAYOUT.pebbles){const stone=mesh(new T.DodecahedronGeometry(p.size,0),p.colour,p.x,.13,p.z);stone.scale.y=.6;}
 // Fixed name boards: over doorways, or on posts for open places. Readable from both sides,
 // they stay where they are mounted instead of turning to face the viewer.
 function sign(text,x,y,z,face,{w=2.6,h=.46,post=false}={}){
@@ -354,8 +359,8 @@ function clearLine(a,b){
 // Points he can walk between: the bends and ends of every lane, round the ring lane, and the fronts of the doors.
 // Before v0.33.2 a blocked walk always went via the middle of the green, so he crossed it to go anywhere.
 function hubs(){
- const out=[];for(const lane of VILLAGE.lanes)for(const [x,z] of lane.points)out.push(new T.Vector3(x,0,z));
- const r=(VILLAGE.ringLane.inner+VILLAGE.ringLane.outer)/2;for(let i=0;i<12;i++){const a=i*Math.PI/6;out.push(new T.Vector3(Math.cos(a)*r,0,Math.sin(a)*r));}
+ const out=[];for(const lane of LAYOUT.lanes)for(const [x,z] of lane.points)out.push(new T.Vector3(x,0,z));
+ const r=(LAYOUT.ring_lane.inner+LAYOUT.ring_lane.outer)/2;for(let i=0;i<12;i++){const a=i*Math.PI/6;out.push(new T.Vector3(Math.cos(a)*r,0,Math.sin(a)*r));}
  return [...out,...Object.values(stations),LIB.door];
 }
 // Straight there if nothing is in the way; otherwise the shortest chain of clear legs between those points;

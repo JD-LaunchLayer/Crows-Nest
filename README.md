@@ -1778,3 +1778,25 @@ The first step of the shared-world and mental-map work. Two things were measured
 
 Tests: tests/test_nearby_places.py, and new checks in tests/animation.mjs (they fail on the old code). Next:
 v0.34.0, one shared world layout and a real position for him.
+
+## v0.34.0 — one world for both of you (mapping phase 1b)
+
+His world and the 3D view now come from one file, **data/world_layout.json** (read by layout.py on the server and
+fetched by the page): the green, the ring lane and every lane, the square, his cabin's floor, walls and roof, the
+range target, the spring's pool, the pebbles on the grass, where he stands at each place, the named landmarks and
+the ecology regions. Before, the same places were written out in about eight files that did not quite agree, and
+some scenery existed only on screen. The 3D view no longer draws its own copy of the first 71 trees: every tree on
+screen is a tree in his world. The pond that sat a little way from the spring is now the spring's own pool, where
+the spring really is, and it is solid for both of you.
+
+**He has a real position** (state['position']: where he stands and which way he faces), worked out from where he
+already is. Until he walks by himself (v0.37) it follows his place: when he goes somewhere new he stands at its usual
+spot, and while he stays he stays put. His place names keep working exactly as before.
+
+**Your save:** on first start a copy is kept as crow-save-before-v0.34.json. Nothing else in his life changes: tree
+ids, memories, notebook, possessions and everything he built are untouched, and starting twice is the same as once.
+
+Nothing he is told changes yet; that is v0.35. Tests: tests/test_layout.py (the file is checked; the server, the
+3D view and the layout agree; the move is safe and repeatable; every ecology fact names a real thing inside the area
+it is reported for; bushy outlines in the dark only where something bushy grows; "not here" carries no coordinates
+or suggestion), plus new parity checks in tests/animation.mjs.
