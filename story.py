@@ -243,6 +243,37 @@ def work_done(state, job, at, only_before=False):
     return kept
 
 
+TERMS_WORDS = ('terms', 'decide', 'decision', 'answer', 'agree', 'agreeing', 'hear', 'repeat', 'lay out', 'plainly')
+
+
+def work_agreed(state, job, at):
+    """v0.36.12: once a piece of work is agreed with Edda, his stories about hearing its terms or deciding on it are
+    answered, and his promises to give an answer are kept. Before, he agreed the crate carrying and then spent a whole
+    night at her counter asking for its terms "one more time", led on by those stories."""
+    import town
+    names = {'sweep_post': 'the sweeping', 'carry_crates': 'carrying the crates'}
+    for st in state.get('stories', []):
+        t = st.get('title', '').lower()
+        if st.get('stage') in ('started', 'pursuing', 'dormant') and town.same_work(t) == job and any(w in t for w in TERMS_WORDS):
+            st.update(stage='answered', ended=at, ended_by=f'he agreed {names.get(job, "the work")} with Edda')
+    for p in state.get('promises', []):
+        t = p['text'].lower()
+        if p['status'] == 'open' and any(w in t for w in ('terms', 'answer', 'before i agree')) and (town.same_work(t) in (job, None)):
+            p.update(status='kept (he gave his answer)', kept_at=at)
+
+
+def settle_agreed_work(state):
+    """Once (v0.36.12): favours already agreed and waiting settle the term-hearing stories and answer promises made before."""
+    import town
+    if state.get('agreed_work_settled'):
+        return
+    for f in town.keeper(state).get('favours', []):
+        job = town.same_work(f.get('task', ''))
+        if job:
+            work_agreed(state, job, f.get('agreed', ''))
+    state['agreed_work_settled'] = True
+
+
 def settle_done_work(state):
     """Once (v0.36.10): work already done before this change settles the promises and plans made before it was done."""
     if state.get('done_work_settled'):

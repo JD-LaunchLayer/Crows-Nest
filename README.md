@@ -2016,3 +2016,14 @@ fed it:
   has told him all there is and the rest is his to decide. She still volunteers nothing he has not asked about.
 
 Test: tests/test_edda_elf.py.
+
+## v0.36.12 — agreed is agreed
+
+The night's loop at Edda's counter (29 of his last 30 choices were talks) was held in place by his own open stories:
+"Stay at Edda's counter and hear her full terms for the Monday crate job…", "…let her finish the plain terms, start
+to finish…", and promises to "give you a clear answer once I've eaten". He had already agreed the crate carrying with
+her as a favour, but nothing marked those as settled, so every moment he was shown them as things he was still in the
+middle of. Now, when work is agreed with Edda, his stories about hearing its terms or deciding on it are answered ("he
+agreed carrying the crates with Edda") and his promises to give an answer are kept; his promise to actually do the work
+stays open until he does it (then v0.36.10 settles it). On first start, favours already agreed settle the same way.
+His words are kept exactly. Test: tests/test_work_done.py.

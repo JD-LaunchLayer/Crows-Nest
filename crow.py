@@ -55,7 +55,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.36.11'
+APP_VERSION = '0.36.12'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -165,6 +165,7 @@ life.annotate_overridden_trials(state)  # v0.21.1: labels, never rewrites, past 
 story.annotate_phantoms(state)  # v0.27: a plain note beside threads about Tam, the board and the "solid part" rule
 story.leave_phantom_stories(state)  # v0.36.6: stories resting on Edda's soup, which never existed, are left with a note
 story.settle_done_work(state)  # v0.36.10: work already done settles the promises and plans made before it
+story.settle_agreed_work(state)  # v0.36.12: work already agreed settles the stories about hearing its terms
 ecology.ensure(state)
 ecology.backfill_recorded(state)  # v0.24.2: his field notebook, from what he already recorded
 consolidation.ensure(state)
@@ -1497,6 +1498,9 @@ def finish_action(geometry=None):
         talk=p.get('reading') or {'conversation':[],'agreed':None}
         lines=' '.join(f"{c['who']}: “{c['text'][:160]}”" for c in talk['conversation'][:6])
         deal=town.apply_proposal(state,talk['agreed'],now().isoformat(),now().date().isoformat()) if talk.get('agreed') else {'success':True,'text':'No deal was made.'}
+        if talk.get('agreed') and talk['agreed'].get('kind')=='favour' and deal.get('success'):   # v0.36.12: agreed is agreed
+            job=town.same_work(talk['agreed'].get('task',''))
+            if job:story.work_agreed(state,job,now().isoformat())
         town.remember(state,talk.get('note',''),talk.get('warmth',0),now().isoformat())
         for promised in talk.get('promises',[]):story.add_promise(state,promised,'Edda Thorne',now().isoformat())
         result={'success':deal['success'],'text':deal['text'],'conversation':talk['conversation']}

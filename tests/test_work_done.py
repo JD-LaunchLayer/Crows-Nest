@@ -24,3 +24,13 @@ s2 = {'stories': [{'id': 1, 'title': 'head to the post to start on the sweeping'
 story.settle_done_work(s2)
 assert s2['stories'][0]['stage'] == 'done' and s2['stories'][1]['stage'] == 'pursuing' and s2['promises'][0]['status'] == 'open'
 print('PASS v0.36.10: work already done settles only what came before it.')
+# v0.36.12: agreeing the work answers the stories about hearing its terms, and keeps promises to give an answer.
+s3 = {'stories': [{'id': 1, 'title': "Stay at Edda's counter and hear her full terms for the Monday crate job and the food bundle", 'stage': 'pursuing', 'steps': []},
+                  {'id': 2, 'title': 'Walk home across the clearing in the dark', 'stage': 'pursuing', 'steps': []}],
+      'promises': [{'id': 1, 'text': "I'll give you a clear answer on the crate carrying once I've eaten.", 'status': 'open'},
+                   {'id': 2, 'text': "I'll do the crate work in the yard now.", 'status': 'open'}],
+      'threads': [], 'next_story_id': 3}
+story.work_agreed(s3, 'carry_crates', '2027-01-12T06:50:00+00:00')
+assert s3['stories'][0]['stage'] == 'answered' and s3['stories'][1]['stage'] == 'pursuing'
+assert s3['promises'][0]['status'].startswith('kept') and s3['promises'][1]['status'] == 'open', 'doing it is still owed'
+print('PASS v0.36.12: agreed work answers the term-hearing stories.')
