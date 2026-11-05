@@ -55,7 +55,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.36.7'
+APP_VERSION = '0.36.8'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -1881,7 +1881,7 @@ def talk_session(opening, hope):
             'only if it owes him anything). note_about_crow is what you would remember about him from this; '
             'warmth -1..1 is how you feel towards him now. '+json.dumps({'board':board,'his_money':town.money(credit),'what_you_remember':kp['notes'][-10:],
             'open_favours':kp['favours'],'next_delivery_due':town.next_delivery(state),'what_your_book_shows_the_post_owes_him':town.post_owes(state),
-            'your_ledger_for_days_he_mentions':{q:town.ledger_lookup(state,q,20) for q in set(re.findall(r'\d{4}-\d{1,2}-\d{1,2}|\b\d{1,2}-\d{1,2}\b',' '.join(c['text'] for c in convo if c['who']=='Crow')))},
+            'your_ledger_for_days_he_mentions':{q:town.ledger_lookup(state,q,20) or ['(no entries that day)'] for q in town.days_mentioned(' '.join(c['text'] for c in convo if c['who']=='Crow'),now().date())},
             'your_ledger_last_three_days':[f"{str(l.get('at',''))[:16].replace('T',' ')} · {l['text']}" for l in state['trading']['ledger'] if str(l.get('at',''))[:10]>=(now()-timedelta(days=3)).date().isoformat()][-30:],'what_your_goods_are_for':town.ITEM_KNOWLEDGE,'conversation':convo},ensure_ascii=False),keeper_schema,350,'keeper',system=town.KEEPER_PERSONA)
         reply=' '.join(str(last.get('reply','')).split())[:400]
         convo.append({'who':'Edda','text':reply})

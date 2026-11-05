@@ -544,7 +544,7 @@ def ledger_lookup(state, query, limit=15):
         g = m.groups()
         day = f'{int(g[-2]):02d}-{int(g[-1]):02d}'
     else:
-        m = re.search(r'\b(\d{1,2})(?:st|nd|rd|th)?\s+(' + '|'.join(MONTHS) + r')', q) or re.search(r'(' + '|'.join(MONTHS) + r')\s+(\d{1,2})', q)
+        m = re.search(r'\b(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?(' + '|'.join(MONTHS) + r')', q) or re.search(r'(' + '|'.join(MONTHS) + r')\s+(\d{1,2})', q)
         if m:
             a, b = m.groups()
             d, mon = (a, b) if a.isdigit() else (b, a)
@@ -555,6 +555,39 @@ def ledger_lookup(state, query, limit=15):
         words = [w for w in re.findall(r'[a-z]+', q) if len(w) > 2]
         hits = [l for l in book if words and all(w in l['text'].lower() for w in words)]
     return [f"{str(l.get('at', ''))[:16].replace('T', ' ')} · {l['text']}" for l in hits[-limit:]]
+
+
+def days_mentioned(text, today):
+    """v0.36.8: the days he names, however he names them ("12-27", "27 December", "the 27th of December", or just "the
+    27th, 28th and 29th"), as 'MM-DD'. A bare day of the month is the most recent such day up to today. Before, only
+    "12-27" was understood, so when he asked about "the 27th, 28th and 29th" Edda was shown nothing for them and told
+    him her book had no entries for those days, when it did."""
+    import re
+    from datetime import date, timedelta
+    t = str(text).lower()
+    out = []
+    for m in re.finditer(r'\b(?:\d{4}-)?(\d{1,2})-(\d{1,2})\b', t):
+        out.append(f'{int(m.group(1)):02d}-{int(m.group(2)):02d}')
+    names = '|'.join(MONTHS + [x[:3] for x in MONTHS])
+    for m in re.finditer(r'\b(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?(' + names + r')\b', t):
+        mon = next(i for i, x in enumerate(MONTHS) if x.startswith(m.group(2)[:3])) + 1
+        out.append(f'{mon:02d}-{int(m.group(1)):02d}')
+    for m in re.finditer(r'\b(' + names + r')\s+(\d{1,2})(?:st|nd|rd|th)?\b', t):
+        mon = next(i for i, x in enumerate(MONTHS) if x.startswith(m.group(1)[:3])) + 1
+        out.append(f'{mon:02d}-{int(m.group(2)):02d}')
+    for m in re.finditer(r'\b(\d{1,2})(?:st|nd|rd|th)\b(?!\s+(?:of\s+)?(?:' + names + r'))', t):
+        n = int(m.group(1))
+        d = today
+        for _ in range(62):
+            if d.day == n:
+                out.append(f'{d.month:02d}-{d.day:02d}')
+                break
+            d -= timedelta(days=1)
+    seen = []
+    for k in out:
+        if k not in seen and 1 <= int(k[:2]) <= 12 and 1 <= int(k[3:]) <= 31:
+            seen.append(k)
+    return seen[:6]
 
 
 def _parse_money(text):

@@ -1973,3 +1973,12 @@ each day of his life cost less without changing who he is:
 
 When the budget is reached he still dozes and his world waits with him until it resets after midnight. Test:
 tests/test_budget_savers.py.
+
+## v0.36.8 — the days he names are found in Edda's book
+
+On 2 January he asked Edda to go through "the 27th, 28th and 29th" with him. Edda is shown her book for the days he
+mentions, but only a form like "12-27" was understood, so she was shown nothing for those days and told him her book
+had no entries for them. It did (he bought bread on the 27th and carried crates on the 29th), and he went looking for
+coin he thought was missing. Now days are understood however he names them ("the 27th", "27th of December",
+"December 27", "12-27"); a bare day of the month is the most recent one up to today; a day with nothing in the book is
+shown to her as having no entries, so she says so only when it is true. Test: tests/test_days_named.py.
