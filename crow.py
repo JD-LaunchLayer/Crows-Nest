@@ -55,7 +55,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.36.9'
+APP_VERSION = '0.36.10'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -164,6 +164,7 @@ life.ensure(state)
 life.annotate_overridden_trials(state)  # v0.21.1: labels, never rewrites, past trials
 story.annotate_phantoms(state)  # v0.27: a plain note beside threads about Tam, the board and the "solid part" rule
 story.leave_phantom_stories(state)  # v0.36.6: stories resting on Edda's soup, which never existed, are left with a note
+story.settle_done_work(state)  # v0.36.10: work already done settles the promises and plans made before it
 ecology.ensure(state)
 ecology.backfill_recorded(state)  # v0.24.2: his field notebook, from what he already recorded
 consolidation.ensure(state)
@@ -1502,6 +1503,9 @@ def finish_action(geometry=None):
         description='Talked with Edda Thorne at the trading post. '+lines+' '+deal['text']
     elif a=='trade':
         result=town.trade(state,d.get('trade_mode','ask'),d.get('trade_item',''),d.get('trade_quantity',1),now().isoformat());description=result['text']
+        if d.get('trade_mode')=='job' and result.get('success'):   # v0.36.10: the work done settles promises and plans to do it
+            fav=next((f for f in town.keeper(state)['favours'] if f['id']==d.get('trade_item')),None)
+            story.work_done(state,d.get('trade_item') if d.get('trade_item') in town.JOBS else town.same_work(fav['task'] if fav else description),now().isoformat())
     elif a=='notebook':
         result=(notebook.write(state,d.get('note_title',''),d.get('note_text',''),now().isoformat()) if d.get('notebook_mode')=='write'
                 else notebook.read(state,d.get('note_query','')));description=result['text']

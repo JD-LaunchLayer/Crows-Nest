@@ -224,6 +224,34 @@ def add_promise(state, text, to, at):
     return promise
 
 
+def work_done(state, job, at, only_before=False):
+    """v0.36.10: when he has actually done a piece of posted work, his open promises to do that work and the stories
+    that were about getting to it are settled by the fact, in the world's words; his own words are kept. Before, he
+    swept the post at 08:39 and spent the rest of the day still meaning to "head to the trading post to start on the
+    sweeping I owe Edda" (a story 142 steps long), and his promise to sweep stayed open."""
+    import town
+    names = {'sweep_post': 'the sweeping', 'carry_crates': 'carrying the crates'}
+    kept = 0
+    for p in state.get('promises', []):
+        if p['status'] == 'open' and town.same_work(p['text']) == job and not (only_before and str(p.get('at', '')) >= at):
+            p.update(status='kept (the work was done)', kept_at=at)
+            kept += 1
+    for st in state.get('stories', []):
+        if st.get('stage') in ('started', 'pursuing', 'dormant') and town.same_work(st.get('title', '')) == job \
+                and not (only_before and str(st.get('started', '')) >= at):
+            st.update(stage='done', ended=at, ended_by=f'he did {names.get(job, "the work")}')
+    return kept
+
+
+def settle_done_work(state):
+    """Once (v0.36.10): work already done before this change settles the promises and plans made before it was done."""
+    if state.get('done_work_settled'):
+        return
+    for job, at in (state.get('trading', {}).get('jobs_done') or {}).items():
+        work_done(state, job, at, only_before=True)
+    state['done_work_settled'] = True
+
+
 def keep_promise(state, ident, at):
     for p in state.get('promises', []):
         if p['id'] == ident and p['status'] == 'open':

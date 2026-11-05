@@ -1990,3 +1990,12 @@ and waited for an answer; the book only said "Nothing appears because of it", an
 answering. The book is where Edda notes what people would like her to stock; it never replies. Now writing in it says
 so plainly: "…where Edda keeps note of things people would like her to stock. Nothing appears because of it, and the
 book gives no reply; questions are for asking her at the counter." Test: tests/test_days_named.py.
+
+## v0.36.10 — work done settles the plans to do it
+
+On 9 January he swept the post at 08:39, then spent the afternoon in bed still meaning to "head to the trading post to
+start on the sweeping I owe Edda" (a story 142 steps long), with his promise to sweep still open. Nothing tied the work
+he actually did to the promises and plans to do it. Now, when he finishes a posted job or a favour, his open promises
+to do that work are marked kept ("the work was done") and the stories about getting to it are done ("he did the
+sweeping"); his own words are kept exactly. On first start, work already done settles only the promises and stories
+made before it. Test: tests/test_work_done.py.
