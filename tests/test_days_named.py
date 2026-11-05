@@ -19,3 +19,7 @@ for q in town.days_mentioned("the 27th", today):
     assert town.ledger_lookup(s, q) and 'Bought' in town.ledger_lookup(s, q)[0]
 assert town.ledger_lookup(s, 'the 27th of december'), 'a day with "of" is found too'
 print('PASS v0.36.8: days he names in any wording are looked up in her book.')
+# v0.36.9: the request book says plainly what it is for and that it gives no reply.
+r = town.trade(s, 'ask', 'paid work for today', 1, '2027-01-06T15:13:00+00:00')
+assert 'things people would like her to stock' in r['text'] and 'gives no reply' in r['text'], r['text']
+print('PASS v0.36.9: the request book says what it is for.')

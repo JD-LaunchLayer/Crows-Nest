@@ -704,7 +704,9 @@ def trade(state, mode, item, quantity, at):
         else:
             post['requests'].append({'item': wanted, 'first': at, 'last': at, 'times': 1})
         post['requests'] = post['requests'][-60:]
-        text = f'Wrote "{wanted}" in the request book at the trading post. Nothing appears because of it.'
+        # v0.36.9: what the book is for, plainly. He had been writing questions to Edda in it and waiting for a reply.
+        text = (f'Wrote "{wanted}" in the request book at the trading post, where Edda keeps note of things people would like '
+                'her to stock. Nothing appears because of it, and the book gives no reply; questions are for asking her at the counter.')
     else:
         return {'success': False, 'text': 'Unknown kind of trade.'}
     _record(post, text, at)

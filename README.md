@@ -1982,3 +1982,11 @@ had no entries for them. It did (he bought bread on the 27th and carried crates 
 coin he thought was missing. Now days are understood however he names them ("the 27th", "27th of December",
 "December 27", "12-27"); a bare day of the month is the most recent one up to today; a day with nothing in the book is
 shown to her as having no entries, so she says so only when it is true. Test: tests/test_days_named.py.
+
+## v0.36.9 — what the request book is for
+
+He wrote questions to Edda in the post's request book three times in one afternoon ("what paid work is there today?")
+and waited for an answer; the book only said "Nothing appears because of it", and he took the silence as Edda not
+answering. The book is where Edda notes what people would like her to stock; it never replies. Now writing in it says
+so plainly: "…where Edda keeps note of things people would like her to stock. Nothing appears because of it, and the
+book gives no reply; questions are for asking her at the counter." Test: tests/test_days_named.py.
