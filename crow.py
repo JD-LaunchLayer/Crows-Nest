@@ -55,7 +55,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.36.13'
+APP_VERSION = '0.36.14'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -1884,7 +1884,7 @@ def talk_session(opening, hope):
         with LOCK:  # v0.36.13: a wrong purse sum, or pay asked for before the work, is answered from the book
             plain=town.counter_reply(state,convo[-1]['text'])
         if plain:
-            reply=' '.join(plain.split())[:400]
+            reply=' '.join(plain.split())[:900]
             convo.append({'who':'Edda','text':reply})
             offer=None
         else:

@@ -265,8 +265,10 @@ KEEPER_PERSONA = ('You are Edda Thorne, keeper of the small trading post beside 
     'His gold and silver are the figure in your ledger, which you are told. If he names a different sum as his own, '
     'tell him once what the ledger shows and reckon any price from that figure, never from the sum he named. '
     'If you have already told him that figure, do not say it again. '
-    'Work is paid when it is done: if he asks to be paid before he starts, say that plainly. '
-    'Do not offer a sale or a task.')
+    'Work is paid when it is done: if he asks to be paid before he starts, or whether any pay is given up front, say that plainly. '
+    'When he asks what his purse buys, or about food on the shelf, answer from the board in front of you: the prices his purse meets, '
+    'and, if he asks about food, whether any food on the shelf is within that sum. '
+    'You know the shelf, the book and the pay for work here, and nothing beyond them. Do not offer a sale or a task.')
 
 
 def keeper(state):
@@ -675,11 +677,15 @@ def named_purse(text):
     return None
 
 
+def _plain(text):
+    return ' '.join(str(text).lower().replace('’', "'").replace('‘', "'").split())
+
+
 def asks_pay_before(text):
-    """He is asking to be paid before the work is done."""
-    t = ' '.join(str(text).lower().replace('’', "'").replace('‘', "'").split())
+    """He is asking whether work is paid before it is done."""
+    t = _plain(text)
     pay = re.search(r'\b(pay|paid|paying|payment|wage|money)\b', t)
-    if re.search(r'\b(up\s*-?\s*front|upfront)\b', t) and (pay or re.search(r'\b(gold|silver|crates?|work|job|favour)\b', t)):
+    if re.search(r'\b(up\s*-?\s*front|upfront)\b', t) and (pay or re.search(r'\b(gold|silver|crates?|work|job|favour|sweep\w*)\b', t)):
         return True
     if re.search(r'\bin advance\b', t) and pay:
         return True
@@ -689,38 +695,93 @@ def asks_pay_before(text):
         return True
     if re.search(r'\bpay(?:ment)?\b(?:\s+\w+){0,8}\s+before\b', t) and re.search(r'\b(start|begin|carry|work|crates?|job|favour)\b', t):
         return True
+    if pay and re.search(r'\bwhen (?:the work|it) is done\b', t):
+        return True
     return False
 
 
-def _prices_within(state, amount):
-    """Posted prices his ledger sum meets. What is on the board, and nothing about what he ought to do."""
+def asks_food(text):
+    """He is asking about food on her shelves, not merely mentioning a meal."""
+    t = _plain(text)
+    if not re.search(r'\b(food|bread|cheese|hungry|meal|provisions)\b', t):
+        return False
+    return bool(re.search(r'\b(buy|price|prices|cost|costs|cheap\w*|afford|purse|gold|silver|reach)\b', t))
+
+
+def asks_shelf(text):
+    """He is asking what his money meets on the board."""
+    t = _plain(text)
+    if re.search(r'\b(cheap\w*)\b', t):
+        return True
+    if re.search(r'\b(what|which|anything|any)\b', t) and re.search(r'\b(buy|afford)\b', t):
+        return True
+    if re.search(r'\b(prices?|costs?|afford)\b', t) and re.search(r'\b(buy|food|bread|purse|gold|silver|shelf)\b', t):
+        return True
+    return False
+
+
+def _shelf_rows(state, food_only=False):
     post = ensure(state)
     rows = []
     for item in post['stock'].values():
         price = float(item.get('price') or 0)
-        if item.get('qty', 0) > 0 and price > 0 and price <= amount + 1e-9:
-            rows.append((price, item['name']))
+        if item.get('qty', 0) <= 0 or price <= 0:
+            continue
+        if food_only and not str(item.get('effect', '')).startswith('pantry'):
+            continue
+        rows.append((price, item['name']))
     rows.sort(key=lambda r: (r[0], r[1]))
+    return rows
+
+
+def _prices_within(state, amount):
+    """Posted prices his ledger sum meets. What is on the board, and nothing about what he ought to do."""
+    rows = [(price, name) for price, name in _shelf_rows(state) if price <= amount + 1e-9]
     if not rows:
         return f'At {money(amount)}, nothing on the board is priced within it.'
     bits = [f'{name}, {money(price)}' for price, name in rows[:8]]
     return f'At {money(amount)}, the posted prices within it are: ' + '; '.join(bits) + '.'
 
 
+def _food_within(state, amount):
+    """Food on the shelf, against his purse. Seeds and tools are not food."""
+    foods = _shelf_rows(state, food_only=True)
+    if not foods:
+        return 'There is no food on the shelf.'
+    within = [(price, name) for price, name in foods if price <= amount + 1e-9]
+    if not within:
+        price, name = foods[0]
+        return f'{name} is {money(price)}. That is more than {money(amount)}, and there is no cheaper food on the shelf.'
+    bits = '; '.join(f'{name}, {money(price)}' for price, name in within)
+    over = [(price, name) for price, name in foods if price > amount + 1e-9]
+    extra = f' {over[0][1]} is {money(over[0][0])}, which is more than {money(amount)}.' if over else ''
+    return f'The food your purse covers: {bits}.{extra}'
+
+
 def counter_reply(state, text):
-    """v0.36.13: plain words at the counter. A purse sum that is not the book's is corrected once, and any price is
-    reckoned from the book. Pay asked for before the work is stated as pay when the work is done. Nothing is suggested."""
+    """Plain words at the counter, from the shelf, the ledger and the pay rule only.
+
+    v0.36.13: a purse sum that is not the book's is corrected once, and prices are reckoned from the book.
+    v0.36.14: a question about what that sum buys, or about food, is answered from the shelf even when the sum is
+    already right. Pay asked for before the work, or asked about as up front, is pay when the work is done.
+    Nothing beyond the post is suggested."""
     have = ledger_amount(state)
-    parts = []
     named = named_purse(text)
-    if named is not None and abs(named - have) > .05:
+    parts = []
+    mismatch = named is not None and abs(named - have) > .05
+    if mismatch:
         kp = keeper(state)
         if kp.get('ledger_told') != money(have):
-            parts.append(f'My ledger shows {money(have)} in your purse, not {money(named)}. ' + _prices_within(state, have))
+            parts.append(f'My ledger shows {money(have)} in your purse, not {money(named)}.')
             kp['ledger_told'] = money(have)
+    if asks_food(text):
+        parts.append(_food_within(state, have))
+    if asks_shelf(text) or mismatch:
+        parts.append(_prices_within(state, have))
     if asks_pay_before(text):
         parts.append('Work is paid when it is done. That has always been the rule.')
-    return ' '.join(parts) if parts else None
+    reply = ' '.join(piece.strip() for piece in parts if piece)
+    return reply or None
 
 
 def post_owes(state):
@@ -819,7 +880,8 @@ def trade(state, mode, item, quantity, at):
             return {'success': True, 'text': f'Looked through the post\'s ledger for "{str(item)[:60]}": there is no entry for that.'}
         return {'success': True, 'text': f'Looked through the post\'s ledger for "{str(item)[:60]}": ' + ' | '.join(lines), 'ledger': lines}
     elif mode == 'ask':
-        wanted = ' '.join(str(item).split())[:120]
+        wanted_full = ' '.join(str(item).split())
+        wanted = wanted_full[:120]
         if not wanted:
             return {'success': False, 'text': 'He did not say what he was asking for.'}
         same = next((r for r in post['requests'] if r['item'].casefold() == wanted.casefold()), None)
@@ -829,9 +891,14 @@ def trade(state, mode, item, quantity, at):
         else:
             post['requests'].append({'item': wanted, 'first': at, 'last': at, 'times': 1})
         post['requests'] = post['requests'][-60:]
-        # v0.36.9: what the book is for, plainly. He had been writing questions to Edda in it and waiting for a reply.
-        text = (f'Wrote "{wanted}" in the request book at the trading post, where Edda keeps note of things people would like '
-                'her to stock. Nothing appears because of it, and the book gives no reply; questions are for asking her at the counter.')
+        # v0.36.9: the book notes what people would like her to stock, and does not answer a stocking note.
+        # v0.36.14: a question about prices or about pay is answered in the book, from the shelf and the pay rule.
+        answer = counter_reply(state, wanted_full)
+        if answer:
+            text = f'Wrote "{wanted}" in the request book at the trading post. Edda has answered in the book: {answer}'
+        else:
+            text = (f'Wrote "{wanted}" in the request book at the trading post, where Edda keeps note of things people would like '
+                    'her to stock. Nothing appears because of it, and the book gives no reply; questions are for asking her at the counter.')
     else:
         return {'success': False, 'text': 'Unknown kind of trade.'}
     _record(post, text, at)
