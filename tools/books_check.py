@@ -40,7 +40,8 @@ def show(x):
 
 def stated(text):
     """What the entry says changed hands, and which way (None: the entry moves no money)."""
-    if text.startswith(('Agreed a favour', 'New stock arrived', 'The weekly delivery', 'Wrote "', 'From now on the post counts')):
+    if text.startswith(('Agreed a favour', 'New stock arrived', 'The weekly delivery', 'Wrote "', 'From now on the post counts',
+                         'His purse, by the ledger')):
         return None
     body = re.split(r'\.?\s*(?:Left in his purse|In his purse):', text)[0]
     body = re.sub(r'\(board price[^)]*\)', '', body)

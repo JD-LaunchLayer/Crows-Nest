@@ -55,7 +55,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.36.12'
+APP_VERSION = '0.36.13'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -184,6 +184,7 @@ if not state['trading'].get('money_note'):
         'text':'From now on the post counts money in gold and silver: what was one credit is one gold, and ten silver make a gold. '
                f"He has {town.money(state['trading']['credit'])}."})
     state.setdefault('world_notes',[]).append('The trading post now counts money in gold and silver; one credit became one gold, and ten silver make a gold.')
+town.ledger_amount(state)  # v0.36.13: the book states his gold and silver, so Edda can read them back
 interactions.ensure(state)
 experience.ensure(state)
 story.ensure(state)
@@ -1880,22 +1881,33 @@ def talk_session(opening, hope):
     keeper_schema=fields_schema({'reply':STRING,'proposal':town.proposal_schema(),'note_about_crow':STRING,
                                  'warmth':{'type':'number','minimum':-1,'maximum':1}})
     for turn in range(TALK_TURNS):
-        last,_=model_call('It is '+clock_now+'. Crow, the elf who lives in the clearing, is at your counter. Reply to him in character. '
-            'Money here is gold and silver: ten silver make one gold. In a proposal, the credit field is the amount in gold (0.5 = 5 silver). '
-            'proposal is ONE optional deal (kind none if you are just talking): sell_item (item = a stock id, credit = total price in gold; you '
-            'may haggle but not below 70% of the board), buy_goods (item = wood, stone or one of his carving ids he has mentioned; '
-            'quantity in kg or 1), favour (task, minutes 15-180, pay up to about 1 gold 5 silver per 30 minutes; you may ask him for help or '
-            'accept help he offers), gift (at most 1 gold, rarely), or make_good (credit = some or all of what your book shows the post owes him; '
-            'only if it owes him anything). note_about_crow is what you would remember about him from this; '
-            'warmth -1..1 is how you feel towards him now. '+json.dumps({'board':board,'his_money':town.money(credit),'what_you_remember':kp['notes'][-10:],
-            'open_favours':kp['favours'],'next_delivery_due':town.next_delivery(state),'what_your_book_shows_the_post_owes_him':town.post_owes(state),
-            'your_ledger_for_days_he_mentions':{q:town.ledger_lookup(state,q,20) or ['(no entries that day)'] for q in town.days_mentioned(' '.join(c['text'] for c in convo if c['who']=='Crow'),now().date())},
-            'your_ledger_last_three_days':[f"{str(l.get('at',''))[:16].replace('T',' ')} · {l['text']}" for l in state['trading']['ledger'] if str(l.get('at',''))[:10]>=(now()-timedelta(days=3)).date().isoformat()][-30:],'what_your_goods_are_for':town.ITEM_KNOWLEDGE,'conversation':convo},ensure_ascii=False),keeper_schema,350,'keeper',system=town.KEEPER_PERSONA)
-        reply=' '.join(str(last.get('reply','')).split())[:400]
-        convo.append({'who':'Edda','text':reply})
-        prop=last.get('proposal') or {'kind':'none'}
-        with LOCK:ok,why=town.check_proposal(state,prop,day)
-        offer=prop if ok and prop.get('kind')!='none' else None
+        with LOCK:  # v0.36.13: a wrong purse sum, or pay asked for before the work, is answered from the book
+            plain=town.counter_reply(state,convo[-1]['text'])
+        if plain:
+            reply=' '.join(plain.split())[:400]
+            convo.append({'who':'Edda','text':reply})
+            offer=None
+        else:
+            with LOCK:
+                purse_words=town.money(town.ledger_amount(state))
+                told=town.keeper(state).get('ledger_told')==purse_words
+            last,_=model_call('It is '+clock_now+'. Crow, the elf who lives in the clearing, is at your counter. Reply to him in character. '
+                'Money here is gold and silver: ten silver make one gold. In a proposal, the credit field is the amount in gold (0.5 = 5 silver). '
+                'proposal is ONE optional deal (kind none if you are just talking): sell_item (item = a stock id, credit = total price in gold; you '
+                'may haggle but not below 70% of the board), buy_goods (item = wood, stone or one of his carving ids he has mentioned; '
+                'quantity in kg or 1), favour (task, minutes 15-180, pay up to about 1 gold 5 silver per 30 minutes; you may ask him for help or '
+                'accept help he offers), gift (at most 1 gold, rarely), or make_good (credit = some or all of what your book shows the post owes him; '
+                'only if it owes him anything). note_about_crow is what you would remember about him from this; '
+                'warmth -1..1 is how you feel towards him now. '+json.dumps({'board':board,'his_money':town.money(credit),'his_purse_by_your_ledger':purse_words,
+                'already_told_him_that_purse_figure':told,'what_you_remember':kp['notes'][-10:],
+                'open_favours':kp['favours'],'next_delivery_due':town.next_delivery(state),'what_your_book_shows_the_post_owes_him':town.post_owes(state),
+                'your_ledger_for_days_he_mentions':{q:town.ledger_lookup(state,q,20) or ['(no entries that day)'] for q in town.days_mentioned(' '.join(c['text'] for c in convo if c['who']=='Crow'),now().date())},
+                'your_ledger_last_three_days':[f"{str(l.get('at',''))[:16].replace('T',' ')} · {l['text']}" for l in state['trading']['ledger'] if str(l.get('at',''))[:10]>=(now()-timedelta(days=3)).date().isoformat()][-30:],'what_your_goods_are_for':town.ITEM_KNOWLEDGE,'conversation':convo},ensure_ascii=False),keeper_schema,350,'keeper',system=town.KEEPER_PERSONA)
+            reply=' '.join(str(last.get('reply','')).split())[:400]
+            convo.append({'who':'Edda','text':reply})
+            prop=last.get('proposal') or {'kind':'none'}
+            with LOCK:ok,why=town.check_proposal(state,prop,day)
+            offer=prop if ok and prop.get('kind')!='none' else None
         answer,_=model_call('You are talking with Edda Thorne at the trading post. Say your next line naturally (or a brief goodbye). '
             'accept_offer agrees to the offer on the table, if any; leave ends the conversation. Deals are settled when you leave. '
             'promise: only if this line promises her something new, in your words; otherwise empty. '

@@ -261,7 +261,12 @@ KEEPER_PERSONA = ('You are Edda Thorne, keeper of the small trading post beside 
     'If he has already agreed a favour with you (it is in his open favours), tell him plainly that it is agreed and '
     'waiting, that there is nothing more to decide, and that he can start it here whenever he likes. If he keeps asking '
     'you the same thing again and again, tell him kindly but plainly that you have told him all there is, and that the '
-    'rest is his to decide; do not keep offering to go over it again.')
+    'rest is his to decide; do not keep offering to go over it again. '
+    'His gold and silver are the figure in your ledger, which you are told. If he names a different sum as his own, '
+    'tell him once what the ledger shows and reckon any price from that figure, never from the sum he named. '
+    'If you have already told him that figure, do not say it again. '
+    'Work is paid when it is done: if he asks to be paid before he starts, say that plainly. '
+    'Do not offer a sale or a task.')
 
 
 def keeper(state):
@@ -600,6 +605,122 @@ def _parse_money(text):
     g = re.search(r'(\d+) gold', text)
     sv = re.search(r'(\d+) silver', text)
     return (int(g.group(1)) if g else 0) + (int(sv.group(1)) / 10 if sv else 0)
+
+
+PURSE_LINE = 'His purse, by the ledger:'
+# A sum he states as his own sits just after one of these. "I have agreed the crates for 2 gold" is not his purse.
+_MONEY = re.compile(r'(\d+)\s+gold(?:\s*,?\s*and)?\s*,?\s*(\d+)\s+silver|(\d+)\s+gold|(\d+)\s+silver')
+_CLAIM_BEFORE = re.compile(
+    r"\b(?:i have|i've got|i have got|i hold|i'm holding|i am holding|in my purse|my purse|i counted)"
+    r"(?:\s+(?:exactly|about|only|just|still|currently|now|is|holds|has|shows|contains)){0,2}\s*$")
+
+
+def _money_match(m):
+    if m.group(1):
+        return int(m.group(1)) + int(m.group(2)) / 10
+    if m.group(3):
+        return float(int(m.group(3)))
+    return int(m.group(4)) / 10
+
+
+def _latest_balance(post):
+    for line in reversed(post.get('ledger') or []):
+        if line.get('credit_after') is not None:
+            return round(float(line['credit_after']), 2)
+    return None
+
+
+def _latest_purse_words(post):
+    for line in reversed(post.get('ledger') or []):
+        if str(line.get('text', '')).startswith(PURSE_LINE):
+            return _parse_money(line['text'].split(':', 1)[-1].strip().rstrip('.'))
+    return None
+
+
+def note_purse(state, at=None):
+    """v0.36.13: the book states his gold and silver. A line is added only when that statement is missing or stale.
+    Earlier lines are left as they were."""
+    post = ensure(state)
+    credit = round(float(post.get('credit', 0) or 0), 2)
+    words = _latest_purse_words(post)
+    if words is not None and abs(words - credit) < .05:
+        return credit
+    when = at if at is not None else (state.get('clock') or {}).get('iso', '')
+    _record(post, f'{PURSE_LINE} {money(credit)}.', when)
+    return credit
+
+
+def ledger_amount(state, at=None):
+    """What the book shows he has, in gold. His coins are written into the book when it does not already say them."""
+    post = ensure(state)
+    credit = round(float(post.get('credit', 0) or 0), 2)
+    recorded = _latest_balance(post)
+    words = _latest_purse_words(post)
+    if recorded is None or abs(recorded - credit) > .05 or words is None or abs(words - credit) > .05:
+        note_purse(state, at)
+    return credit
+
+
+def named_purse(text):
+    """The sum he states as his own, in gold, or None when he names none. A wage or a price is not his purse."""
+    t = ' '.join(str(text).lower().replace('’', "'").replace('‘', "'").split())
+    for m in _MONEY.finditer(t):
+        if _CLAIM_BEFORE.search(t[max(0, m.start() - 40):m.start()]):
+            return _money_match(m)
+    for sent in re.split(r'[.?!]', t):
+        if re.search(r'\b(what|which)\b', sent) and re.search(r'\b(buy|afford|get)\b', sent):
+            m = _MONEY.search(sent)
+            if m:
+                return _money_match(m)
+    return None
+
+
+def asks_pay_before(text):
+    """He is asking to be paid before the work is done."""
+    t = ' '.join(str(text).lower().replace('’', "'").replace('‘', "'").split())
+    pay = re.search(r'\b(pay|paid|paying|payment|wage|money)\b', t)
+    if re.search(r'\b(up\s*-?\s*front|upfront)\b', t) and (pay or re.search(r'\b(gold|silver|crates?|work|job|favour)\b', t)):
+        return True
+    if re.search(r'\bin advance\b', t) and pay:
+        return True
+    if re.search(r"\bbefore\b(?:\s+\w+){0,6}\s+(?:i|i'll|i will)\s+(?:start|begin|carry)\b", t) and pay:
+        return True
+    if re.search(r'\b(paid|pay me|paying me)\s+first\b', t):
+        return True
+    if re.search(r'\bpay(?:ment)?\b(?:\s+\w+){0,8}\s+before\b', t) and re.search(r'\b(start|begin|carry|work|crates?|job|favour)\b', t):
+        return True
+    return False
+
+
+def _prices_within(state, amount):
+    """Posted prices his ledger sum meets. What is on the board, and nothing about what he ought to do."""
+    post = ensure(state)
+    rows = []
+    for item in post['stock'].values():
+        price = float(item.get('price') or 0)
+        if item.get('qty', 0) > 0 and price > 0 and price <= amount + 1e-9:
+            rows.append((price, item['name']))
+    rows.sort(key=lambda r: (r[0], r[1]))
+    if not rows:
+        return f'At {money(amount)}, nothing on the board is priced within it.'
+    bits = [f'{name}, {money(price)}' for price, name in rows[:8]]
+    return f'At {money(amount)}, the posted prices within it are: ' + '; '.join(bits) + '.'
+
+
+def counter_reply(state, text):
+    """v0.36.13: plain words at the counter. A purse sum that is not the book's is corrected once, and any price is
+    reckoned from the book. Pay asked for before the work is stated as pay when the work is done. Nothing is suggested."""
+    have = ledger_amount(state)
+    parts = []
+    named = named_purse(text)
+    if named is not None and abs(named - have) > .05:
+        kp = keeper(state)
+        if kp.get('ledger_told') != money(have):
+            parts.append(f'My ledger shows {money(have)} in your purse, not {money(named)}. ' + _prices_within(state, have))
+            kp['ledger_told'] = money(have)
+    if asks_pay_before(text):
+        parts.append('Work is paid when it is done. That has always been the rule.')
+    return ' '.join(parts) if parts else None
 
 
 def post_owes(state):
