@@ -2027,3 +2027,16 @@ middle of. Now, when work is agreed with Edda, his stories about hearing its ter
 agreed carrying the crates with Edda") and his promises to give an answer are kept; his promise to actually do the work
 stays open until he does it (then v0.36.10 settles it). On first start, favours already agreed settle the same way.
 His words are kept exactly. Test: tests/test_work_done.py.
+
+## v0.36.13 — Edda goes by her ledger
+
+On 13 January he kept telling Edda he had 2 gold 8 silver, which had been true on 6 January. His purse held 1 gold
+3 silver, and his own view of it already said so, but he was going by the old figure in his notes. He asked what that
+sum could buy, and he asked to be paid up front for the crates before he would start. She never answered either
+question plainly, and he went round again.
+
+The trading post's book now states his gold and silver (a line is added when that statement is missing or out of
+date; earlier lines are left as they were). If he names a different sum as his own, she tells him once what her
+ledger shows and reckons the posted prices from that figure. If he asks to be paid before the work is done, she says
+plainly that work is paid when it is done, which has always been the rule. She suggests no sale and no task.
+Test: tests/test_edda_ledger.py.
