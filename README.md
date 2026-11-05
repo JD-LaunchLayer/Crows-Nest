@@ -2040,3 +2040,19 @@ date; earlier lines are left as they were). If he names a different sum as his o
 ledger shows and reckons the posted prices from that figure. If he asks to be paid before the work is done, she says
 plainly that work is paid when it is done, which has always been the rule. She suggests no sale and no task.
 Test: tests/test_edda_ledger.py.
+
+## v0.36.14 — she answers what the purse buys
+
+On 14 January the ledger was right and he said so: 1 gold 3 silver. He still left the counter unsure. He had asked,
+plainly, what the cheapest food was for that sum, whether any food was cheaper than the 3-gold bundle, and whether
+sweeping or the crates were paid up front or only when the work was done. He wrote the same questions in the request
+book. The book is for noting what people would like stocked, so a stocking note still gets no reply; a question about
+prices or about pay was being treated the same way, and at the counter a sum that already matched the ledger was left
+to her to improvise.
+
+Now, when he asks what a sum buys, or about food, she answers from the shelf and from the purse in the ledger. With
+1 gold 3 silver she names the prices that sum meets (the broadhead arrow, the radish seeds, the salad seeds, each at
+1 gold) and says the bundle of bread, cheese and dried fruit is 3 gold, more than that, and that there is no cheaper
+food on the shelf. When he asks whether work is paid up front, she says it is paid when it is done. The same answer
+is written back when the question is in the request book. She knows the shelf, the book and that pay rule, and she
+offers no other course. Test: tests/test_edda_ledger.py.

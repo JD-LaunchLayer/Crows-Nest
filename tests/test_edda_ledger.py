@@ -37,12 +37,15 @@ for nudge in ('wood', 'sell', 'crate', 'you should', 'you can now', 'hint', 'rec
 assert town.named_purse("I've got 2 gold and 8 silver") == 2.8
 assert town.named_purse('What can 2 gold 8 silver buy?') == 2.8
 assert town.named_purse('What can I buy with 2 gold, 8 silver?') == 2.8
-assert town.counter_reply(s, "I've got 2 gold and 8 silver, what will that buy?") is None, 'she has told him once'
-assert town.counter_reply(s, 'What can 2 gold 8 silver buy?') is None
-# The right sum is not a correction, and a wage is not his purse.
+again = town.counter_reply(s, "I've got 2 gold and 8 silver, what will that buy?")
+assert again and 'not 2 gold 8 silver' not in again and 'Broadhead arrow' in again and '1 gold 3 silver' in again, again
+assert 'not 2 gold 8 silver' not in town.counter_reply(s, 'What can 2 gold 8 silver buy?')
+# The right sum is not a correction. Asking what it buys is still answered from the shelf.
 fresh = {'materials': 0., 'stone': 0., 'creations': []}
 world_state.ensure(fresh); life.ensure(fresh); town.ensure(fresh); fresh['trading']['credit'] = 1.3
-assert town.counter_reply(fresh, 'I have 1 gold 3 silver. What can that buy?') is None
+right = town.counter_reply(fresh, 'I have 1 gold 3 silver. What can that buy?')
+assert right and 'Broadhead arrow' in right and 'Salad leaf seeds' in right and 'not 1 gold' not in right, right
+assert 'Packet of vegetable seeds' not in right and 'Bundle of bread' not in right
 assert town.counter_reply(fresh, 'The crates pay 2 gold.') is None
 assert town.counter_reply(fresh, 'I have agreed the crates for 2 gold.') is None
 assert 'ledger_told' not in fresh['keeper']
@@ -96,10 +99,39 @@ with tempfile.TemporaryDirectory() as td:
     app.model_call = model
     session = app.talk_session('I have 2 gold 8 silver. What can that buy?', 'what the sum buys')
     edda = [c['text'] for c in session['conversation'] if c['who'] == 'Edda']
-    assert '1 gold 3 silver' in edda[0] and 'Broadhead arrow' in edda[0] and 'Packet of vegetable seeds' not in edda[0], edda[0]
-    assert 'another time' in edda[1], edda  # the repeated wrong sum is not corrected again
+    assert '1 gold 3 silver' in edda[0] and 'not 2 gold 8 silver' in edda[0] and 'Broadhead arrow' in edda[0], edda[0]
+    assert 'Packet of vegetable seeds' not in edda[0]
+    assert 'not 2 gold 8 silver' not in edda[1] and 'Broadhead arrow' in edda[1], edda[1]
     assert edda[2] == 'Work is paid when it is done. That has always been the rule.', edda
-    assert calls.count('keeper') == 1, calls
+    assert calls.count('keeper') == 0, calls
     assert session['agreed'] is None and abs(st['trading']['credit'] - 1.3) < 1e-9 and st['keeper']['favours']
     assert 'wood' not in ' '.join(edda).lower() and 'sell' not in ' '.join(edda).lower()
 print('PASS v0.36.13: in the talk, the book answers; the favour stays unpaid until the work is done.')
+
+# v0.36.14: the sum he names is already right, and he still asks. She answers the food, the shelf and the pay rule.
+# The same questions written in the request book are answered there; a stocking note still gets no reply.
+q = ("Edda, I'm hungry and my purse is light, so I'll ask plainly. I have 1 gold 3 silver. "
+     "What is the cheapest food I can buy with that? The bundle of bread, cheese and dried fruit is 3 gold, "
+     "which I can't reach. Is there any cheaper food at all? And for the sweeping and the crates, is any of "
+     "the pay given up front, or only when the work is done?")
+asked = {'materials': 6.7, 'stone': 0., 'creations': []}
+world_state.ensure(asked); life.ensure(asked); town.ensure(asked)
+asked['trading']['credit'] = 1.3
+asked['trading']['last_delivery'] = '2027-01-06T09:00:00+00:00'
+town.apply_proposal(asked, {'kind': 'favour', 'item': '', 'quantity': 1, 'credit': 2, 'minutes': 60,
+                             'task': 'Carry the delivered crates into the store room'}, '2027-01-06T12:00:00+00:00', 1)
+face = town.counter_reply(asked, q)
+assert face and 'no cheaper food on the shelf' in face and '3 gold' in face, face
+assert 'Broadhead arrow' in face and 'Radish seeds' in face and 'Salad leaf seeds' in face, face
+assert 'Packet of vegetable seeds' not in face and 'Oil lantern' not in face, face
+assert 'Work is paid when it is done. That has always been the rule.' in face, face
+for nudge in ('wood', 'sell', 'you should', 'you can now', 'hint', 'recipe', 'hunt', 'craft', 'plant'):
+    assert nudge not in face.lower(), (nudge, face)
+assert abs(asked['trading']['credit'] - 1.3) < 1e-9 and asked['keeper']['favours']
+book = town.trade(asked, 'ask', q, 1, '2027-01-14T11:00:00+00:00')
+spoken = book['text'].split('Edda has answered in the book: ', 1)
+assert len(spoken) == 2 and 'no cheaper food on the shelf' in spoken[1] and 'Work is paid when it is done' in spoken[1], book['text']
+assert 'gives no reply' not in book['text'] and 'wood' not in spoken[1].lower()
+note = town.trade(asked, 'ask', 'paid work for today', 1, '2027-01-14T11:05:00+00:00')
+assert 'gives no reply' in note['text'] and 'Nothing appears' in note['text'], note['text']
+print('PASS v0.36.14: food, the shelf and pay-when-done are answered at the counter and in the request book.')
