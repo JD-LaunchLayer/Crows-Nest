@@ -1999,3 +1999,20 @@ he actually did to the promises and plans to do it. Now, when he finishes a post
 to do that work are marked kept ("the work was done") and the stories about getting to it are done ("he did the
 sweeping"); his own words are kept exactly. On first start, work already done settles only the promises and stories
 made before it. Test: tests/test_work_done.py.
+
+## v0.36.11 — the post at night, and a loop at the counter
+
+Through the night of 11–12 January he sat at Edda's counter and talked with her more than twenty times, asking her to go
+over the crate job and the sweeping "one more time", too cold and hungry, he said, to decide. Two things in the world
+fed it:
+
+- **The post was as cold as outside at night.** By day her stove keeps it warm; after dark the world treated it like his
+  open cabin, although Edda dozes there by the banked stove. Now at night the stove is banked low, not out: the post is
+  cool but sheltered (about 12°C on a freezing night) and he is told so: "Edda's stove is banked low for the night: the
+  post is cool, but out of the wind and much warmer than outside."
+- **Edda kept offering to go over it again,** although he had already agreed the crate carrying with her as a favour.
+  Now, if he has agreed a favour, she tells him plainly that it is agreed and waiting, that there is nothing more to
+  decide, and that he can start whenever he likes; and if he keeps asking the same thing, she tells him kindly that she
+  has told him all there is and the rest is his to decide. She still volunteers nothing he has not asked about.
+
+Test: tests/test_edda_elf.py.

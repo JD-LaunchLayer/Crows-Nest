@@ -25,3 +25,11 @@ assert 'Warm through by the stove; hands and feet warm.' in inner.BODY
 b['body']['chill'] = .4; assert not any('Warm through' in x for x in life.perceive(b)['sensations'])
 b['body']['chill'] = 0; b['location'] = 'woods'; assert not any('Warm through' in x for x in life.perceive(b)['sensations'])
 print('PASS v0.36.5: no invented food from Edda; warm through by a stove is felt.')
+# v0.36.11: at night her stove is banked, not out: the post is cool but sheltered, never as cold as outside.
+import senses
+night = {'location': 'shop', 'clock': {'iso': '2027-01-12T03:00:00+00:00'}}
+assert senses.felt_temp(night, 'talk') >= 12 and 'banked low' in senses.inside_line(night)
+print('PASS v0.36.11: the post at night is cool but sheltered by the banked stove.')
+# v0.36.11: an agreed favour is said to be agreed; the same question asked over and over gets a kind, plain end.
+assert 'it is agreed and' in town.KEEPER_PERSONA and 'do not keep offering to go over it again' in town.KEEPER_PERSONA
+print('PASS v0.36.11: Edda says what is agreed, and ends a loop kindly.')

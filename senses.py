@@ -176,6 +176,8 @@ def felt_temp(state, action=None):
         return 19. if t < 17 else t - 2
     if loc == 'shop' and 7 <= hour < 19:
         return 17. if t < 15 else t - 2
+    if loc == 'shop':   # v0.36.11: at night her stove is banked low, not out: cool, but out of the wind and far from freezing
+        return max(t + 2., 12.) if t < 14 else t - 2
     import handwork
     if handwork.lit_here(state):   # v0.32.0: beside his own fire
         return max(17., t) if loc == 'cabin' else max(15., t + 8)
@@ -209,6 +211,8 @@ def inside_line(state):
         return WARM_INSIDE[loc]
     if loc == 'shop' and 7 <= hour < 19:
         return "It is warm in the post from Edda's stove."
+    if loc == 'shop':
+        return "Edda's stove is banked low for the night: the post is cool, but out of the wind and much warmer than outside."
     if loc == 'cabin' and stove_lit(state):
         return 'The stove is burning, and the cabin is warm.'
     if loc == 'cabin':
