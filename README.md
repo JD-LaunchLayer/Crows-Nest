@@ -2076,4 +2076,10 @@ not move him.
 Carrying listed every loose thing in the world, including things far from him, and not the wood in his own hands.
 What he is offered is what is near him, and what he is already carrying. Anything he could lift, including wood and
 stone by the kilogram, can be carried. What is too heavy is refused as too heavy to lift alone. What the post will
-buy is unchanged. Test: tests/test_v03615.py.
+buy is unchanged.
+
+A building is too big to carry. Taking one apart was only a fifteen-minute edit of any object, and the wood vanished
+into a total. Now, removing a part — or the whole of something, if he names no part — takes work in proportion to how
+much material is in it. About half comes away as usable lengths or pieces, left on the ground where it stood; the rest
+is split and full of bent nails. Edda's trading post, the café and the public monuments are not his, and do not come
+apart. The reading cabin he was given, and anything he built, do. Test: tests/test_v03615.py, tests/test_dismantle.py.
