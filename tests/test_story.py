@@ -18,6 +18,23 @@ assert [x['id'] for x in story.context(s)]==[a['id']], 'one-step beginnings are 
 s['body']['active_hours']=10+story.DORMANT_HOURS+1;story.age(s);assert a['stage']=='dormant'
 story.note_step(s,ev(5,'Map the unlogged woodland edge for new plants'));assert a['stage']=='pursuing'
 m=ev(6,'Map the unlogged woodland edge for new plants','read');story.note_step(s,m);story.settle(s,m,'answered');assert a['stage']=='answered'
+assert all(x['id']!=a['id'] for x in story.context(s)), 'an answered story is not still ongoing'
+# A plan with more than one part, and a promise, are left alone. Recall does not read a ledger he has not seen.
+import memory_recall
+mixed={'body':{'active_hours':5},'current_intention':'count the purse','stories':[
+    {'id':1,'title':'Watch the woodland edge','stage':'pursuing','count':3,'updated_hours':1},
+    {'id':2,'title':'Whether the purse holds 2 gold','stage':'answered','count':4,'updated_hours':2},
+    {'id':3,'title':'Check the debt then sweep the floor, thank Edda, and buy bread','stage':'pursuing','count':2,'updated_hours':1}],
+    'promises':[{'id':1,'text':'I will thank Edda for telling me the purse','status':'open','to':'Edda Thorne'}],
+    'trading':{'credit':2,'ledger':[{'at':'2026-12-19T18:48:00','text':'Edda took 4 kg of wood for nothing.','credit_after':2}]},
+    'memories':[{'id':1,'kind':'experience','action':'inspect','at':'2027-01-31T11:00:00+00:00',
+                 'event':'Opened his purse and counted what is in it: 2 gold.','reason':'To see.'}]}
+promises=copy.deepcopy(mixed['promises']);titles=[x['title'] for x in mixed['stories']]
+listed=story.context(mixed,10)
+assert [x['id'] for x in listed]==[1,3] and listed[1]['story']==titles[2]
+assert mixed['promises']==promises and [x['title'] for x in mixed['stories']]==titles and mixed['stories'][1]['stage']=='answered'
+recalled=' '.join(x.get('text','') for x in memory_recall.recall(mixed,2000,limit=4))
+assert '2 gold' in recalled and 'took 4 kg' not in recalled and 'outstanding' not in recalled
 s['body']['active_hours']+=story.LEFT_HOURS*2;story.age(s);assert c['stage']=='left'
 # Threads and promises.
 t=story.add_thread(s,'Moss only on the north side of the birch?','grove',7,'t');assert t and not story.add_thread(s,'Moss only on north side of the birch','grove',8,'t')
