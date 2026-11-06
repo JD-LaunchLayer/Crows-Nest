@@ -1008,7 +1008,7 @@ def parameter_request(d):
                  'possessions':state.get('possessions',{})})
     if a=='plan':
         return ('Draft a blueprint. plan_operation new places a new structure at destination_x/z; add/remove edits object_id '
-                '(remove also needs part_id). Coordinates metres, x east/z south; library origin (-11,10). Geometry is designed next; nothing is built.',
+                '(remove takes off part_id, or the whole of it if part_id is empty). Coordinates metres, x east/z south; library origin (-11,10). Geometry is designed next; nothing is built.',
                 {'creation_name':STRING,'plan_operation':{'type':'string','enum':['new','add','remove']},
                  'object_id':{'type':'string','enum':['']+list(objects)},'part_id':STRING,
                  'destination_x':{'type':'number'},'destination_z':{'type':'number'}},

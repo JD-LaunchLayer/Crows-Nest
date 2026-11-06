@@ -242,9 +242,20 @@ def propose(state, name, operation, target_id, x, z, parts=None, remove_part='')
     target=world['objects'].get(target_id)
     if operation in ['add','remove'] and not target:raise ValueError('That target does not exist')
     if operation=='remove':
-        p=next((p for p in target['parts'] if p['id']==remove_part),None)
-        if not p:raise ValueError('That part does not exist')
-        prepared=[];bill={};minutes=15;salvage={k:round(v*.5,2) for k,v in mass([p]).items()}
+        if not his_to_dismantle(target):
+            raise ValueError(f'{target["name"]} is not his to take apart')
+        whole = remove_part in ('', 'whole', 'all')
+        if whole:
+            gone = list(target['parts'])
+        else:
+            p=next((p for p in target['parts'] if p['id']==remove_part),None)
+            if not p:raise ValueError('That part does not exist')
+            gone = [p]
+        full = mass(gone)
+        prepared=[];bill={}
+        # Work scales with how much material has to come apart, the same way building does.
+        minutes=max(15, math.ceil(sum(full.values())*2 + len(gone)*8))
+        salvage={k:round(v*.5,2) for k,v in full.items() if round(v*.5,2)>0}
     else:
         prepared=validate_parts(parts);bill=mass(prepared);salvage={}
         if not bill:raise ValueError('Plan has no material requirement')
@@ -254,6 +265,7 @@ def propose(state, name, operation, target_id, x, z, parts=None, remove_part='')
             if abs(origin['x']+p['x'])+p['width']/2>31 or abs(origin['z']+p['z'])+p['depth']/2>31:raise ValueError('A part would extend outside the clearing')
     plan={'id':world['next_plan_id'],'name':name[:100] or 'Untitled plan','operation':operation,'target_id':target_id,
           'x':target['x'] if target else x,'z':target['z'] if target else z,'parts':prepared,'remove_part':remove_part,
+          'remove_all':operation=='remove' and remove_part in ('', 'whole', 'all'),
           'bill':bill,'salvage':salvage,'minutes':minutes,'work_done_minutes':0,'status':'proposed','target_revision':target['revision'] if target else None}
     world['next_plan_id']+=1;world['plans'].append(plan);world['revision']+=1
     return copy.deepcopy(plan)
@@ -303,14 +315,36 @@ def construct(state, plan_id, work_minutes=None, execute=None):
             piece=copy.deepcopy(part);piece['id']='plan-'+str(p['id'])+'-'+piece['id'];target['parts'].append(piece)
         target['revision']+=1
     else:
-        target['parts']=[part for part in target['parts'] if part['id']!=p['remove_part']];target['revision']+=1
+        if p.get('remove_all'):
+            world['objects'].pop(target['id'], None)
+        else:
+            target['parts']=[part for part in target['parts'] if part['id']!=p['remove_part']];target['revision']+=1
+            if not target['parts']:
+                world['objects'].pop(target['id'], None)
     for k,v in p['bill'].items():add_inventory(state,k,-v)
-    for k,v in p['salvage'].items():add_inventory(state,k,v)
+    _leave_salvage(state, p.get('salvage') or {}, target.get('name', p['name']))
     # Parts that did not hold: half their material is recoverable as offcuts, half is lost.
     for k,v in mass(failed).items():add_inventory(state,k,round(v*.5,2))
     p['status']='built';p['outcome']=report;world['revision']+=1
+    if p['operation']=='remove':
+        bits=[]
+        for k,v in (p.get('salvage') or {}).items():
+            bits.append(f'about {v:g} kg of {"lengths of wood" if k=="wood" else "pieces of stone"}')
+        lying=(' On the ground where it stood: '+', '.join(bits)+'.' ) if bits else ''
+        text=('Took '+p['name']+' apart.'+lying+' The rest is split and full of bent nails.')
+        return {'success':True,'built':True,'object_id':p['target_id'],'text':text}
     return {'success':True,'built':True,'object_id':target['id'],'text':('Completed construction plan: '+p['name']+'. '+
-            ('Recovered '+str(p['salvage'])+' kg of material.' if p['salvage'] else 'Used '+str(p['bill'])+' kg of material. ')+report).strip()}
+            ('Used '+str(p['bill'])+' kg of material. ')+report).strip()}
+
+
+def _leave_salvage(state, salvage, name):
+    """Usable wood and stone from taking something apart, as lots where it stood. About half is lost."""
+    import materials
+    for fam, kg in salvage.items():
+        if kg <= 0:
+            continue
+        materials.add(state, materials.PLAIN.get(fam, fam), kg, form='lengths' if fam=='wood' else 'rubble',
+                      source=f'left on the ground where {name} was taken apart')
 
 
 def intersects_world(world, obj, x, z, ignore_id=None):
@@ -364,13 +398,39 @@ def mental_map(state, action_places):
     return out
 
 
+# Village buildings and monuments are not his. The reading cabin and what he has built are.
+NOT_HIS = {'trading_post', 'internet_cafe', 'weathered_figure', 'bronze_dial', 'stone_ring', 'hanging_tubes'}
+NOT_HIS_KINDS = {'decoration', 'building', 'water_source', 'food_source'}
+HIS_KINDS = {'built', 'workpiece', 'carving', 'structure', 'furniture', 'provisions'}
+
+
+def too_big_to_carry(obj):
+    """A building or anything that spans more than a few metres does not come away in the arms."""
+    if obj.get('kind') in ('structure', 'building'):
+        return True
+    for p in obj.get('parts') or []:
+        if max(p.get('width', 0), p.get('depth', 0), p.get('height', 0)) >= 4:
+            return True
+    return False
+
+
+def his_to_dismantle(obj):
+    """What he built, or was given as his own. Not Edda's post, the café, or the public monuments."""
+    if not obj:
+        return False
+    if obj.get('id') in NOT_HIS or obj.get('kind') in NOT_HIS_KINDS:
+        return False
+    return obj.get('kind') in HIS_KINDS or bool(obj.get('paid_materials')) or str(obj.get('id', '')).startswith(('built-', 'worked-', 'carving-'))
+
+
 def move(state, ident, x, z):
     world=ensure(state);o=world['objects'].get(ident)
     if not o or not o.get('parts'):return {'success':False,'text':'That object does not exist.'}
     if any(obj.get('on')==ident and obj.get('parts') for obj in world['objects'].values()):
         return {'success':False,'text':'Other objects rest on it; move those before carrying their support.'}
-    # v0.36.15: something not made to be carried is refused by weight, in plain words.
-    # A thing already marked liftable (a chair, a carving) keeps that, even if its bounding box weighs heavy.
+    # v0.36.15: a building stays where it is. Weight still stops what one person cannot lift.
+    if too_big_to_carry(o):
+        return {'success': False, 'text': f'{o["name"]} is too big and heavy to carry; it did not move.'}
     if not o.get('portable') and object_kg(o) > LIFT_KG:
         return {'success': False, 'text': f'{o["name"]} is too heavy to lift alone; it did not move.'}
     if type(x) not in [int,float] or type(z) not in [int,float] or not -25<=x<=25 or not -25<=z<=25:
