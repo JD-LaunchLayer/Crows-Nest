@@ -2083,3 +2083,8 @@ into a total. Now, removing a part — or the whole of something, if he names no
 much material is in it. About half comes away as usable lengths or pieces, left on the ground where it stood; the rest
 is split and full of bent nails. Edda's trading post, the café and the public monuments are not his, and do not come
 apart. The reading cabin he was given, and anything he built, do. Test: tests/test_v03615.py, tests/test_dismantle.py.
+
+A story he has already marked answered is no longer listed among the ones still going on. It had stayed in that list
+after the answer, so the next decision was shown it again. This does not close a question, keep a promise, or finish
+a plan, and it does not make him accept a figure. What he has already lived can still come back through ordinary
+recall, which reads his saved events and not the ledger. Test: tests/test_story.py.

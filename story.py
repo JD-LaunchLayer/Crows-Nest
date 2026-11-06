@@ -166,14 +166,14 @@ def age(state):
 
 
 def context(state, limit=4):
-    """All his ongoing stories side by side (those with more than one step, not yet left behind).
+    """All his ongoing stories side by side (those with more than one step, not yet answered or left behind).
 
     Listed in the order they began, with no excerpt of the latest step, so the one he is
     in the middle of is not given extra prominence. If there are more than `limit`, the
     ones touched longest ago are left out, but the remainder stay in starting order."""
     ensure(state)
     now = _hours(state)
-    live = [s for s in state['stories'] if s['count'] >= 2 and s['stage'] != 'left']
+    live = [s for s in state['stories'] if s['count'] >= 2 and s['stage'] not in ('left', 'answered')]
     kept = sorted(live, key=lambda s: -s.get('updated_hours', 0))[:limit]
     return [{'id': s['id'], 'story': s['title'], 'stage': s['stage'], 'steps': s['count'],
              'hours_since_last_step': round(max(0., now - s.get('updated_hours', now))),
