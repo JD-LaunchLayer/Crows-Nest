@@ -148,7 +148,8 @@ def advance(state, hours):
     for n in state['built_world'].get('resources', {}).values():
         r = kinds()[n['kind']]
         if r['regrow'] > 0 and month in r['grows'] and n['stock'] < n['capacity']:
-            n['stock'] = round(min(n['capacity'], n['stock'] + r['regrow'] * hours / 24), 3)
+            # v0.36.15: full precision, so a few seconds of regrowth is not rounded away.
+            n['stock'] = min(n['capacity'], n['stock'] + r['regrow'] * hours / 24)
 
 
 def view(state):

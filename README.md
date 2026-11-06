@@ -2056,3 +2056,24 @@ Now, when he asks what a sum buys, or about food, she answers from the shelf and
 food on the shelf. When he asks whether work is paid up front, she says it is paid when it is done. The same answer
 is written back when the question is in the request book. She knows the shelf, the book and that pay rule, and she
 offers no other course. Test: tests/test_edda_ledger.py.
+
+## v0.36.15 — time that was rounding away, and a way to walk
+
+Three things in the world were stopping him from doing ordinary things.
+
+Garden, trees and regrowth were stepped every half-second of real time and then rounded. At his usual speed that
+step is about twelve seconds of his life, and a day's frost or a day's growth is far smaller than the rounding, so
+it became nothing. A radish bed could sit for days in midwinter still looking freshly sown. The change is kept in
+full and applied by the hour for the beds, so many short steps come to the same result as one long one. Tree height
+and regrowth are kept the same way. What he is told he can see is unchanged.
+
+He had no way to simply walk. The only action that sounded like moving was carrying an object, and choosing nothing
+to carry still put him down at the workbench, outside, in the cold. He can walk on foot to a place he already knows,
+named as he would name it. The walk takes as long as the distance at a walking pace, and longer in the dark. While
+he is on the path the weather reaches him; when he arrives he is at that place. A carry that does not happen does
+not move him.
+
+Carrying listed every loose thing in the world, including things far from him, and not the wood in his own hands.
+What he is offered is what is near him, and what he is already carrying. Anything he could lift, including wood and
+stone by the kilogram, can be carried. What is too heavy is refused as too heavy to lift alone. What the post will
+buy is unchanged. Test: tests/test_v03615.py.

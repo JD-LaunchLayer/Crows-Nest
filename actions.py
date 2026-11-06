@@ -31,6 +31,8 @@ REGISTRY = {
         'practise archery at the range'),
     'explore': Action('woods', 1200, 'walk through part of the woodland, noticing what is there and picking up loose wood',
         'walk through part of the woods, picking up loose wood as I go'),
+    'walk': Action('woods', None, 'walk on foot to a place you know',
+        'walk to a place I know'),
     'craft': Action('workbench', 2700, 'carve a small piece from 1 kg wood with a measured outcome',
         'carve something small from wood',
         impossible=lambda s: s['materials'] < 1,

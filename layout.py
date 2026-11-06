@@ -106,10 +106,32 @@ def ensure_position(state):
     return state['position']
 
 
+def destinations(state):
+    """Places he can walk to, named as he would name them. Only where he has been, or where he is now.
+    The names carry no coordinates."""
+    mind = (state.get('mind_map') or {}).get('places', {})
+    here = state.get('location')
+    places = get()['places']
+    keys = set(mind)
+    if here in places:
+        keys.add(here)
+    out = {}
+    for key in keys:
+        p = places.get(key)
+        if p:
+            out[p['words']] = (key, float(p['stand'][0]), float(p['stand'][1]))
+    if 'spring' in mind and 'the spring' in landmarks():
+        x, z, _r = landmarks()['the spring']
+        out['the spring'] = ('spring', float(x), float(z))
+    return out
+
+
 def follow(state):
-    """Until he walks by himself (v0.37), his position follows his place: when he is somewhere new he stands at its
-    usual spot. Where he already is stays put, so nothing jumps while he stays."""
+    """His position follows his place when he arrives somewhere new. While he is still on the path (walking), he
+    stays where he was, out in the weather, until he arrives. Where he already is stays put."""
     pos = ensure_position(state)
+    if state.get('walking'):
+        return pos
     place = state.get('location', 'cabin')
     if region_of(pos['x'], pos['z']) == place:
         return pos

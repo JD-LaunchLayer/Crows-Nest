@@ -18,6 +18,74 @@ def part(ident, x, y, z, w, h, d, color='#817057', rz=0):
     return {'id': ident, 'shape': 'box', 'x':x,'y':y,'z':z,'width':w,'height':h,'depth':d,'color':color,'rotation_z':rz,'material':'wood'}
 
 
+LIFT_KG = 20.   # what one person can lift and walk with. Heavier things stay where they are.
+NEAR_M = 8.      # loose things he can reach without already having walked off
+
+
+def object_kg(obj):
+    """How heavy an object is to lift, from its parts. A material with no density is counted as wood."""
+    parts = []
+    for p in obj.get('parts') or []:
+        q = dict(p)
+        if q.get('material') not in DENSITY:
+            q['material'] = 'wood'
+        parts.append(q)
+    return sum(mass(parts).values()) if parts else 0.
+
+
+def carry_choices(state):
+    """What he can take hold of from where he stands, and what he is already carrying.
+    Words only in what he is shown; the handle is how the choice is carried out."""
+    import materials
+    materials.ensure(state)
+    pos = layout.ensure_position(state)
+    choices = []
+    for ident, o in ensure(state)['objects'].items():
+        if not o.get('parts'):
+            continue
+        if math.hypot(o.get('x', 0) - pos['x'], o.get('z', 0) - pos['z']) > NEAR_M:
+            continue
+        choices.append({'handle': ident, 'words': o.get('name', ident), 'kg': round(object_kg(o), 1), 'kind': 'object'})
+    for lot in materials.view(state):
+        if not lot.get('id') or lot.get('mass_kg', 0) < .05:
+            continue
+        fam = materials.family(lot['material']).replace('_', ' ')
+        choices.append({'handle': f"lot:{lot['id']}", 'words': f"{fam}, {lot['mass_kg']:g} kg",
+                        'kg': lot['mass_kg'], 'kind': 'lot'})
+    for key, n in sorted((state.get('possessions') or {}).items()):
+        if n:
+            choices.append({'handle': f'own:{key}', 'words': key.replace('_', ' '), 'kg': 1, 'kind': 'own'})
+    return choices
+
+
+def carry_lot(state, lot_id, kg, x, z):
+    """Lift some of a lot he has and put it down. Over a man's carry, or off the clearing, it stays put."""
+    import materials
+    import handwork
+    if type(x) not in (int, float) or type(z) not in (int, float) or not -25 <= x <= 25 or not -25 <= z <= 25:
+        return {'success': False, 'text': 'That destination is outside the clearing.'}
+    lot = next((l for l in state.get('stock', {}).get('lots', []) if str(l.get('id')) == str(lot_id)), None)
+    if not lot:
+        return {'success': False, 'text': 'He did not have that to carry.'}
+    want = float(kg or 0)
+    if want <= 0:
+        want = min(lot['mass_kg'], LIFT_KG)
+    if want > LIFT_KG + 1e-9:
+        return {'success': False, 'text': 'That is too heavy to lift alone; it did not move.'}
+    want = min(want, lot['mass_kg'])
+    taken = materials.take(state, lot['material'], want)
+    got = sum(g for _, g in taken)
+    if got <= 0:
+        return {'success': False, 'text': 'He did not have that to carry.'}
+    h = handwork.ensure(state)
+    place = layout.region_of(x, z) or state.get('location') or 'woods'
+    h['heaps'].append({'id': f"heap-{h['next_heap']}", 'place': place, 'x': float(x), 'z': float(z), 'layers': [
+        {'material': m, 'form': lot.get('form', 'loose'), 'kg': g, 'moisture': lot.get('moisture') or 0.} for m, g in taken],
+        'lit': False, 'ash_kg': 0., 'lit_at': None, 'out_at': None})
+    h['next_heap'] += 1
+    return {'success': True, 'text': f'Carried {got:g} kg and put it down.'}
+
+
 def mass(parts):
     bill = {'wood':0.0, 'stone':0.0}
     for p in parts:
@@ -301,7 +369,10 @@ def move(state, ident, x, z):
     if not o or not o.get('parts'):return {'success':False,'text':'That object does not exist.'}
     if any(obj.get('on')==ident and obj.get('parts') for obj in world['objects'].values()):
         return {'success':False,'text':'Other objects rest on it; move those before carrying their support.'}
-    if not o['portable']:return {'success':False,'text':'That object is too heavy to carry whole; it did not move.'}
+    # v0.36.15: something not made to be carried is refused by weight, in plain words.
+    # A thing already marked liftable (a chair, a carving) keeps that, even if its bounding box weighs heavy.
+    if not o.get('portable') and object_kg(o) > LIFT_KG:
+        return {'success': False, 'text': f'{o["name"]} is too heavy to lift alone; it did not move.'}
     if type(x) not in [int,float] or type(z) not in [int,float] or not -25<=x<=25 or not -25<=z<=25:
         return {'success':False,'text':'That destination is outside the clearing.'}
     # Moving an object is a supported macro: travel, carry and put down. It does
@@ -374,7 +445,8 @@ def grow_trees(state, hours, season_factor):
         if t['stage'] != 'young':
             continue
         rate = GROWTH_M_PER_YEAR.get(t.get('species', 'hazel'), .4)
-        t['height'] = round(t['height'] + rate * years * season_factor * 2, 4)  # soil warmth averages 0.5 over a year
+        # v0.36.15: full precision. Rounding to 4 dp each tick wiped a year's growth when the tick was a few seconds.
+        t['height'] = t['height'] + rate * years * season_factor * 2  # soil warmth averages 0.5 over a year
         if t['height'] >= FELLABLE_M:
             t.update(stage='standing', timber_kg=round(t['height'] * 18))
             changed = True
