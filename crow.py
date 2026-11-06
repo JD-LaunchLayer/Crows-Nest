@@ -166,6 +166,7 @@ story.annotate_phantoms(state)  # v0.27: a plain note beside threads about Tam, 
 story.leave_phantom_stories(state)  # v0.36.6: stories resting on Edda's soup, which never existed, are left with a note
 story.settle_done_work(state)  # v0.36.10: work already done settles the promises and plans made before it
 story.settle_agreed_work(state)  # v0.36.12: work already agreed settles the stories about hearing its terms
+story.settle_by_evidence(state)  # v0.36.15: a check that matches the record answers the question that was waiting on it
 ecology.ensure(state)
 ecology.backfill_recorded(state)  # v0.24.2: his field notebook, from what he already recorded
 consolidation.ensure(state)
@@ -1623,7 +1624,7 @@ def finish_action(geometry=None):
     if a in ('observe','explore'):details['new_evidence']=new_evidence
     m=event(description,d['reason'],**details)
     if a=='interact':interactions.record(state,d,result,m)
-    story.note_step(state,m);story.settle(state,m);story.settle_need(state,m,details['body_after']);story.age(state)
+    story.note_step(state,m);story.settle(state,m);story.settle_need(state,m,details['body_after']);story.settle_by_evidence(state,m.get('at',''));story.age(state)
     if trial:life.bind_trial(state,trial,m)
     if a in ('read','browse'):
         reading_journal.record_reading(state,m,p,ROOT)

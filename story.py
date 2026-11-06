@@ -283,6 +283,168 @@ def settle_done_work(state):
     state['done_work_settled'] = True
 
 
+# v0.36.15: a question he is still carrying is answered when he has checked and the record agrees,
+# and it stays open when the record does not. His words are kept. Nothing here tells him what to do.
+ACCOUNT_SETTLED = "the purse and the post's book agree, and the book shows nothing still owed"
+FOOD_SETTLED = 'there is food in the chest'
+HOME_SETTLED = 'he is at the cabin'
+_ACCOUNT = re.compile(
+    r"\b(debt|shortfall|discrepanc\w*|let it go|nothing is owed|payment on)\b"
+    r"|\b(owe[ds]?|owing|gap|missing)\b.{0,48}\b(gold|silver|credits?|ledger|purse)\b"
+    r"|\b(gold|silver|credits?)\b.{0,48}\b(owe[ds]?|owing|gap|missing|ledger|debt)\b",
+    re.I)
+_EMPTY = re.compile(
+    r"\b(empty|nothing(?: left| to eat)?|no food|bare)\b.{0,40}\b(chest|provisions|larder)\b"
+    r"|\b(chest|provisions|larder)\b.{0,40}\b(empty|bare|nothing)\b",
+    re.I)
+_HOME = re.compile(r"\b(head(?:ing)? home|go home|walk home|back home|return home|back to (?:the |my )?cabin)\b", re.I)
+_OWED = ('nothing is owed', 'nothing owed', 'not owed', 'do not owe', "don't owe", 'no debt', 'none is owed')
+_PURSE_CLAIM = re.compile(
+    r"(?:you have|your purse(?: holds| has| is)?|ledger shows|i show)\s+"
+    r"(\d+ gold(?: \d+ silver)?|\d+ silver|nothing)\b", re.I)
+
+
+def _account_question(text):
+    return bool(_ACCOUNT.search(str(text)))
+
+
+def _books_agree(state):
+    """His purse and the post's own book name the same sum, and the book shows nothing still owed.
+    A price he paid is not a debt; only what the book itself records as short is."""
+    import town
+    post = state.get('trading') or {}
+    purse = round(float(post.get('credit', 0) or 0), 2)
+    recorded = None
+    for line in reversed(post.get('ledger') or []):
+        if line.get('credit_after') is not None:
+            recorded = round(float(line['credit_after']), 2)
+            break
+    if recorded is None or abs(recorded - purse) >= .05:
+        return False
+    try:
+        owed = town.post_owes(state)['total']
+    except Exception:
+        return False
+    return owed <= .05
+
+
+def _edda_text(memory):
+    bits = []
+    result = memory.get('world_result') if isinstance(memory.get('world_result'), dict) else {}
+    for turn in result.get('conversation') or []:
+        if turn.get('who') == 'Edda':
+            bits.append(str(turn.get('text', '')))
+    if not bits and 'Edda' in str(memory.get('event', '')):
+        bits.append(str(memory.get('event', '')))
+    return ' '.join(bits)
+
+
+def _account_stance(state):
+    """What her latest word on the account was, checked against the purse now. None if she has not spoken to it."""
+    import town
+    words = town.money(state.get('trading', {}).get('credit', 0)).lower()
+    stance = None
+    for memory in state.get('memories', []):
+        text = _edda_text(memory)
+        if not text:
+            continue
+        low = text.lower()
+        claim = _PURSE_CLAIM.search(low)
+        if claim and claim.group(1).lower() not in (words, 'nothing'):
+            stance = 'contradicts'
+        elif (claim and claim.group(1).lower() == words) or any(p in low for p in _OWED):
+            stance = 'confirms'
+    return stance
+
+
+def _purse_count_matches(state):
+    import town
+    words = town.money(state.get('trading', {}).get('credit', 0))
+    found = None
+    for memory in state.get('memories', []):
+        event = str(memory.get('event', ''))
+        if 'Opened his purse and counted' in event:
+            found = event
+    return bool(found) and words in found
+
+
+def _chest_has_food(state):
+    import foods
+    try:
+        return sum(foods.view(state).values()) > .05
+    except Exception:
+        return False
+
+
+def _mark_thread(item, at, why):
+    item.update(status='followed', followed_at=at, settled_by=why)
+
+
+def _mark_story(item, at, why):
+    item.update(stage='answered', ended=at, ended_by=why)
+
+
+def _mark_promise(item, at, why):
+    item.update(status='kept (the record answered it)', kept_at=at, settled_by=why)
+
+
+def settle_by_evidence(state, at=''):
+    """v0.36.15: an open question is answered when a fresh look and the record agree, and reopened when they do not.
+
+    His wording stays. A price he paid is not treated as money still owed. Nothing is removed from his history."""
+    ensure(state)
+    at = at or (state.get('clock') or {}).get('iso', '')
+    agree = _books_agree(state)
+    stance = _account_stance(state)
+    counted = _purse_count_matches(state)
+    account_ok = agree and counted and stance == 'confirms'
+    fed = _chest_has_food(state)
+    home = state.get('location') == 'cabin'
+    for item in state.get('threads', []):
+        text = item.get('text', '')
+        why = item.get('settled_by')
+        if _account_question(text):
+            if item.get('status') == 'followed' and why == ACCOUNT_SETTLED and not account_ok:
+                item['status'] = 'open'
+            elif item.get('status') == 'open' and account_ok:
+                _mark_thread(item, at, ACCOUNT_SETTLED)
+        elif _EMPTY.search(text):
+            if item.get('status') == 'followed' and why == FOOD_SETTLED and not fed:
+                item['status'] = 'open'
+            elif item.get('status') == 'open' and fed:
+                _mark_thread(item, at, FOOD_SETTLED)
+        elif _HOME.search(text) and not _account_question(text):
+            if item.get('status') == 'open' and home:
+                _mark_thread(item, at, HOME_SETTLED)
+    for item in state.get('stories', []):
+        text = ' '.join([item.get('title', '')] + item.get('variants', []))
+        why = item.get('ended_by')
+        open_ = item.get('stage') in ('started', 'pursuing', 'dormant')
+        if _account_question(text):
+            if item.get('stage') == 'answered' and why == ACCOUNT_SETTLED and not account_ok:
+                item['stage'] = 'pursuing'
+            elif open_ and account_ok:
+                _mark_story(item, at, ACCOUNT_SETTLED)
+        elif _EMPTY.search(text):
+            if item.get('stage') == 'answered' and why == FOOD_SETTLED and not fed:
+                item['stage'] = 'pursuing'
+            elif open_ and fed:
+                _mark_story(item, at, FOOD_SETTLED)
+        elif _HOME.search(text):
+            if open_ and home:
+                _mark_story(item, at, HOME_SETTLED)
+    for item in state.get('promises', []):
+        text = item.get('text', '')
+        why = item.get('settled_by')
+        if not _account_question(text):
+            continue
+        if str(item.get('status', '')).startswith('kept') and why == ACCOUNT_SETTLED and not account_ok:
+            item['status'] = 'open'
+        elif item.get('status') == 'open' and account_ok:
+            _mark_promise(item, at, ACCOUNT_SETTLED)
+    return True
+
+
 def keep_promise(state, ident, at):
     for p in state.get('promises', []):
         if p['id'] == ident and p['status'] == 'open':
