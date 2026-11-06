@@ -55,7 +55,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.36.14'
+APP_VERSION = '0.36.15'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -524,7 +524,7 @@ DECISION_DEFAULTS={'wish':'','wish_reason':'','object_id':'','plan_id':0,'destin
     'material':'wood','plan_operation':'new','part_id':'','reading_spot':'standing','library_query':'',
     'reading_mode':'lookup','research_question':'','next_step':'','creation_name':'','creation_shape':'orb',
     'project_id':-1,'project_title':'','project_status':'active','target_action':'rest','target_sessions':1,
-    'observe_area':'woodland_edge','focus':'','trade_mode':'ask','trade_item':'','trade_quantity':1,'opening':'','hope':'','use_item':'','use_on':'','use_how':'',
+    'observe_area':'woodland_edge','focus':'','trade_mode':'ask','trade_item':'','trade_quantity':1,'opening':'','hope':'','use_item':'','use_on':'','use_how':'','walk_to':'','carry_kg':0,
     'verb':'','other_id':'','procedure_id':'','hypothesis':'','prediction':'','bed':1,'garden_task':'look','sow_item':'','sapling':'','music_mode':'practise','title':'','notes':'','tempo':80,'piece_id':0,'songbook':'','explore_area':'woodland_edge','hunt_area':'deeper_woods','food':'','put_area':'clearing','notebook_mode':'read','note_title':'','note_text':'','note_query':'','from_place':''}
 # One neutral line per action. Details are requested only after an action is chosen.
 ACTION_MENU=actions.menu()
@@ -911,15 +911,23 @@ def parameter_request(d):
                 'In darkness little detail is visible.',
                 {'observe_area':{'type':'string','enum':list(ecology.AREAS)},'focus':STRING},
                 {'areas':ecology.area_summary(),'daylight':round(state.get('daylight',0),2)})
+    if a=='walk':
+        # v0.36.15: on foot, to a place he already knows, named as he would name it.
+        places=layout.destinations(state)
+        names=sorted(places) or ['nowhere I know']
+        return ('Choose a place you know and walk there on foot.',
+                {'walk_to':{'type':'string','enum':names}},
+                {'places':names})
     if a=='move_object':
-        portable=[i for i,o in objects.items() if o.get('portable')]
-        # 'none' (v0.25.1): if none of the things that can be picked up is what he meant, nothing moves.
-        # Before, the list forced a choice, so carrying 'the crates' moved a carving or the chair instead.
-        return ('Choose which of these things that can be picked up to carry, and where to put it down, in metres '
-                '(x east, z south; clearing -25..25). These are the only loose objects that can be carried; '
-                'if none of them is what you meant, choose none and nothing is moved.',
-                {'object_id':{'type':'string','enum':portable+['none']},'destination_x':{'type':'number'},'destination_z':{'type':'number'}},
-                {'can_be_picked_up':[{k:objects[i][k] for k in ['id','name','x','z']} for i in portable[-20:]],
+        # v0.36.15: only what is near him, or already in his hands. 'none' still moves nothing.
+        choices=world_state.carry_choices(state)
+        handles=[c['handle'] for c in choices]+['none']
+        return ('Choose something near you, or something you are already carrying, and where to put it down '
+                '(x east, z south; clearing -25..25). carry_kg is how many kilograms of something measured by weight, or 0 for all of it you can lift. '
+                'If none of them is what you meant, choose none and nothing is moved.',
+                {'object_id':{'type':'string','enum':handles},'destination_x':{'type':'number'},'destination_z':{'type':'number'},
+                 'carry_kg':{'type':'number','minimum':0,'maximum':20}},
+                {'near_me':[{'what':c['words'],'kg':c['kg']} for c in choices],
                  'where_things_are_as_you_know_them':world_state.mental_map(state,ACTIONS)})
     if a=='construct':
         open_plans=[p for p in world['plans'] if p['status'] in ['proposed','in_progress']]
@@ -1252,7 +1260,9 @@ def start_action(d, seconds, reading=None):
             if p['id']!=project['id'] and p['status']=='active':p['status']='paused'
     action = d['action']
     state.pop('posture',None)
-    if action=='sleep':
+    if action=='walk':
+        duration=60
+    elif action=='sleep':
         duration=life.sleep_needed_seconds(state)  # v0.27: he wakes when rested, whatever the hour
         # v0.28 body clock: a sleep begun in the dark runs on until first light if he is not up sooner (at most 11 hours).
         if state.get('daylight',1)<.12:
@@ -1268,12 +1278,35 @@ def start_action(d, seconds, reading=None):
         if plan:
             duration=min(120,max(1,plan['minutes']-plan.get('work_done_minutes',0)))*60
             if not world_state.affordable(state,plan) or plan['status'] not in ['proposed','in_progress']:duration=60
-    if action=='move_object':
-        obj=world_state.ensure(state)['objects'].get(d.get('object_id'))
-        if obj:duration=max(120,math.hypot(obj['x']-d.get('destination_x',obj['x']),obj['z']-d.get('destination_z',obj['z']))/1.2+90)
-    state.update(action=action,location=ACTIONS[action],reason=d['reason'][:350],last_seconds=seconds,last_error='')
+    kept=state.get('location')
+    if action=='walk':
+        where=layout.destinations(state).get(d.get('walk_to',''))
+        if where:
+            _key,x,z=where
+            pos=layout.ensure_position(state)
+            dist=math.hypot(x-pos['x'],z-pos['z'])
+            pace=.6 if state.get('daylight',1)<.12 else 1.2   # slower in the dark
+            duration=int(dist/pace)+30   # the distance on foot, and a moment to set off; the dark pace is slower
+            state['walking']=d.get('walk_to')
+            loc='woods'   # out of doors: the weather reaches him until he arrives
+        else:
+            duration=60
+            loc=kept
+    elif action=='move_object':
+        # A carry that cannot be done does not move him. A real carry takes as long as the walk with the weight.
+        if d.get('object_id') in ('none','',None):
+            duration=60
+        else:
+            pos=layout.ensure_position(state)
+            duration=max(120,math.hypot(pos['x']-float(d.get('destination_x',pos['x'])),pos['z']-float(d.get('destination_z',pos['z'])))/1.2+90)
+        loc=kept
+    else:
+        loc=ACTIONS[action]
+    state.update(action=action,location=loc,reason=d['reason'][:350],last_seconds=seconds,last_error='')
     state['decisions'] += 1
-    state['pending']={'decision':copy.deepcopy(d),'project_id':project['id'] if project and project['status']=='active' else None,'remaining':duration,'duration':duration,'ends_at':time.time()+duration,'start':dt.isoformat(),'reading':reading,'review_in':900}
+    state['pending']={'decision':copy.deepcopy(d),'project_id':project['id'] if project and project['status']=='active' else None,'remaining':duration,'duration':duration,'ends_at':time.time()+duration,'start':dt.isoformat(),'reading':reading,'review_in':900,'from_place':kept}
+    if action=='walk' and state.get('walking'):
+        state['pending']['walk_goal']={'key':_key,'x':x,'z':z}
     if action=='interact':state['pending']['posture']=interactions.posture_target(state,d)
     if action=='garden':
         state['pending']['remaining']=state['pending']['duration']=garden.DURATIONS.get(d.get('garden_task'),900)
@@ -1384,14 +1417,46 @@ def finish_action(geometry=None):
         result=world_state.construct(state,d.get('plan_id'),p['duration']/60,
                                      execute=lambda parts:life.build_parts(state,d.get('plan_id'),parts));description=result['text']
         if plan:life.build_practice(state,plan['parts'],plan.get('work_done_minutes',0)-before)
-    elif a=='move_object':
-        if d.get('object_id') in ('none','',None):
-            names=[o['name'] for o in world_state.ensure(state)['objects'].values() if o.get('portable')]
-            description=('Nothing was carried: none of the things that can be picked up was the one meant. '
-                         'The loose objects here that can be picked up and carried are: '+', '.join(names)+'.')
-            result={'success':False,'text':description}
+    elif a=='walk':
+        goal=p.get('walk_goal')
+        state.pop('walking',None)
+        if not goal:
+            state['location']=p.get('from_place') or state.get('location')
+            result={'success':False,'text':'He did not know a way there, and stayed where he was.'}
+            description=result['text']
         else:
-            result=world_state.move(state,d.get('object_id',''),d.get('destination_x',0),d.get('destination_z',0));description=result['text']
+            key,x,z=goal['key'],goal['x'],goal['z']
+            if key in layout.get()['places']:
+                state['location']=key
+                layout.follow(state)
+            else:
+                state['location']='woods'
+                pos=layout.ensure_position(state)
+                pos.update(x=float(x),z=float(z),heading=layout._facing(x,z),since=state.get('clock',{}).get('iso',''))
+                pos['held']=True
+            result={'success':True,'text':f'Walked to {d.get("walk_to")}.'}
+            description=result['text']
+    elif a=='move_object':
+        # v0.36.15: he stays where he is unless the carry itself is a walk, which it is not. Failure does not relocate him.
+        ident=str(d.get('object_id') or '')
+        if ident in ('none','',):
+            names=[c['words'] for c in world_state.carry_choices(state)]
+            description=('Nothing was carried: none of what is near, or what he is carrying, was the one meant. '
+                         + ('Near him: '+', '.join(names)+'.' if names else 'Nothing near him can be picked up.'))
+            result={'success':False,'text':description}
+        elif ident.startswith('lot:'):
+            result=world_state.carry_lot(state,ident.split(':',1)[1],d.get('carry_kg') or 0,d.get('destination_x',0),d.get('destination_z',0))
+            description=result['text']
+        elif ident.startswith('own:'):
+            key=ident.split(':',1)[1]
+            if not state.get('possessions',{}).get(key):
+                result={'success':False,'text':'He does not have that.'}
+            else:
+                result={'success':True,'text':f'Carried the {key.replace("_"," ")} with him. It is still with him.'}
+            description=result['text']
+        else:
+            result=world_state.move(state,ident,d.get('destination_x',0),d.get('destination_z',0))
+            description=result['text']
     elif a=='interact' and d.get('verb') in handwork.VERBS:
         result=do_handwork(d);description=result['text']
     elif a=='interact':

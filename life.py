@@ -62,7 +62,7 @@ def effort(action):
     return {'sleep':0.,'rest':.05,'read':.08,'reflect':.08,'observe':.1,
             'eat':.1,'drink':.05,'inspect':.12,'test_object':.2,'plan':.25,
             'craft':.55,'construct':.75,'gather':.65,'explore':.45,
-            'practise':.65,'move_object':.8,'fell_tree':1.,'plant_tree':.6,'play_music':.2,'browse':.08,'trade':.3,'garden':.45,'talk':.05,'use_item':.2,
+            'practise':.65,'move_object':.8,'walk':.35,'fell_tree':1.,'plant_tree':.6,'play_music':.2,'browse':.08,'trade':.3,'garden':.45,'talk':.05,'use_item':.2,
             'hunt':.5,'butcher':.55,'preserve':.3,'put_out_food':.08,'notebook':.06}.get(action,.15)
 
 
@@ -187,7 +187,7 @@ def injure(state, kind, where, severity):
 def heal(state, hours):
     hurts = state['body'].get('injuries') or []
     for i in hurts:
-        i['severity'] = round(i['severity'] - HEAL_PER_DAY.get(i['kind'], .25) * hours / 24 * (.5 + i['severity']), 4)
+        i['severity'] = max(0., i['severity'] - HEAL_PER_DAY.get(i['kind'], .25) * hours / 24 * (.5 + i['severity']))
     state['body']['injuries'] = [i for i in hurts if i['severity'] > .02]
 
 
@@ -218,7 +218,7 @@ def wear(state, action, hours):
     tool, rate = WEAR.get(action, (None, 0))
     if tool:
         cond = state.setdefault('tool_condition', {'axe': 1., 'carving_knife': 1.})
-        cond[tool] = round(max(.2, cond.get(tool, 1.) - rate * hours), 4)
+        cond[tool] = max(.2, cond.get(tool, 1.) - rate * hours)
 
 
 def tool_feel(state, tool):

@@ -56,17 +56,14 @@ def warmth(doy):
     return .5 - .5 * math.cos(2 * math.pi * (doy - 20) / 365)
 
 
-def advance(state, hours, doy):
-    g = ensure(state)
-    if hours <= 0:
-        return
-    days = hours / 24
-    s = season(doy)
+def _hour(g, doy):
+    """One hour of weather on the beds. Full precision: a short tick must not round the change away."""
+    days = 1 / 24
     for b in g['beds']:
         w = warmth(doy)  # winter rain and cold keep beds damp and weeds slow; summer dries them fast
-        b['moisture'] = round(max(0., b['moisture'] - days * (.04 + .3 * w)), 4)
-        b['weeds'] = round(min(1., b['weeds'] + days * (.01 + .15 * w)), 4)
-        b['tilth'] = round(max(0., b.get('tilth', 0.) - days * .015), 4)   # dug soil slowly settles and packs down again
+        b['moisture'] = max(0., b['moisture'] - days * (.04 + .3 * w))
+        b['weeds'] = min(1., b['weeds'] + days * (.01 + .15 * w))
+        b['tilth'] = max(0., b.get('tilth', 0.) - days * .015)   # dug soil slowly settles and packs down again
         if b['crop'] == 'growing':
             _, ripe_days, _, hardy = CROPS.get(b.get('item', 'seeds'), CROPS['seeds'])
             w = warmth(doy)
@@ -74,15 +71,27 @@ def advance(state, hours, doy):
             pace = w if w >= .4 else (max(w, .15) if hardy else 0.)
             if b['moisture'] > .3 and b['weeds'] < .6 and pace:
                 # v0.28.2: soil dug over before sowing gives the plants an easier start (up to a quarter faster).
-                b['growth'] = round(min(1., b['growth'] + days * pace / ripe_days * (1 + .25 * b.get('tilth_at_sow', 0.))), 4)
+                b['growth'] = min(1., b['growth'] + days * pace / ripe_days * (1 + .25 * b.get('tilth_at_sow', 0.)))
             if not hardy and w < .25:  # frosts from about late November to mid-March damage tender plants
-                b['health'] = round(max(0., b['health'] - days * .25), 4)
+                b['health'] = max(0., b['health'] - days * .25)
             if b['moisture'] < .1:
-                b['health'] = round(max(0., b['health'] - days * .5), 4)
+                b['health'] = max(0., b['health'] - days * .5)
             if b['weeds'] > .8:
-                b['health'] = round(max(0., b['health'] - days * .1), 4)
-            if b['health'] <= 0:
+                b['health'] = max(0., b['health'] - days * .1)
+            if b['health'] <= 1e-9:
+                b['health'] = 0.
                 b['crop'] = 'withered'
+
+
+def advance(state, hours, doy):
+    """v0.36.15: time is kept and applied by the hour, so a 12-second tick cannot round the day's change to nothing."""
+    g = ensure(state)
+    if hours <= 0:
+        return
+    g['_sec'] = g.get('_sec', 0.) + float(hours) * 3600
+    while g['_sec'] >= 3600 - 1e-6:
+        g['_sec'] -= 3600
+        _hour(g, doy)
 
 
 def stage(b):
