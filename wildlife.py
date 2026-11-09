@@ -98,8 +98,24 @@ def herd_area(state, ecology, daylight, minutes=None):
     if m / 1440 < w['spooked_until']:
         return 'deeper_woods', 'standing alert'
     if daylight < .6 or hour < 9 or hour >= 15:             # dawn and dusk: out to the edges to feed
-        return ['woodland_edge', 'grove', 'woodland_edge', 'deeper_woods'][_h('herd', seg) % 4], 'browsing'
-    return ('deeper_woods', 'lying down') if _h('herd', seg, 'day') % 5 else ('grove', 'browsing')
+        area, doing = ['woodland_edge', 'grove', 'woodland_edge', 'deeper_woods'][_h('herd', seg) % 4], 'browsing'
+    else:
+        area, doing = (('deeper_woods', 'lying down') if _h('herd', seg, 'day') % 5 else ('grove', 'browsing'))
+    return _wander(state, area, doing)
+
+
+def _wander(state, area, doing):
+    """Some days the herd is not on its usual round. Night bedding and a spook stay as they are."""
+    import senses
+    if senses.world_seed(state) is None or doing == 'bedded down':
+        return area, doing
+    places = ['woodland_edge', 'grove', 'deeper_woods']
+    if area not in places:
+        return area, doing
+    roll = _h('wander', senses.world_seed(state), _clock(state).timetuple().tm_yday) % 4
+    if roll == 0:
+        return area, doing
+    return places[(places.index(area) + roll) % 3], doing
 
 
 def where(state, ecology, daylight, minutes=None):

@@ -55,7 +55,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.36.15'
+APP_VERSION = '0.36.16'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -138,6 +138,9 @@ state.setdefault('reflection_pending', None)
 state.setdefault('suspended_work', [])
 state.setdefault('next_work_id', 1)
 state.setdefault('research_feedback', [])
+rolls=state.setdefault('world_rolls', {})
+if not isinstance(rolls.get('seed'), int):
+    rolls['seed']=0xC0A15EED   # v0.36.16: one saved seed; the same life rolls the same weather, absence and lateness
 for project in state['projects']:
     if project.get('status')=='completed' and project.get('target_action') in ['read','plan']:
         project['legacy_status']='completed';project['status']='milestone_reached';project['milestone_done']=True
@@ -1001,7 +1004,7 @@ def parameter_request(d):
     if a=='trade':
         carvings=[{'id':i,'name':o['name']} for i,o in objects.items() if o.get('kind')=='carving'][-8:]
         return ('Choose what to do at the trading post. trade_mode buy (trade_item = an item id for sale), sell (wood, stone, the id of '
-                'something you made, or something you own), job (a posted job id), ledger (read the trading post ledger: trade_item = a day such as 2026-12-03, or a word such as sweep), or ask (trade_item = something you would like the post to stock, in your words). '
+                'something you made, or something you own), job (a posted job id), ledger (open the ledger on the counter: trade_item is a day such as 2026-12-03, a weekday such as Friday, or a word such as sweep; trade_item copy writes the open page into the notebook in the book\'s own words), or ask (trade_item = something you would like the post to stock, in your words). '
                 'trade_quantity is how many; when selling wood or stone it is how many kilograms (1 if not relevant).',
                 {'trade_mode':{'type':'string','enum':['buy','sell','job','ledger','ask']},'trade_item':STRING,'trade_quantity':{'type':'integer','minimum':1,'maximum':200}},
                 {'board':town.board(state),'your_carvings':carvings,'inventory_kg':{'wood':state['materials'],'stone':state['stone']},
@@ -1562,15 +1565,19 @@ def finish_action(geometry=None):
         result=town.use_item(state,d.get('use_item',''),d.get('use_on',''),d.get('use_how',''));description=result['text']
     elif a=='talk':
         talk=p.get('reading') or {'conversation':[],'agreed':None}
-        lines=' '.join(f"{c['who']}: “{c['text'][:160]}”" for c in talk['conversation'][:6])
-        deal=town.apply_proposal(state,talk['agreed'],now().isoformat(),now().date().isoformat()) if talk.get('agreed') else {'success':True,'text':'No deal was made.'}
-        if talk.get('agreed') and talk['agreed'].get('kind')=='favour' and deal.get('success'):   # v0.36.12: agreed is agreed
-            job=town.same_work(talk['agreed'].get('task',''))
-            if job:story.work_agreed(state,job,now().isoformat())
-        town.remember(state,talk.get('note',''),talk.get('warmth',0),now().isoformat())
-        for promised in talk.get('promises',[]):story.add_promise(state,promised,'Edda Thorne',now().isoformat())
-        result={'success':deal['success'],'text':deal['text'],'conversation':talk['conversation']}
-        description='Talked with Edda Thorne at the trading post. '+lines+' '+deal['text']
+        if talk.get('absent'):
+            description='Went to the counter at the trading post. Edda is not there.'
+            result={'success':False,'text':description,'conversation':[]}
+        else:
+            lines=' '.join(f"{c['who']}: “{c['text'][:160]}”" for c in talk['conversation'][:6])
+            deal=town.apply_proposal(state,talk['agreed'],now().isoformat(),now().date().isoformat()) if talk.get('agreed') else {'success':True,'text':'No deal was made.'}
+            if talk.get('agreed') and talk['agreed'].get('kind')=='favour' and deal.get('success'):   # v0.36.12: agreed is agreed
+                job=town.same_work(talk['agreed'].get('task',''))
+                if job:story.work_agreed(state,job,now().isoformat())
+            town.remember(state,talk.get('note',''),talk.get('warmth',0),now().isoformat())
+            for promised in talk.get('promises',[]):story.add_promise(state,promised,'Edda Thorne',now().isoformat())
+            result={'success':deal['success'],'text':deal['text'],'conversation':talk['conversation']}
+            description='Talked with Edda Thorne at the trading post. '+lines+' '+deal['text']
     elif a=='trade':
         result=town.trade(state,d.get('trade_mode','ask'),d.get('trade_item',''),d.get('trade_quantity',1),now().isoformat());description=result['text']
         if d.get('trade_mode')=='job' and result.get('success'):   # v0.36.10: the work done settles promises and plans to do it
@@ -1762,7 +1769,7 @@ def tick(elapsed):
     if not state['paused']:
         pass_time(elapsed)
         doy=now().timetuple().tm_yday
-        garden.advance(state,elapsed/3600,doy)
+        garden.advance(state,elapsed/3600,doy,1. if senses.weather(state).get('rain') else 0.)
         foods.advance(state);wildlife.advance(state);resources.advance(state,elapsed/3600);handwork.advance(state,elapsed/3600)
         world_state.grow_trees(state,elapsed/3600,garden.warmth(doy))
         if town.weekly_delivery(state,now()):runtime['status']='A delivery arrived at the trading post'
@@ -1938,6 +1945,9 @@ def talk_session(opening, hope):
     """A short conversation at the trading post. Edda speaks from her own persona and memory of him;
     any deal must pass the world's limits before it is offered, and is settled when the talk ends."""
     with LOCK:
+        if not town.keeper_here(state):
+            return {'kind':'conversation','with':'Edda Thorne','conversation':[],'agreed':None,'promises':[],
+                    'absent':True,'note':'','warmth':0}
         kp=copy.deepcopy(town.keeper(state));credit=state['trading']['credit'];day=now().date().isoformat()
         goods={'wood_kg':state['materials'],'stone_kg':state['stone'],
                'carvings':[{'id':i,'name':o['name']} for i,o in state['built_world']['objects'].items() if o.get('kind')=='carving'][-6:]}

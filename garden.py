@@ -56,12 +56,15 @@ def warmth(doy):
     return .5 - .5 * math.cos(2 * math.pi * (doy - 20) / 365)
 
 
-def _hour(g, doy):
-    """One hour of weather on the beds. Full precision: a short tick must not round the change away."""
+def _hour(g, doy, rain=0.):
+    """One hour of weather on the beds. Full precision: a short tick must not round the change away.
+    Rain, when it is actually falling, wets the soil. The days a crop takes to ripen are unchanged."""
     days = 1 / 24
     for b in g['beds']:
         w = warmth(doy)  # winter rain and cold keep beds damp and weeds slow; summer dries them fast
         b['moisture'] = max(0., b['moisture'] - days * (.04 + .3 * w))
+        if rain:
+            b['moisture'] = min(1., b['moisture'] + days * .55)
         b['weeds'] = min(1., b['weeds'] + days * (.01 + .15 * w))
         b['tilth'] = max(0., b.get('tilth', 0.) - days * .015)   # dug soil slowly settles and packs down again
         if b['crop'] == 'growing':
@@ -83,15 +86,16 @@ def _hour(g, doy):
                 b['crop'] = 'withered'
 
 
-def advance(state, hours, doy):
-    """v0.36.15: time is kept and applied by the hour, so a 12-second tick cannot round the day's change to nothing."""
+def advance(state, hours, doy, rain=0.):
+    """v0.36.15: time is kept and applied by the hour, so a 12-second tick cannot round the day's change to nothing.
+    rain is 1 while rain is falling, and 0 otherwise. It only wets the beds."""
     g = ensure(state)
     if hours <= 0:
         return
     g['_sec'] = g.get('_sec', 0.) + float(hours) * 3600
     while g['_sec'] >= 3600 - 1e-6:
         g['_sec'] -= 3600
-        _hour(g, doy)
+        _hour(g, doy, rain)
 
 
 def stage(b):
