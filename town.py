@@ -169,12 +169,16 @@ def weekly_delivery(state, now):
         post['last_delivery'] = now.isoformat()
         return None
     from datetime import datetime
-    if (now - datetime.fromisoformat(last)).total_seconds() < RESTOCK_DAYS * 86400:
+    late = int(post.get('delivery_late_days') or 0)
+    if (now - datetime.fromisoformat(last)).total_seconds() < (RESTOCK_DAYS + late) * 86400:
         return None
     for k, v in STARTING_STOCK.items():
         item = post['stock'].setdefault(k, dict(v))
         item['qty'] = max(item['qty'], v['qty'])
     post['last_delivery'] = now.isoformat()
+    import senses
+    rng = senses.roll(state, 'delivery', now.date().isoformat())
+    post['delivery_late_days'] = 0 if rng is None else rng.choice((0, 0, 0, 1, 2))
     post['ledger'] = (post.get('ledger', []) + [{'at': now.isoformat(), 'text': 'The weekly delivery arrived; the shelves were topped up.'}])[-LEDGER_KEEP:]
     return True
 
@@ -249,6 +253,9 @@ KEEPER_PERSONA = ('You are Edda Thorne, keeper of the small trading post beside 
     'If he asks to pay part now and part later, you say no to the tab kindly. '
     'Your book is what you are told of it: when he asks about a day, go by those entries exactly, read him every one if he '
     'wants them, and never agree that something is in your book, or that money is missing or owed, when it is not. '
+    'The ledger lies on the counter. When he names a day and asks to see that page, or to have it written out, you are '
+    'given the page as it is, and you turn the book so he can read it. If the page is blank, say that it is blank. '
+    'Do not add what the page means. '
     'You are also told what your book shows the post owes HIM, if anything: goods you took from him and paid less than '
     'they were worth. That is a real debt of the post\'s; if he raises it, or you come to it going through those entries, '
     'say so plainly and you may pay it back with a make_good proposal. '
@@ -542,6 +549,33 @@ def board(state):
 
 LEDGER_KEEP = 5000   # v0.28.3: the post's book keeps its whole history (before, a weekly delivery cut it to the last 60 lines)
 MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december']
+WEEKDAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+
+
+def keeper_here(state):
+    """Whether Edda is behind the counter. With a saved seed she is away for part of some days.
+    Without one she is at the counter, as before. Buying and selling do not depend on this."""
+    import senses
+    rng = senses.roll(state, 'edda', _day_key(state))
+    if rng is None or rng.random() > .30:
+        return True
+    try:
+        from datetime import datetime
+        dt = datetime.fromisoformat(state['clock']['iso'])
+    except (KeyError, TypeError, ValueError):
+        return True
+    start = 8 + rng.randrange(0, 8)
+    length = 2 + rng.randrange(0, 3)
+    hour = dt.hour + dt.minute / 60
+    return not (start <= hour < start + length)
+
+
+def _day_key(state):
+    try:
+        from datetime import datetime
+        return datetime.fromisoformat(state['clock']['iso']).date().isoformat()
+    except (KeyError, TypeError, ValueError):
+        return ''
 
 
 def ledger_lookup(state, query, limit=15):
@@ -598,7 +632,99 @@ def days_mentioned(text, today):
     for k in out:
         if k not in seen and 1 <= int(k[:2]) <= 12 and 1 <= int(k[3:]) <= 31:
             seen.append(k)
+    for name in _weekdays_named(t, today):
+        key = f'{name.month:02d}-{name.day:02d}'
+        if key not in seen:
+            seen.append(key)
     return seen[:6]
+
+
+def _moment(state, at):
+    from datetime import datetime
+    for candidate in (at, (state.get('clock') or {}).get('iso')):
+        try:
+            return datetime.fromisoformat(str(candidate))
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
+def _weekdays_named(text, today):
+    """Weekdays named in text, as dates on or before today. 'last Friday' is the one before the latest."""
+    from datetime import timedelta
+    found = []
+    for m in re.finditer(r'\b(last\s+)?(' + '|'.join(WEEKDAYS) + r')\b', str(text).lower()):
+        target = WEEKDAYS.index(m.group(2))
+        delta = (today.weekday() - target) % 7
+        if m.group(1):
+            delta = 7 if delta == 0 else delta
+        found.append(today - timedelta(days=delta))
+    return found
+
+
+def _page_date(query, moment):
+    """A single calendar day named as a date or a weekday, or None when the words are not a day."""
+    from datetime import date
+    q = str(query).strip().lower()
+    if not q or q == 'copy':
+        return None
+    m = re.search(r'(\d{4})-(\d{1,2})-(\d{1,2})', q)
+    if m:
+        try:
+            return date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        except ValueError:
+            return None
+    if moment is None:
+        return None
+    named = _weekdays_named(q, moment.date())
+    if named:
+        return named[0]
+    keys = days_mentioned(q, moment.date())
+    if len(keys) != 1:
+        return None
+    month, day = int(keys[0][:2]), int(keys[0][3:])
+    year = moment.year
+    try:
+        got = date(year, month, day)
+    except ValueError:
+        return None
+    if got > moment.date():
+        try:
+            got = date(year - 1, month, day)
+        except ValueError:
+            return None
+    return got
+
+
+def _page_label(day):
+    return f'{WEEKDAYS[day.weekday()].capitalize()} {day.day} {MONTHS[day.month - 1].capitalize()} {day.year}'
+
+
+def read_page(state, query, at=None):
+    """The ledger page for a day he names: every line that is on it, or a blank page. None if he did not name a day.
+
+    Opening the page does not say what the lines mean, and does not change any other line."""
+    moment = _moment(state, at)
+    day = _page_date(query, moment)
+    if day is None:
+        return None
+    key = day.isoformat()
+    lines = [f"{str(l.get('at', ''))[:16].replace('T', ' ')} · {l.get('text', '')}"
+             for l in ensure(state).get('ledger') or [] if str(l.get('at', ''))[:10] == key]
+    label = _page_label(day)
+    ensure(state)['open_page'] = {'label': label, 'day': key, 'lines': lines}
+    if not lines:
+        return (f'Opened the ledger on the counter to {label}. The page is blank. Nothing is written on it; '
+                'there is no entry for that.')
+    return f'Opened the ledger on the counter to {label}. The page reads: ' + ' | '.join(lines)
+
+
+def asks_page(text):
+    """He is asking to see or to have a ledger page written out. A price, a wage or a promise is not this."""
+    t = _plain(text)
+    if re.search(r'\bledger\b', t) and re.search(r'\b(read|see|show|write|written|copy|open|turn|look|line|page)\b', t):
+        return True
+    return bool(re.search(r'\bline\b', t) and re.search(r'\b(write|written|copy|page)\b', t))
 
 
 def _parse_money(text):
@@ -780,6 +906,10 @@ def counter_reply(state, text):
         parts.append(_prices_within(state, have))
     if asks_pay_before(text):
         parts.append('Work is paid when it is done. That has always been the rule.')
+    if asks_page(text):
+        page = read_page(state, text)
+        if page:
+            parts.append(page)
     reply = ' '.join(piece.strip() for piece in parts if piece)
     return reply or None
 
@@ -875,6 +1005,18 @@ def trade(state, mode, item, quantity, at):
         post['credit'] = round(post['credit'] + job['credit'], 2)
         text = f'Finished the posted job "{job["name"]}" and earned {money(job["credit"])}. In his purse: {money(post["credit"])}.'
     elif mode == 'ledger':
+        if str(item).strip().lower() == 'copy':
+            page = post.get('open_page') or {}
+            if not page:
+                return {'success': False, 'text': 'The ledger is shut. There is no page open to copy.'}
+            import notebook
+            body = '\n'.join(page.get('lines') or []) or 'The page is blank. Nothing is written on it.'
+            written = notebook.write(state, page.get('label') or 'ledger page', body, at if _moment(state, at) else (state.get('clock') or {}).get('iso', ''))
+            text = f"Copied the open page ({page.get('label', '')}) into his notebook, in the book's own words. {written['text']}"
+            return {'success': bool(written.get('success')), 'text': text, 'page': page.get('day')}
+        page = read_page(state, item, at)
+        if page:
+            return {'success': True, 'text': page}
         lines = ledger_lookup(state, item)
         if not lines:
             return {'success': True, 'text': f'Looked through the post\'s ledger for "{str(item)[:60]}": there is no entry for that.'}

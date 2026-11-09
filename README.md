@@ -2088,3 +2088,9 @@ A story he has already marked answered is no longer listed among the ones still 
 after the answer, so the next decision was shown it again. This does not close a question, keep a promise, or finish
 a plan, and it does not make him accept a figure. What he has already lived can still come back through ordinary
 recall, which reads his saved events and not the ledger. Test: tests/test_story.py.
+
+## v0.36.16 — the ledger page, and a world that varies
+
+There is no separate "Friday line" in the book. Each line is dated. Looking up the word Friday found nothing, and looking up sweep found the old sweep entries. Edda could only speak a short reply; she had no page to turn. The ledger is on the counter. Opening it to a day, or to a weekday such as Friday, shows every line written on that day, or that the page is blank. Copying the open page writes those words into his notebook. Nothing in that says what the lines mean, and it does not close a question or a promise.
+
+With one saved seed, some days are wet or dry against the plain calendar, and rain wets the beds. The number of days a crop takes to ripen is unchanged. Edda is away from the counter for part of some days; the book stays where it is, and buying and selling are as they were. The weekly delivery is sometimes a day or two late. On some days the deer are not on their usual round. None of this is written into how he feels. Test: tests/test_v03616.py.

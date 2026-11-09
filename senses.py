@@ -32,6 +32,22 @@ def _when(state):
     return dt, dt.timetuple().tm_yday, dt.hour + dt.minute / 60
 
 
+def world_seed(state):
+    """A saved seed for variation that is not fixed by the date alone. Absent means the old calendar."""
+    rolls = state.get('world_rolls')
+    if isinstance(rolls, dict) and isinstance(rolls.get('seed'), int):
+        return rolls['seed']
+    return None
+
+
+def roll(state, *parts):
+    """A reproducible roll for this life, or None when the life has no saved seed."""
+    seed = world_seed(state)
+    if seed is None:
+        return None
+    return _rng('life', seed, *parts)
+
+
 def weather(state):
     """The weather now: sky, rain, wind, mist, frost and temperature (degrees, kept to himself)."""
     dt, doy, hour = _when(state)
@@ -56,7 +72,27 @@ def weather(state):
     temp = seasonal + swing * math.cos(2 * math.pi * (hour - 15) / 24) + day.uniform(-3, 3) - (1 if raining else 0)
     mist = wind == 'still' and sky != 'overcast' and temp < 8 and (hour < 10 or hour > 20) and not raining
     frost = sky == 'clear' and temp < 1.5 and (hour < 10 or hour > 18) and not raining
-    return {'sky': sky, 'rain': raining, 'wind': wind, 'mist': mist, 'frost': frost, 'temp': round(temp, 1)}
+    out = {'sky': sky, 'rain': raining, 'wind': wind, 'mist': mist, 'frost': frost, 'temp': round(temp, 1)}
+    # v0.36.16: with a saved seed, some days are wet or dry against the calendar, in spells, still seasonal.
+    varied = roll(state, 'sky', dt.date().isoformat())
+    if varied is None:
+        return out
+    kind = varied.randrange(5)
+    if kind == 2 and not out['rain']:
+        start, length = varied.uniform(0, 18), varied.uniform(2, 6)
+        if (hour - start) % 24 < length:
+            out = dict(out)
+            out['rain'] = varied.choice(['drizzle', 'rain', 'rain', 'heavy rain'])
+            out['sky'] = 'overcast'
+            out['temp'] = round(out['temp'] - 1, 1)
+            out['frost'] = False
+            out['mist'] = False
+    elif kind >= 3 and out['rain']:
+        out = dict(out)
+        out['rain'] = None
+        out['sky'] = 'cloudy'
+        out['temp'] = round(out['temp'] + 1, 1)
+    return out
 
 
 def _warmth(t):
@@ -198,6 +234,9 @@ EDDA_BUSY = {(5, 9): 'stoking the stove and opening the shutters', (9, 12): 'wri
 
 
 def edda_line(state):
+    import town
+    if not town.keeper_here(state):
+        return 'The counter is unattended. The ledger lies on it, and Edda is not behind it.'
     _, _, hour = _when(state)
     busy = next(v for (a, b), v in EDDA_BUSY.items() if a <= hour < b)
     return f'{EDDA_LOOK}; she is {busy}.'
