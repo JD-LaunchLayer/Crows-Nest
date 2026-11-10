@@ -22,7 +22,7 @@ r=town.apply_proposal(s,fair,'t','d');assert r['success'] and s['possessions']['
 greedy={'kind':'buy_goods','item':'wood','quantity':6,'credit':5,'minutes':0,'task':''}
 assert not town.check_proposal(s,greedy,'d')[0];ok={**greedy,'credit':2.5};assert town.apply_proposal(s,ok,'t','d')['success'] and s['materials']==3
 assert not town.check_proposal(s,{**ok,'quantity':10},'d')[0], 'cannot sell goods he does not have'
-fav={'kind':'favour','item':'','quantity':1,'credit':3,'minutes':60,'task':'Patch the store-room roof'}
+fav={'kind':'favour','item':'','quantity':1,'credit':3,'minutes':60,'task':'Sweep the trading post'}
 assert town.apply_proposal(s,fav,'t','d')['success'] and s['keeper']['favours'][0]['id']=='favour-1' and 'favour-1' in town.board(s)['jobs']
 credit=s['trading']['credit'];assert town.trade(s,'job','favour-1',1,'t')['success'] and s['trading']['credit']==credit+3 and not s['keeper']['favours']
 gift={'kind':'gift','item':'','quantity':1,'credit':1,'minutes':0,'task':''}
