@@ -55,7 +55,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.36.16'
+APP_VERSION = '0.36.17'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -1371,7 +1371,8 @@ def wikipedia(query, question=''):
         return data
     result=api({'action':'query','list':'search','srsearch':query,'srlimit':5})
     hits=result.get('query',{}).get('search',[])
-    if not hits:raise ValueError('Wikipedia found no article for: '+query)
+    if not hits:  # v0.36.17: nothing matched is what he found, not a fault in the world
+        return {'unavailable':True,'query':query,'question':question,'reason':f'There is no article for "{query}".'}
     pageid=hits[0]['pageid']
     if question:
         candidates=[{'page_id':h['pageid'],'title':h['title'],'snippet':re.sub(r'<[^>]+>',' ',h.get('snippet',''))[:350]} for h in hits]
@@ -1385,7 +1386,8 @@ def wikipedia(query, question=''):
         if pageid not in [h['pageid'] for h in hits]:raise ValueError('Invalid Wikipedia candidate')
     result=api({'action':'query','pageids':pageid,'prop':'extracts|info','inprop':'url','explaintext':1,'exchars':7000})
     pages=result.get('query',{}).get('pages',[])
-    if not pages or not pages[0].get('extract'):raise ValueError('Wikipedia article has no readable text.')
+    if not pages or not pages[0].get('extract'):
+        return {'unavailable':True,'query':query,'question':question,'reason':'The article had no text to read.'}
     page=pages[0]
     return {'query':query,'title':page['title'],'url':page.get('fullurl','https://en.wikipedia.org/?curid='+str(pageid)),
             'text':page['extract'][:7000],'retrieved':now().isoformat()}
@@ -2099,13 +2101,9 @@ def loop():
             processing_started=time.monotonic()
         except Exception as exc:
             # A real fault is retried rather than stopping his life; repeated failure still pauses.
-            # A bad answer never reaches here.
+            # A search that finds nothing is not a fault, and a bad answer never reaches here.
             with LOCK:
-                runtime['failures']=runtime.get('failures',0)+1;state['last_error']=str(exc)[:300]
-                if runtime['failures']>=8:
-                    state['paused']=True;runtime.update(status='Paused after repeated problems — see the error below',generation=runtime['generation']+1,failures=0)
-                else:runtime['status']=f"Had trouble deciding ({runtime['failures']}); trying again…"
-                persist()
+                note_problem(exc)
             time.sleep(min(30,2*runtime.get('failures',1)))
         finally:
             with LOCK:
@@ -2116,6 +2114,18 @@ def loop():
             # Exclude model-call elapsed time from next physical tick; the next pending
             # activity has not started until its decision has been received.
             last=time.monotonic()
+
+
+def note_problem(exc):
+    """Count a real fault. Eight in a row pause him. A lookup that simply finds nothing does not come here."""
+    runtime['failures']=runtime.get('failures',0)+1
+    state['last_error']=str(exc)[:300]
+    if runtime['failures']>=8:
+        state['paused']=True
+        runtime.update(status='Paused after repeated problems — see the error below',generation=runtime['generation']+1,failures=0)
+    else:
+        runtime['status']=f"Had trouble deciding ({runtime['failures']}); trying again…"
+    persist()
 
 
 def update_report(**fields):
