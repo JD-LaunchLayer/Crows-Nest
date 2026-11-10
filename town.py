@@ -148,6 +148,18 @@ def ensure(state):
     post['seeds_added'] = True
     for k, v in STARTING_STOCK.items():  # new lines on the board for older saves (v0.23)
         post['stock'].setdefault(k, dict(v))
+    if not world.get('machine_added'):
+        # v0.36.18: the machine is part of the post, added once. Stock, the building and its other parts stay.
+        shop = world['objects'].get(POST)
+        if shop and not any(p.get('id') == 'machine_case' for p in shop.get('parts', [])):
+            shop['parts'] = list(shop.get('parts') or []) + [
+                _p('machine_case', 1.7, .75, -.2, .7, 1.5, .46, '#4a5560', 'box', 'stone'),
+                _p('machine_glass', 1.7, 1.0, .05, .5, .7, .02, '#b7dbe8', 'box', 'stone'),
+                _p('machine_slot', 1.7, .42, .06, .18, .05, .02, '#1c1c1c'),
+                _p('machine_tray', 1.7, .22, .16, .4, .08, .2, '#3a4046', 'box', 'stone')]
+            shop['revision'] = shop.get('revision', 0) + 1
+        world['machine_added'] = True
+        world['revision'] += 1
     if not world.get('sheet_music_added'):
         import music  # a shelf of sheet music in the reading cabin (v0.24)
         world['objects'].setdefault('sheet_music', {
@@ -262,6 +274,9 @@ KEEPER_PERSONA = ('You are Edda Thorne, keeper of the small trading post beside 
     'When he asks you plainly about work (a posted job, or a favour he has already agreed with you), answer him plainly in '
     'one or two sentences: whether it is there to be done today, what it pays, and that he can simply start it here at the '
     'post whenever he likes. Do not put him off or answer with something else, such as a seat by the stove, instead. '
+    'Shelf goods are sold by the machine at the counter, at the price labelled on it. You do not take that coin. '
+    'A posted job is written on the slate, and the box on the slate pays it when the work is done. You do not hand over that pay. '
+    'You still bargain, agree a favour, and give a gift when you choose to. '
     'You cannot feed him or give him drink yourself: there is no soup, tea or meal of yours to offer, and saying there is '
     'does not make it so. Food he can have is what is on your shelves, sold through a proposal at its price (you may haggle). '
     'He is welcome to warm himself by your stove while he is here. '
@@ -826,6 +841,26 @@ def asks_pay_before(text):
     return False
 
 
+def asking_prices(text):
+    """He is asking what is for sale, not only mentioning bread or coin while asking something else."""
+    t = _plain(text)
+    if re.search(r'\bcheap\w*\b', t):
+        return True
+    if re.search(r'\b(what|which|anything|any)\b', t) and re.search(r'\b(buy|afford|food|price|cost)\b', t):
+        return True
+    if re.search(r'\b(prices?|costs?|afford)\b', t) and re.search(r'\b(buy|food|bread|purse|shelf)\b', t):
+        return True
+    return False
+
+
+def about_work(text):
+    """He is asking about a job or its terms, not about what is for sale."""
+    t = _plain(text)
+    if re.search(r'\b(sweep\w*|crates?|posted job|the job)\b', t):
+        return True
+    return bool(re.search(r'\b(job|favour)\b', t) and re.search(r'\b(terms|pay|paid|wage|minutes|hours|work)\b', t))
+
+
 def asks_food(text):
     """He is asking about food on her shelves, not merely mentioning a meal."""
     t = _plain(text)
@@ -900,9 +935,11 @@ def counter_reply(state, text):
         if kp.get('ledger_told') != money(have):
             parts.append(f'My ledger shows {money(have)} in your purse, not {money(named)}.')
             kp['ledger_told'] = money(have)
-    if asks_food(text):
+    # A question about the work is not answered with the shelf. A question that also asks the price of food still is.
+    shelf = not about_work(text) or asking_prices(text)
+    if asks_food(text) and shelf:
         parts.append(_food_within(state, have))
-    if asks_shelf(text) or mismatch:
+    if (asks_shelf(text) or mismatch) and shelf:
         parts.append(_prices_within(state, have))
     if asks_pay_before(text):
         parts.append('Work is paid when it is done. That has always been the rule.')
@@ -949,12 +986,15 @@ def trade(state, mode, item, quantity, at):
         quantity = min(quantity, stock['qty'])
         cost = stock['price'] * quantity
         if post['credit'] + 1e-9 < cost:
-            return {'success': False, 'text': f'Not enough money: {stock["name"]} costs {money(cost)} and he has {money(post["credit"])}.'}
+            return {'success': False, 'text': f'He held the coins to the machine. It did not open. Not enough money: {stock["name"]} costs {money(cost)} and he has {money(post["credit"])}. The coins stayed in his purse.'}
         post['credit'] = round(post['credit'] - cost, 2)
         stock['qty'] = round(stock['qty'] - quantity, 2)
         _give(state, stock, quantity)
         unit = ' kg' if stock['effect'].split(':')[0] in ('materials', 'stone') else ''
-        text = f'Bought {quantity}{unit} × {stock["name"]} for {money(cost)}. Left in his purse: {money(post["credit"])}.'
+        _record(post, f'Bought {quantity}{unit} × {stock["name"]} for {money(cost)}. Left in his purse: {money(post["credit"])}.', at)
+        return {'success': True, 'text': (f'Coins for {money(cost)} went into the machine. {quantity}{unit} × {stock["name"]} '
+                f'came out into his hands. It returned what was over: {money(post["credit"])} left in his purse.'),
+                'credit': post['credit']}
     elif mode == 'sell':
         if item in SELL_RATES:
             key = 'materials' if item == 'wood' else 'stone'
@@ -1003,7 +1043,8 @@ def trade(state, mode, item, quantity, at):
             return {'success': False, 'text': f'The posted job "{job["name"]}" is not needed now: {why}.'}
         post.setdefault('jobs_done', {})[item] = at
         post['credit'] = round(post['credit'] + job['credit'], 2)
-        text = f'Finished the posted job "{job["name"]}" and earned {money(job["credit"])}. In his purse: {money(post["credit"])}.'
+        text = (f'Finished the posted job "{job["name"]}" from the slate. {money(job["credit"])} came out of the box on the board '
+                f'into his purse. In his purse: {money(post["credit"])}.')
     elif mode == 'ledger':
         if str(item).strip().lower() == 'copy':
             page = post.get('open_page') or {}
@@ -1059,6 +1100,24 @@ def sundial_reading(at, daylight):
     return f'The blade casts a shadow on the disc, lying near the {numerals[mark - 1]} mark.'
 
 
+def machine_labels(state):
+    """What is written on the machine: a name and a price, nothing else."""
+    post = ensure(state)
+    return [f'{item["name"]}, {money(item["price"])}' for item in post['stock'].values() if item.get('qty', 0) > 0]
+
+
+def slate_text(state):
+    """What is written on the slate: the work, how long it takes, what it pays, and whether it is there today."""
+    now = (state.get('clock') or {}).get('iso', '')
+    lines = []
+    for key, job in JOBS.items():
+        _, why = job_open(state, key, now)
+        lines.append(f'{job["name"]}: {job["minutes"]} minutes, pays {money(job["credit"])}; {why}.')
+    for favour in keeper(state)['favours']:
+        lines.append(f'Favour for Edda: {favour["task"]}: {favour["minutes"]} minutes, pays {money(favour["credit"])}.')
+    return ' '.join(lines) if lines else 'Nothing is posted.'
+
+
 def inspect(state, ident, at, daylight):
     """Physical details only. Returns None for objects without authored details."""
     obj = state['built_world']['objects'].get(ident)
@@ -1070,7 +1129,9 @@ def inspect(state, ident, at, daylight):
     if obj.get('dynamic') == 'shadow':
         details.append(sundial_reading(at, daylight))
     if ident == POST:
-        details.append('The board shows: ' + str(board(state)))
+        details.append('The slate shows: ' + slate_text(state))
+        labels = machine_labels(state)
+        details.append('The machine by the counter is labelled: ' + ('; '.join(labels) if labels else 'nothing is left in it.'))
     return {'success': True, 'text': f'Inspected the {obj["name"].lower()}. ' + ' '.join(details), 'findings': [{'about': ident, 'text': d} for d in details]}
 
 

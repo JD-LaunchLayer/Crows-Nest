@@ -2098,3 +2098,7 @@ With one saved seed, some days are wet or dry against the plain calendar, and ra
 ## v0.36.17 — a search that finds nothing is not a fault
 
 Looking something up and finding no article was raised as an error. Eight of those paused his life. A search with no article, or an article with no text to read, is now written down as what happened, and his life carries on. A network failure, an error from the site, or a broken answer still counts, and eight of those still pause him. Test: tests/test_v03617.py.
+
+## v0.36.18 — a machine and a slate
+
+Shelf goods come out of a machine at the post, at the price written on it. The coins go in, the thing comes out, and what is over stays in his purse. If the coins are short, the machine does not open. Posted jobs are on the slate. Finishing one pays once, from the box on the board, into his purse. Edda still talks, bargains, agrees a favour and gives a gift. A question about the work is not answered with the price of the bread. Test: tests/test_v03618.py.
