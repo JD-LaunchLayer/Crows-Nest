@@ -2106,3 +2106,7 @@ Shelf goods come out of a machine at the post, at the price written on it. The c
 ## v0.36.19 — a favour is posted work, and the book only records what happened
 
 A line is written in the trading-post book when something is bought, sold, paid or delivered. Edda cannot add a job's terms, or anything else, to a page. The day she is told for the weekly delivery includes a lateness already saved on the post, so it is the day the delivery actually waits for. A new favour is the sweep or the crates. Any other task is refused, in the same plain way as a price below the board. A favour already stored can still be done and paid. When six favours are open, another is refused and none of the six is dropped. Agreeing the sweep or the crates keeps a promise only when that promise is about that same work. Test: tests/test_v03619.py.
+
+## v0.36.20 — what was said, and the slate, can be remembered
+
+A talk was stored as one line that kept his opening and dropped what Edda replied. That reply is now its own recollection, as something he noticed already is. The slate sentence from an examination is kept whole, including its end. Inside the trading post, in the light, or in the dark with a lantern, a glance includes that same sentence. Nothing is added about whether the work is worth taking, and an open question of his is left open. Test: tests/test_v03620.py.

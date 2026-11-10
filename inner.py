@@ -256,7 +256,10 @@ def light(daylight, hour):
 
 
 def memory_line(item, now):
-    t, text, w = item.get('type', ''), clip(tidy(item.get('text', '')), 200), when(item.get('when', ''), now)
+    raw = str(item.get('text', ''))
+    # The slate is one sentence. The ordinary 200-character cut dropped the end of it.
+    text = tidy(raw) if raw.startswith('The slate shows:') else clip(tidy(raw), 200)
+    t, w = item.get('type', ''), when(item.get('when', ''), now)
     if t == 'event':
         line = f'I remember ({w}): {first_person(text)}'
         for a in item.get('around_it', []):
