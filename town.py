@@ -1113,15 +1113,21 @@ def machine_labels(state):
 
 
 def slate_text(state):
-    """What is written on the slate: the work, how long it takes, what it pays, and whether it is there today."""
+    """What is written on the slate: the work, how long it takes, what it pays, and whether it is there today.
+    Read-only: looking at it does not create her record."""
     now = (state.get('clock') or {}).get('iso', '')
     lines = []
     for key, job in JOBS.items():
         _, why = job_open(state, key, now)
         lines.append(f'{job["name"]}: {job["minutes"]} minutes, pays {money(job["credit"])}; {why}.')
-    for favour in keeper(state)['favours']:
+    for favour in (state.get('keeper') or {}).get('favours') or []:
         lines.append(f'Favour for Edda: {favour["task"]}: {favour["minutes"]} minutes, pays {money(favour["credit"])}.')
     return ' '.join(lines) if lines else 'Nothing is posted.'
+
+
+def slate_sentence(state):
+    """The one sentence an examination reads off the slate."""
+    return 'The slate shows: ' + slate_text(state)
 
 
 def inspect(state, ident, at, daylight):
@@ -1135,7 +1141,7 @@ def inspect(state, ident, at, daylight):
     if obj.get('dynamic') == 'shadow':
         details.append(sundial_reading(at, daylight))
     if ident == POST:
-        details.append('The slate shows: ' + slate_text(state))
+        details.append(slate_sentence(state))
         labels = machine_labels(state)
         details.append('The machine by the counter is labelled: ' + ('; '.join(labels) if labels else 'nothing is left in it.'))
     return {'success': True, 'text': f'Inspected the {obj["name"].lower()}. ' + ' '.join(details), 'findings': [{'about': ident, 'text': d} for d in details]}

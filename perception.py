@@ -256,6 +256,16 @@ def view(state, aperture=None, wide=False, want='', at=None, keep_far=False):
     return out
 
 
+def _slate_in_view(state):
+    """The slate sentence, when he is inside the post and can see it. Same light rule as an examination. Read-only."""
+    if state.get('location') != 'shop':
+        return None
+    if state.get('daylight', 1) < .12 and not (state.get('possessions') or {}).get('lantern'):
+        return None
+    import town
+    return town.slate_sentence(state)
+
+
 def lines(state, wide=False):
     """The few things he notices, each on a line, within his budget; then one line of gist. Read-only."""
     noticed = view(state, wide=wide)
@@ -269,6 +279,12 @@ def lines(state, wide=False):
             break
         out.append(line)
         used += len(line)
+    # Inside the trading post, in the light, the slate is in front of him: the same sentence an examination reads.
+    slate = _slate_in_view(state)
+    if slate and slate not in out:
+        while out and used + len(slate) + 1 > budget:
+            used -= len(out.pop())
+        out.append(slate)
     trees_far = getattr(view, 'far_trees', 0)
     if state.get('daylight', 1) < .12:
         gist = 'Beyond that it is too dark to make anything out.'
