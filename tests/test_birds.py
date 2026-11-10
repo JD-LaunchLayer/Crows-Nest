@@ -25,7 +25,7 @@ with tempfile.TemporaryDirectory() as td:
     assert ecology._negated('unrecorded plant past tree-56 and tree-21',len('unrecorded plant past '))
     s=app.decision_context()['supplies'];assert set(s)=={'ready_food_servings','in_the_provisions_chest','fruit_on_bushes_servings','spring_water_litres'}
     # Favours say how they are done; objects are described in words, not raw data.
-    import town;town.apply_proposal(st,{'kind':'favour','task':'Stack the firewood by the door','minutes':60,'credit':2},'t',1)
+    import town;town.apply_proposal(st,{'kind':'favour','task':'Sweep the trading post','minutes':60,'credit':2},'t',1)
     fav=app.decision_context()['people'][0]['open_favours'][0];assert 'trade, job favour-' in fav
     d={**app.DECISION_DEFAULTS,'action':'inspect','object_id':'workbench','intention':'look','reason':'r'}
     st['paused']=False;app.start_action(d,1);app.tick(60);ev=app.finish_action()['event'];assert 'fixed in place' in ev and not ev.startswith('Inspected {')
