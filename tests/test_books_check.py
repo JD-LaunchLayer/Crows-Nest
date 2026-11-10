@@ -12,7 +12,8 @@ with tempfile.TemporaryDirectory() as td:
     st['materials']=40
     t.trade(st,'sell','wood',3,at(13));t.trade(st,'job','sweep_post',1,at(14))
     t.trade(st,'buy',next(k for k,v in st['trading']['stock'].items() if v['price']<=3),1,at(15))
-    t.apply_proposal(st,{'kind':'favour','item':'','quantity':1,'credit':1.5,'minutes':30,'task':'Tie the kindling'},at(16),st['day'])
+    st['trading']['last_delivery'] = at(9)
+    t.apply_proposal(st,{'kind':'favour','item':'','quantity':1,'credit':1.5,'minutes':30,'task':'Carry the delivered crates into the store room'},at(16),st['day'])
     t.trade(st,'job',t.keeper(st)['favours'][-1]['id'],1,at(17))
     p=Path(td)/'save.json';p.write_text(json.dumps(st));before=p.read_text()
     run=lambda q:subprocess.run([sys.executable,str(ROOT/'tools/books_check.py'),q,'--save',str(p)],capture_output=True,text=True).stdout

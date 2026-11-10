@@ -268,6 +268,7 @@ KEEPER_PERSONA = ('You are Edda Thorne, keeper of the small trading post beside 
     'The ledger lies on the counter. When he names a day and asks to see that page, or to have it written out, you are '
     'given the page as it is, and you turn the book so he can read it. If the page is blank, say that it is blank. '
     'Do not add what the page means. '
+    'A line appears in the book only when something is bought, sold, paid or delivered, and you cannot write a job\'s terms, or anything else, onto a page. '
     'You are also told what your book shows the post owes HIM, if anything: goods you took from him and paid less than '
     'they were worth. That is a real debt of the post\'s; if he raises it, or you come to it going through those entries, '
     'say so plainly and you may pay it back with a make_good proposal. '
@@ -438,12 +439,15 @@ def check_proposal(state, p, day):
         if not 15 <= p['minutes'] <= 180 or not p['task'].strip():
             return False, 'a favour needs a task and 15–180 minutes'
         job = same_work(p['task'])
-        if job:
-            open_, why = job_open(state, job, (state.get('clock') or {}).get('iso', ''))
-            if not open_:
-                return False, f'that work is not needed now: {why}'
-            if any(same_work(f['task']) == job for f in keeper(state)['favours']):
-                return False, 'he has already agreed to do that work for her'
+        if not job:   # v0.36.19: a favour is the sweep or the crates. Anything else is not work the post has.
+            return False, 'that is not posted work at the post'
+        open_, why = job_open(state, job, (state.get('clock') or {}).get('iso', ''))
+        if not open_:
+            return False, f'that work is not needed now: {why}'
+        if any(same_work(f['task']) == job for f in keeper(state)['favours']):
+            return False, 'he has already agreed to do that work for her'
+        if len(keeper(state)['favours']) >= 6:   # v0.36.19: a full list stays as it is; nothing is dropped
+            return False, 'six favours are already agreed'
         if p['credit'] > p['minutes'] / 30 * 1.5 + 1e-9:
             return False, 'more pay than the post can give for that work'
         return True, ''
@@ -484,9 +488,9 @@ def apply_proposal(state, p, at, day):
     elif kind == 'favour':
         fav = {'id': f'favour-{kp["next_favour"]}', 'task': p['task'].strip()[:160], 'minutes': p['minutes'], 'credit': p['credit'], 'agreed': at}
         kp['next_favour'] += 1
-        kp['favours'] = (kp['favours'] + [fav])[-6:]
+        kp['favours'] = kp['favours'] + [fav]
         text = (f'Agreed a favour for Edda: "{fav["task"]}" ({fav["minutes"]} minutes, {money(fav["credit"])}). '
-                f'It is done by working at the trading post as job {fav["id"]}; whatever the work needs is there.')
+                f'It is done by working at the trading post as job {fav["id"]}.')
     elif kind == 'make_good':
         post['credit'] = round(post['credit'] + p['credit'], 2)
         post.setdefault('made_good', []).append({'at': at, 'credit': p['credit']})
@@ -538,10 +542,12 @@ def job_open(state, key, at):
 def next_delivery(state):
     """When the weekly delivery is due on Crow's calendar, in plain words (for Edda, who would know)."""
     from datetime import datetime, timedelta
-    last = state.get('trading', {}).get('last_delivery')
+    post = state.get('trading', {})
+    last = post.get('last_delivery')
     if not last:
         return 'not known yet'
-    due = datetime.fromisoformat(last) + timedelta(days=RESTOCK_DAYS)
+    late = int(post.get('delivery_late_days') or 0)  # v0.36.19: the day she names is the day the delivery waits for
+    due = datetime.fromisoformat(last) + timedelta(days=RESTOCK_DAYS + late)
     return due.strftime('%A %d %B, around %H:00')
 
 

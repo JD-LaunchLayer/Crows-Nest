@@ -258,7 +258,7 @@ def work_agreed(state, job, at):
             st.update(stage='answered', ended=at, ended_by=f'he agreed {names.get(job, "the work")} with Edda')
     for p in state.get('promises', []):
         t = p['text'].lower()
-        if p['status'] == 'open' and any(w in t for w in ('terms', 'answer', 'before i agree')) and (town.same_work(t) in (job, None)):
+        if p['status'] == 'open' and any(w in t for w in ('terms', 'answer', 'before i agree')) and town.same_work(t) == job:
             p.update(status='kept (he gave his answer)', kept_at=at)
 
 

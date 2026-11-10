@@ -2102,3 +2102,7 @@ Looking something up and finding no article was raised as an error. Eight of tho
 ## v0.36.18 — a machine and a slate
 
 Shelf goods come out of a machine at the post, at the price written on it. The coins go in, the thing comes out, and what is over stays in his purse. If the coins are short, the machine does not open. Posted jobs are on the slate. Finishing one pays once, from the box on the board, into his purse. Edda still talks, bargains, agrees a favour and gives a gift. A question about the work is not answered with the price of the bread. Test: tests/test_v03618.py.
+
+## v0.36.19 — a favour is posted work, and the book only records what happened
+
+A line is written in the trading-post book when something is bought, sold, paid or delivered. Edda cannot add a job's terms, or anything else, to a page. The day she is told for the weekly delivery includes a lateness already saved on the post, so it is the day the delivery actually waits for. A new favour is the sweep or the crates. Any other task is refused, in the same plain way as a price below the board. A favour already stored can still be done and paid. When six favours are open, another is refused and none of the six is dropped. Agreeing the sweep or the crates keeps a promise only when that promise is about that same work. Test: tests/test_v03619.py.
