@@ -2094,3 +2094,7 @@ recall, which reads his saved events and not the ledger. Test: tests/test_story.
 There is no separate "Friday line" in the book. Each line is dated. Looking up the word Friday found nothing, and looking up sweep found the old sweep entries. Edda could only speak a short reply; she had no page to turn. The ledger is on the counter. Opening it to a day, or to a weekday such as Friday, shows every line written on that day, or that the page is blank. Copying the open page writes those words into his notebook. Nothing in that says what the lines mean, and it does not close a question or a promise.
 
 With one saved seed, some days are wet or dry against the plain calendar, and rain wets the beds. The number of days a crop takes to ripen is unchanged. Edda is away from the counter for part of some days; the book stays where it is, and buying and selling are as they were. The weekly delivery is sometimes a day or two late. On some days the deer are not on their usual round. None of this is written into how he feels. Test: tests/test_v03616.py.
+
+## v0.36.17 — a search that finds nothing is not a fault
+
+Looking something up and finding no article was raised as an error. Eight of those paused his life. A search with no article, or an article with no text to read, is now written down as what happened, and his life carries on. A network failure, an error from the site, or a broken answer still counts, and eight of those still pause him. Test: tests/test_v03617.py.
