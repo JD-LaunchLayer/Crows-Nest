@@ -42,6 +42,14 @@ def _short(text, limit):
     return text if len(text) <= limit else text[:limit - 1] + '…'
 
 
+def _recollection(text):
+    """One thing he noticed or was told, on its own. The slate is a single sentence and is kept whole."""
+    text = ' '.join(str(text or '').split())
+    if text.startswith('The slate shows:'):
+        return text
+    return _short(text, 200)
+
+
 # Where each kind of activity happens, so a place can bring back what happened there (v0.29).
 PLACE = {'rest': 'cabin', 'sleep': 'cabin', 'eat': 'cabin', 'drink': 'spring', 'reflect': 'cabin', 'play_music': 'cabin',
          'butcher': 'cabin', 'preserve': 'cabin', 'practise': 'range', 'explore': 'woods', 'observe': 'woods', 'gather': 'woods',
@@ -73,8 +81,18 @@ def candidates(state):
         found = (m.get('world_result') or {}).get('findings') or []
         for f in found:  # each thing he actually noticed is recallable on its own
             items.append({'type': 'observed', 'id': m.get('id'), 'order': m.get('id') or 0,
-                          'text': _short(f.get('text'), 200), 'why': _short(m.get('intention'), 100),
-                          'when': m.get('at', '')[:16], 'importance': .2})
+                          'text': _recollection(f.get('text')), 'why': _short(m.get('intention'), 100),
+                          'when': m.get('at', '')[:16], 'importance': .2, 'place': PLACE.get(m.get('action'))})
+        for said in (m.get('world_result') or {}).get('conversation') or []:
+            # v0.36.20: what Edda actually said is its own recollection. The event line keeps only his opening.
+            if said.get('who') != 'Edda':
+                continue
+            text = _recollection(said.get('text'))
+            if not text:
+                continue
+            items.append({'type': 'observed', 'id': m.get('id'), 'order': m.get('id') or 0,
+                          'text': text, 'why': _short(m.get('intention'), 100),
+                          'when': m.get('at', '')[:16], 'importance': .2, 'place': PLACE.get(m.get('action'))})
     for x in state.get('long_term', []):
         items.append({'type': 'lesson', 'id': x.get('source_id'), 'order': x.get('source_id') or 0,
                       'text': _short(x.get('interpretation'), 220), 'why': _short(x.get('fact'), 120),

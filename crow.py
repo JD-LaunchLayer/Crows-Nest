@@ -55,7 +55,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.36.19'
+APP_VERSION = '0.36.20'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -773,6 +773,7 @@ def decision_context():
     recent=[m for m in state['memories'] if m.get('kind') not in ('started','consolidated') and not m.get('stand_in')][-(10 if WIDE else 4):]
     memory=memory_recall.recall(state,MEMORY_BUDGET,exclude_ids=[m['id'] for m in recent],limit=RECALL_LIMIT)
     near=world_state.nearby(state)
+    around=perception.lines(state,WIDE)
     # v0.27: no 'night' label; he has the time and the light. (v0.30: the location key had been swallowed by this comment.)
     context={'clock':{k:state['clock'][k] for k in ['date','time']},'location':state['location'],
         'body':life.perceive(state)['sensations'],
@@ -800,13 +801,18 @@ def decision_context():
                    'open_favours':[f"{f['id']}: {f['task']} ({f['minutes']} min, pays {town.money(f['credit'])}). "
                                    f"Done by working at the trading post: trade, job {f['id']}." for f in town.keeper(state)['favours']]}],
         # v0.35.0: what he can actually make out from where he stands (lit windows after dark included), in plain words.
-        'around_me':perception.lines(state,WIDE),
+        # v0.36.20: kept aside so the slate sentence is not cut to 180 characters with everything else.
+        'around_me':around,
         # v0.36.0: what comes back to him about places, on cue, and what he has just noticed is not as he remembered.
         'comes_back_to_me':mind_map.recall(state,WIDE),'not_as_i_remembered':mind_map.changes(state)}
     context=compact(context)
     # Recent events are what just happened to him: give them room (180 characters cut most observations
     # to their first finding and hid any closing statement). The budget below still trims if needed.
     context['recent_events']=[{k:m.get(k) for k in ['id','time']}|{'event':cut(str(m.get('event','')),700 if WIDE else 320)} for m in recent]
+    context['around_me']=around
+    for item, orig in zip(context.get('relevant_memories') or [], memory):
+        if str(orig.get('text', '')).startswith('The slate shows:'):
+            item['text'] = orig['text']
     return fit(context,CONTEXT_BUDGET,['your_field_notebook','comes_back_to_me','around_me','interests','wishes','self_notes','research','projects','paused_work','patterns_in_your_record','left_open','held_most_strongly','your_ongoing_stories','recent_events','relevant_memories'])
 
 
