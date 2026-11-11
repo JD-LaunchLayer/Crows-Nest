@@ -55,7 +55,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.36.20'
+APP_VERSION = '0.36.21'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -973,7 +973,7 @@ def parameter_request(d):
                 {'harp':music.context(state),'body':life.perceive(state)['sensations']})
     if a=='notebook':
         return ('notebook_mode write: note_title and note_text are what you write, in your own words (one line per line). '
-                'notebook_mode read: note_query is a word or a day (such as 12-03) to look for, or empty for the latest pages.',
+                'notebook_mode read: note_query is a word, a day (such as 12-03), or a page number to look for, or empty for the latest pages.',
                 {'notebook_mode':{'type':'string','enum':['write','read']},'note_title':STRING,'note_text':STRING,'note_query':STRING},
                 {'your_notebook':notebook.summary(state)})
     if a=='hunt':

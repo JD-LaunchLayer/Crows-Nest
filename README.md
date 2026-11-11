@@ -2110,3 +2110,7 @@ A line is written in the trading-post book when something is bought, sold, paid 
 ## v0.36.20 — what was said, and the slate, can be remembered
 
 A talk was stored as one line that kept his opening and dropped what Edda replied. That reply is now its own recollection, as something he noticed already is. The slate sentence from an examination is kept whole, including its end. Inside the trading post, in the light, or in the dark with a lantern, a glance includes that same sentence. Nothing is added about whether the work is worth taking, and an open question of his is left open. Test: tests/test_v03620.py.
+
+## v0.36.21 — a notebook page can be read back by number
+
+Writing a page, and reading one back, already names its number. Asking for that number now opens the page: "69", "70", "page 69", or "pages 69 and 70". A number that is not a page is said plainly, with how many pages he has written. A word, a day such as 12-03, an empty opening, and a phrase such as "1 gold" are looked up as before. Pages already in a save are left as they are. Test: tests/test_v03621.py.
