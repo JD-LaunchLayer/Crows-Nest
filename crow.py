@@ -55,7 +55,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.36.21'
+APP_VERSION = '0.36.22'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -1988,8 +1988,8 @@ def talk_session(opening, hope):
                 'already_told_him_that_purse_figure':told,'what_you_remember':kp['notes'][-10:],
                 'open_favours':kp['favours'],'next_delivery_due':town.next_delivery(state),'what_your_book_shows_the_post_owes_him':town.post_owes(state),
                 'your_ledger_for_days_he_mentions':{q:town.ledger_lookup(state,q,20) or ['(no entries that day)'] for q in town.days_mentioned(' '.join(c['text'] for c in convo if c['who']=='Crow'),now().date())},
-                'your_ledger_last_three_days':[f"{str(l.get('at',''))[:16].replace('T',' ')} · {l['text']}" for l in state['trading']['ledger'] if str(l.get('at',''))[:10]>=(now()-timedelta(days=3)).date().isoformat()][-30:],'what_your_goods_are_for':town.ITEM_KNOWLEDGE,'conversation':convo},ensure_ascii=False),keeper_schema,350,'keeper',system=town.KEEPER_PERSONA)
-            reply=' '.join(str(last.get('reply','')).split())[:400]
+                'your_ledger_last_three_days':[f"{str(l.get('at',''))[:16].replace('T',' ')} · {l['text']}" for l in state['trading']['ledger'] if str(l.get('at',''))[:10]>=(now()-timedelta(days=3)).date().isoformat()][-30:],'what_your_goods_are_for':town.ITEM_KNOWLEDGE,'the_request_book':town.request_book(state),'conversation':convo},ensure_ascii=False),keeper_schema,600,'keeper',system=town.KEEPER_PERSONA)
+            reply=town.whole_sentences(last.get('reply',''),900)   # v0.36.22: never cut her off mid-sentence
             convo.append({'who':'Edda','text':reply})
             prop=last.get('proposal') or {'kind':'none'}
             with LOCK:ok,why=town.check_proposal(state,prop,day)

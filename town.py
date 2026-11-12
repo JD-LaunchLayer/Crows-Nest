@@ -268,6 +268,9 @@ KEEPER_PERSONA = ('You are Edda Thorne, keeper of the small trading post beside 
     'The ledger lies on the counter. When he names a day and asks to see that page, or to have it written out, you are '
     'given the page as it is, and you turn the book so he can read it. If the page is blank, say that it is blank. '
     'Do not add what the page means. '
+    'The request book is a different book: it holds only the notes he has written in it himself, which you are given as they '
+    'stand. If he asks to see an entry, read him the matching notes word for word, or say plainly that there is none; no deal, '
+    'price or terms are ever kept in it. When you read him lines, read each one whole, not part of it. '
     'A line appears in the book only when something is bought, sold, paid or delivered, and you cannot write a job\'s terms, or anything else, onto a page. '
     'You are also told what your book shows the post owes HIM, if anything: goods you took from him and paid less than '
     'they were worth. That is a real debt of the post\'s; if he raises it, or you come to it going through those entries, '
@@ -597,6 +600,24 @@ def _day_key(state):
         return datetime.fromisoformat(state['clock']['iso']).date().isoformat()
     except (KeyError, TypeError, ValueError):
         return ''
+
+
+def whole_sentences(text, limit=900):
+    """v0.36.22: what Edda says, kept to whole sentences. Before, her replies were cut at 400 characters, so when she
+    read him several lines of her book she stopped mid-sentence and he heard only fragments."""
+    t = ' '.join(str(text or '').split())
+    if len(t) <= limit:
+        return t
+    cut = t[:limit]
+    end = max(cut.rfind(x) for x in ('. ', '? ', '! ', '." ', '?" ', '!" '))
+    return cut[:end + 1].rstrip() if end > limit // 3 else cut.rsplit(' ', 1)[0] + '…'
+
+
+def request_book(state, limit=12):
+    """v0.36.22: the request book as it stands, so Edda can read it to him when he asks: only what he wrote in it."""
+    reqs = (state.get('trading') or {}).get('requests', [])[-limit:]
+    return [f"{str(r.get('first', ''))[:10]}: \"{r.get('item', '')}\"" + (f" (written {r['times']} times)" if r.get('times', 1) > 1 else '')
+            for r in reqs] or ['(the book is empty)']
 
 
 def ledger_lookup(state, query, limit=15):
