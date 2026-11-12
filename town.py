@@ -880,6 +880,16 @@ def asking_prices(text):
     return False
 
 
+def asks_terms(text):
+    """v0.36.23: he asks to have the posted work's terms read or shown to him in full. Before, Edda answered from memory,
+    in her own summary, and after a few times told him she would not go over them again, so he never heard the slate's
+    own words and kept asking. The slate is short; she reads it as written."""
+    t = _plain(text)
+    if not re.search(r'\b(terms|slate|posted (?:food )?work|posted jobs?)\b', t):
+        return False
+    return bool(re.search(r'\b(read|aloud|written|in full|whole|every|word for word|term by term|start to finish|show)\b', t))
+
+
 def about_work(text):
     """He is asking about a job or its terms, not about what is for sale."""
     t = _plain(text)
@@ -970,6 +980,8 @@ def counter_reply(state, text):
         parts.append(_prices_within(state, have))
     if asks_pay_before(text):
         parts.append('Work is paid when it is done. That has always been the rule.')
+    if asks_terms(text):   # v0.36.23: the posted terms, read off the slate word for word, are all there is
+        parts.append('The slate reads: ' + slate_text(state) + ' That is everything written on it; there are no other terms.')
     if asks_page(text):
         page = read_page(state, text)
         if page:
