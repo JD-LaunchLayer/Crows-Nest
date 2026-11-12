@@ -124,6 +124,29 @@ def look(b):
     return f'Bed {b["n"]}: {plants}; soil {soil}; {weeds}.'
 
 
+def close_look(state, ident):
+    """v0.36.24: kneeling by a bed and looking closely: what is in it and the feel of the soil. Before, a bed could not be
+    examined at all ("that world object does not exist"), so he could not find out up close what was left in one."""
+    try:
+        n = int(str(ident).rsplit('_', 1)[-1])
+    except ValueError:
+        return None
+    b = next((x for x in ensure(state)['beds'] if x['n'] == n), None)
+    if b is None:
+        return None
+    name = CROPS.get(b.get('item', 'seeds'), CROPS['seeds'])[0]
+    st = stage(b)
+    close = {'empty': 'Nothing is growing in it; there are no roots or leaves left in the soil.',
+             'withered': f'The {name} are dead through, roots and leaves; there is nothing in them to eat.',
+             'sown': 'No shoots have broken the surface yet.',
+             'sprouting': f'The {name} shoots are small and tender; nothing is ready to eat yet.',
+             'growing': f'The {name} are growing but not ready to pick.',
+             'ripe': f'The {name} are ready to pick.'}[st]
+    wet = 'Water stands on the surface.' if b['moisture'] > .85 else 'The soil is wet in the hand.' if b['moisture'] > .7 \
+        else 'The soil is damp in the hand and drains.' if b['moisture'] > .3 else 'The soil is dry to the touch.'
+    return {'success': True, 'text': f'Knelt by bed {n} and looked closely. ' + look(b) + ' ' + close + ' ' + wet}
+
+
 def summary(state):
     return [look(b) for b in ensure(state)['beds']]
 

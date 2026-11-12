@@ -55,7 +55,7 @@ PUBLIC = False  # --public: anyone may watch (read-only); only the owner's token
 RESTART_TOKEN = os.environ.pop('CROW_RESTART_TOKEN','')
 RESTART_RESUME = os.environ.pop('CROW_UPDATE_RESUME','')
 UPDATE_LOCK = threading.Lock()
-APP_VERSION = '0.36.23'
+APP_VERSION = '0.36.24'
 MODEL = os.environ.get('CROW_MODEL', 'qwen3:4b')
 NUM_CTX = int(os.environ.get('CROW_NUM_CTX', '4096'))
 TZ = ZoneInfo('Europe/London')
@@ -910,7 +910,9 @@ def parameter_request(d):
                                               'tree','plant','ground','target','water','carving','workpiece','heap','fire'},limit=20)
         own={'my axe':'axe','my carving knife':'carving_knife','my purse':'purse',
              **{'my '+k.replace('_',' '):k for k,v in state.get('possessions',{}).items() if v}}
-        handles={**seen,**own}
+        # v0.36.24: at the garden, his beds can be knelt by and looked at closely, as he names them.
+        beds={f'garden bed {b["n"]}':f'garden_bed_{b["n"]}' for b in garden.ensure(state)['beds']} if state.get('location')=='garden' else {}
+        handles={**seen,**beds,**own}
         return ('Choose something to examine closely: something you can see from here, or something of your own.',
                 {'object_id':{'type':'string','enum':list(handles)}},
                 {'in_sight':list(seen)[:10],'__handles__':handles})
@@ -1486,6 +1488,8 @@ def finish_action(geometry=None):
             inside=foods.view(state)
             living={'success':True,'text':'Opened the provisions chest and counted what is inside: '+
                     ('; '.join(f'{v:g} serving{"s" if v!=1 else ""} of {k}' for k,v in inside.items()) if inside else 'it is empty')+'.'}
+        elif ident.startswith('garden_bed_'):  # v0.36.24: knelt by a bed and looked closely
+            living=garden.close_look(state,ident)
         elif ident in town.TOOLS:
             living={'success':True,'text':'Inspected the '+ident.replace('_',' ')+'. '+life.tool_feel(state,ident)}
         elif state.get('possessions',{}).get(ident):
